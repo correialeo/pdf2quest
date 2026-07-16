@@ -1,0 +1,5 @@
+target/
+concursos.db
+*.class
+.idea/
+*.iml
