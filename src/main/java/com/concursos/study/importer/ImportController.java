@@ -45,4 +45,33 @@ public class ImportController {
         model.addAttribute("job", job);
         return "import-result";
     }
+
+    @GetMapping("/import/gabarito")
+    public String gabaritoForm(Model model) {
+        model.addAttribute("jobs", importJobRepository.findAllByOrderByStartedAtDesc());
+        return "import-gabarito";
+    }
+
+    @PostMapping("/import/gabarito")
+    public String gabaritoUpload(@RequestParam("file") MultipartFile file,
+                                  @RequestParam("titulo") String titulo,
+                                  @RequestParam("importJobId") Long importJobId,
+                                  RedirectAttributes redirectAttributes) {
+        if (file.isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", "Selecione um arquivo PDF de gabarito.");
+            return "redirect:/import/gabarito";
+        }
+        GabaritoLinkResult result = importService.linkGabarito(file, titulo, importJobId);
+        redirectAttributes.addFlashAttribute("result", result);
+        redirectAttributes.addFlashAttribute("titulo", titulo);
+        return "redirect:/import/gabarito/resultado";
+    }
+
+    @GetMapping("/import/gabarito/resultado")
+    public String gabaritoResult(Model model) {
+        if (!model.containsAttribute("result")) {
+            return "redirect:/import/gabarito";
+        }
+        return "import-gabarito-resultado";
+    }
 }

@@ -44,6 +44,9 @@ public class Question {
     /** Numero da questao na prova original (para manter/reproduzir a ordem do PDF). */
     private Integer questionNumber;
 
+    /** ImportJob que originou esta questao (usado para linkar o gabarito correto). */
+    private Long importJobId;
+
     @Lob
     private String explanation;
 

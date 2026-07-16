@@ -60,4 +60,6 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findErrorNotebook();
 
     long countBySubject(String subject);
+
+    List<Question> findByImportJobId(Long importJobId);
 }

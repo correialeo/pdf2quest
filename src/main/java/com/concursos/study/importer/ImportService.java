@@ -10,7 +10,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,6 +21,7 @@ public class ImportService {
     private final QuestionRepository questionRepository;
     private final ImportJobRepository importJobRepository;
     private final PdfQuestionParser parser = new PdfQuestionParser();
+    private final GabaritoParser gabaritoParser = new GabaritoParser();
 
     public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository) {
         this.questionRepository = questionRepository;
@@ -49,12 +52,7 @@ public class ImportService {
         String organization = hasText(organizationOverride) ? organizationOverride : result.organization();
         Integer year = yearOverride != null ? yearOverride : result.year();
 
-        List<Question> toSave = result.questions().stream()
-                .map(pq -> toQuestion(pq, organization, year, examOverride, file.getOriginalFilename()))
-                .collect(Collectors.toList());
-        questionRepository.saveAll(toSave);
-
-        job.setImportedQuestions(toSave.size());
+        job.setImportedQuestions(0);
         job.setFailedQuestions(result.failures().size());
         job.setErrorLog(result.failures().stream()
                 .map(f -> "Questao " + f.number() + ": " + f.reason())
@@ -62,10 +60,19 @@ public class ImportService {
         job.setDetectedOrganization(result.organization());
         job.setDetectedYear(result.year());
         job.setFinishedAt(LocalDateTime.now());
-        return importJobRepository.save(job);
+        ImportJob savedJob = importJobRepository.save(job);
+
+        List<Question> toSave = result.questions().stream()
+                .map(pq -> toQuestion(pq, organization, year, examOverride, file.getOriginalFilename(), savedJob.getId()))
+                .collect(Collectors.toList());
+        questionRepository.saveAll(toSave);
+
+        savedJob.setImportedQuestions(toSave.size());
+        return importJobRepository.save(savedJob);
     }
 
-    private Question toQuestion(ParsedQuestion pq, String organization, Integer year, String exam, String source) {
+    private Question toQuestion(ParsedQuestion pq, String organization, Integer year, String exam, String source,
+                                 Long importJobId) {
         Question q = new Question();
         q.setStatement(pq.statement());
         q.setAlternativeA(pq.alternativeA());
@@ -81,7 +88,44 @@ public class ImportService {
         q.setYear(year);
         q.setExam(exam);
         q.setSource(source);
+        q.setImportJobId(importJobId);
         return q;
+    }
+
+    public GabaritoLinkResult linkGabarito(MultipartFile file, String titulo, Long importJobId) {
+        String text;
+        try {
+            byte[] bytes = file.getBytes();
+            try (PDDocument document = Loader.loadPDF(bytes)) {
+                text = new PDFTextStripper().getText(document);
+            }
+        } catch (IOException e) {
+            return new GabaritoLinkResult(0, 0, 0, List.of(), "Falha ao ler o PDF: " + e.getMessage());
+        }
+
+        Map<Integer, String> answers = gabaritoParser.parse(text, titulo);
+        if (answers.isEmpty()) {
+            return new GabaritoLinkResult(0, 0, 0, List.of(),
+                    "Titulo nao encontrado no PDF de gabarito: " + titulo);
+        }
+
+        List<Question> questions = questionRepository.findByImportJobId(importJobId);
+
+        int matched = 0;
+        List<Integer> unmatched = new ArrayList<>();
+        for (Question q : questions) {
+            Integer number = q.getQuestionNumber();
+            String letter = number != null ? answers.get(number) : null;
+            if (letter != null) {
+                q.setCorrectAnswer(letter);
+                matched++;
+            } else {
+                unmatched.add(number);
+            }
+        }
+        questionRepository.saveAll(questions);
+
+        return new GabaritoLinkResult(matched, answers.size(), questions.size(), unmatched, null);
     }
 
     private boolean hasText(String s) {
