@@ -125,4 +125,94 @@ class PdfQuestionParserTest {
         assertNull(result.organization());
         assertNull(result.year());
     }
+
+    @Test
+    void textoDeApoioComNomeProprioNaoViraDisciplinaNemPoluiAlternativa() {
+        String texto = """
+                CONHECIMENTOS GERAIS
+
+                LINGUA INGLESA
+
+                18 - Question about the guide
+                A) Alternative A
+                B) Alternative B
+                C) Alternative C
+                D) Alternative D
+                E) Alternative E
+                Use the following TEXT to answer the next two questions.
+                It's not often we write about printers, but this one is different.
+                It prints up to 20 pages per minute from any PC.
+                Louis Ramirez
+                http://example.com/
+
+                19 - What does the pronoun refer to
+                A) the printer
+                B) the PC
+                C) the review
+                D) the guide
+                E) the manual
+                """;
+
+        ParseResult result = parser.parse(texto);
+
+        assertEquals(2, result.questions().size());
+
+        ParsedQuestion q18 = result.questions().get(0);
+        assertEquals("Lingua Inglesa", q18.subject());
+        assertEquals("Alternative E", q18.alternativeE());
+
+        ParsedQuestion q19 = result.questions().get(1);
+        assertEquals("Lingua Inglesa", q19.subject());
+    }
+
+    @Test
+    void conhecimentosEspecificosSemCabecalhoNaoHerdaDisciplinaDosConhecimentosGerais() {
+        String texto = """
+                CONHECIMENTOS GERAIS
+
+                DIREITO CONSTITUCIONAL
+
+                1 - Pergunta de direito constitucional
+                A) Alternativa A
+                B) Alternativa B
+                C) Alternativa C
+
+                CONHECIMENTOS ESPECIFICOS
+
+                2 - Pergunta especifica sem cabecalho de disciplina
+                A) Alternativa A
+                B) Alternativa B
+                C) Alternativa C
+                """;
+
+        ParseResult result = parser.parse(texto);
+
+        ParsedQuestion q1 = result.questions().get(0);
+        assertEquals("Direito Constitucional", q1.subject());
+        assertEquals(QuestionCategory.GERAL, q1.category());
+
+        ParsedQuestion q2 = result.questions().get(1);
+        assertNull(q2.subject());
+        assertEquals(QuestionCategory.ESPECIFICO, q2.category());
+    }
+
+    @Test
+    void tituloDeDisciplinaComPreposicaoMantemMinusculaExcetoNoInicio() {
+        String texto = """
+                CONHECIMENTOS GERAIS
+
+                LEGISLACAO ACERCA DE SEGURANCA DA
+                INFORMACAO E PROTECAO DE DADOS
+
+                1 - Pergunta qualquer
+                A) Alternativa A
+                B) Alternativa B
+                C) Alternativa C
+                """;
+
+        ParseResult result = parser.parse(texto);
+
+        assertEquals("Legislacao Acerca de Seguranca da Informacao e Protecao de Dados",
+                result.questions().get(0).subject());
+    }
 }

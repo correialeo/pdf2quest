@@ -50,6 +50,13 @@ public class PdfQuestionParser {
 
     private static final Pattern YEAR = Pattern.compile("(19|20)\\d{2}");
 
+    // Frases de instrucao que introduzem um texto de apoio (interpretacao de
+    // texto, comum em Lingua Inglesa/Portuguesa), ex.: "Use the following TEXT
+    // to answer the next six questions." Nada depois delas pertence a questao
+    // anterior - servem de fronteira de bloco, igual GABARITO/CONHECIMENTOS.
+    private static final Pattern READING_PASSAGE_CUE = Pattern.compile(
+            "(?i)^(use|read|utilize|leia|considere|analise|observe)\\b.*\\btext[oe]?s?\\b.*\\b(quest(\\u00e3|a)o|question)");
+
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
         String organization = detectOrganization(text);
@@ -73,6 +80,12 @@ public class PdfQuestionParser {
         // Depois disso, so abre um novo bloco se o numero continuar a sequencia,
         // evitando que um numero solto qualquer (pagina, item de lista) vire questao.
         int expectedNumber = -1;
+        // Fica true assim que um texto corrido comum (nao cabecalho) aparece depois
+        // do ultimo ponto de corte conhecido (troca de categoria ou inicio de bloco).
+        // Um titulo de disciplina legitimo so aparece bem no comeco desse intervalo,
+        // antes de qualquer texto de apoio - depois disso, linhas curtas que parecem
+        // cabecalho sao nome de autor/citacao dentro do texto (comum em Ingles).
+        boolean gapHasBodyText = false;
 
         for (String rawLine : text.split("\n", -1)) {
             String line = rawLine.trim();
@@ -98,16 +111,50 @@ public class PdfQuestionParser {
                     continue;
                 }
                 if (upper.contains("CONHECIMENTOS") && upper.contains("GERA")) {
-                    currentSubject = commitPendingSubject(pendingSubjectLines, currentSubject);
+                    if (blockLines != null) {
+                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                        blockLines = null;
+                    }
+                    pendingSubjectLines.clear();
+                    currentSubject = null;
                     currentCategory = QuestionCategory.GERAL;
+                    gapHasBodyText = false;
                     continue;
                 }
                 if (upper.contains("CONHECIMENTOS") && upper.contains("ESPEC")) {
-                    currentSubject = commitPendingSubject(pendingSubjectLines, currentSubject);
+                    if (blockLines != null) {
+                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                        blockLines = null;
+                    }
+                    pendingSubjectLines.clear();
+                    currentSubject = null;
                     currentCategory = QuestionCategory.ESPECIFICO;
+                    gapHasBodyText = false;
                     continue;
                 }
-                pendingSubjectLines.add(line);
+                if (!gapHasBodyText) {
+                    // Titulo de disciplina legitimo: fecha o bloco anterior (se houver)
+                    // para o texto de apoio que vem a seguir nao grudar na ultima
+                    // alternativa dele.
+                    if (blockLines != null) {
+                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                        blockLines = null;
+                    }
+                    pendingSubjectLines.add(line);
+                }
+                // Senao: parece cabecalho mas veio depois de texto corrido ja ter
+                // comecado nesse intervalo - trata como parte do texto de apoio (ignora).
+                continue;
+            }
+            if (READING_PASSAGE_CUE.matcher(line).find()) {
+                if (blockLines != null) {
+                    flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                    blockLines = null;
+                }
+                // Essa frase ja anuncia que um texto de apoio comeca agora - nada
+                // depois dela (nem o titulo do texto) deve ser lido como titulo de
+                // disciplina, entao marca o "gap" como se ja tivesse corpo de texto.
+                gapHasBodyText = true;
                 continue;
             }
             currentSubject = commitPendingSubject(pendingSubjectLines, currentSubject);
@@ -132,6 +179,7 @@ public class PdfQuestionParser {
                 blockSubject = currentSubject;
                 blockCategory = currentCategory;
                 blockLines = new ArrayList<>();
+                gapHasBodyText = false;
                 if (!remainder.isBlank()) {
                     blockLines.add(remainder);
                 }
@@ -140,6 +188,8 @@ public class PdfQuestionParser {
 
             if (blockLines != null) {
                 blockLines.add(line);
+            } else if (!line.isBlank()) {
+                gapHasBodyText = true;
             }
         }
         if (blockLines != null) {
@@ -259,6 +309,7 @@ public class PdfQuestionParser {
     private String toTitleCase(String line) {
         String[] words = line.toLowerCase(Locale.ROOT).split("\\s+");
         StringBuilder sb = new StringBuilder();
+        boolean isFirstWord = true;
         for (String w : words) {
             if (w.isBlank()) {
                 continue;
@@ -266,7 +317,14 @@ public class PdfQuestionParser {
             if (sb.length() > 0) {
                 sb.append(' ');
             }
-            sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+            // Preposicoes/conectivos ficam minusculos, exceto quando abrem o titulo
+            // (ex.: "Legislacao Acerca de Seguranca da Informacao", nao "... De ...").
+            if (!isFirstWord && LOWER_CONNECTORS.contains(w)) {
+                sb.append(w);
+            } else {
+                sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+            }
+            isFirstWord = false;
         }
         return sb.toString();
     }
