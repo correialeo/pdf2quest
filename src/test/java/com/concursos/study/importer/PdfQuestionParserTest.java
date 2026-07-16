@@ -215,4 +215,48 @@ class PdfQuestionParserTest {
         assertEquals("Legislacao Acerca de Seguranca da Informacao e Protecao de Dados",
                 result.questions().get(0).subject());
     }
+
+    @Test
+    void rodapeDePaginaRepetidoNaoPoluiAlternativaNoMeioDaPagina() {
+        String rodape = """
+                pcimarkpci MjgwNDo4MmM0OjAwYjY6NDUwMDpkZDY2OmY0OWY6NmYwODplY2Zj:V2VkLCAxNSBKdWwgMjAyNiAyMzozNDozOCAtMDMwMA==
+                www.provaonline.com.br
+                INSTITUTO EXEMPLO DE CONCURSOS PUBLICOS
+                PROVA MODELO - PAGINA 1
+                """;
+
+        String texto = """
+                CONHECIMENTOS GERAIS
+
+                LINGUA PORTUGUESA
+
+                """ + rodape + """
+
+                1 - Assinale a alternativa correta
+                A) Alternativa A
+                B) Alternativa B
+                C) Alternativa C
+                D) Alternativa D
+                """ + rodape + """
+                E) Alternativa E
+
+                2 - Segunda pergunta
+                A) Alternativa A
+                B) Alternativa B
+                """ + rodape + """
+                C) Alternativa C
+                """;
+
+        ParseResult result = parser.parse(texto);
+
+        assertEquals(2, result.questions().size());
+
+        ParsedQuestion q1 = result.questions().get(0);
+        assertEquals("Lingua Portuguesa", q1.subject());
+        assertEquals("Alternativa D", q1.alternativeD());
+        assertEquals("Alternativa E", q1.alternativeE());
+
+        ParsedQuestion q2 = result.questions().get(1);
+        assertEquals("Alternativa C", q2.alternativeC());
+    }
 }

@@ -3,6 +3,7 @@ package com.concursos.study.importer;
 import com.concursos.study.question.QuestionCategory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -57,10 +58,24 @@ public class PdfQuestionParser {
     private static final Pattern READING_PASSAGE_CUE = Pattern.compile(
             "(?i)^(use|read|utilize|leia|considere|analise|observe)\\b.*\\btext[oe]?s?\\b.*\\b(quest(\\u00e3|a)o|question)");
 
+    // Ruido de rodape/marca d'agua que sites como pciconcursos.com.br injetam em
+    // toda pagina do PDF. Quando a ultima alternativa de uma questao termina bem
+    // no fim de uma pagina, essas linhas caem no meio do bloco e poluem o texto.
+    private static final Pattern PAGE_WATERMARK_LINE = Pattern.compile("(?i)^pcimarkpci\\b");
+    private static final Pattern PAGE_URL_LINE = Pattern.compile("(?i)^www\\.\\S+$");
+    private static final Pattern PAGE_NUMBER_FOOTER = Pattern.compile("(?i)P[\\u00c1A]GINA\\s+\\d{1,4}\\s*$");
+
+    // Numero minimo de repeticoes identicas para uma linha em CAIXA ALTA (ex.:
+    // nome da instituicao/prova repetido em todo rodape) ser considerada ruido
+    // de pagina generico, sem precisar hardcodar o nome de nenhuma banca.
+    private static final int BRANDING_LINE_MIN_LENGTH = 15;
+    private static final int BRANDING_LINE_MIN_OCCURRENCES = 3;
+
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
         String organization = detectOrganization(text);
         Integer year = detectYear(text);
+        Set<String> repeatedBrandingLines = detectRepeatedBrandingLines(text);
 
         List<ParsedQuestion> questions = new ArrayList<>();
         List<ParseFailure> failures = new ArrayList<>();
@@ -89,6 +104,10 @@ public class PdfQuestionParser {
 
         for (String rawLine : text.split("\n", -1)) {
             String line = rawLine.trim();
+
+            if (isPageNoise(line, repeatedBrandingLines)) {
+                continue;
+            }
 
             if (inGabaritoSection) {
                 gabaritoLines.add(line);
@@ -327,6 +346,54 @@ public class PdfQuestionParser {
             isFirstWord = false;
         }
         return sb.toString();
+    }
+
+    private boolean isPageNoise(String line, Set<String> repeatedBrandingLines) {
+        if (line.isBlank()) {
+            return false;
+        }
+        return PAGE_WATERMARK_LINE.matcher(line).find()
+                || PAGE_URL_LINE.matcher(line).matches()
+                || PAGE_NUMBER_FOOTER.matcher(line).find()
+                || repeatedBrandingLines.contains(line);
+    }
+
+    /**
+     * Encontra linhas em CAIXA ALTA que se repetem identicas varias vezes no
+     * documento - tipicamente o nome da instituicao/prova reimpresso em todo
+     * rodape de pagina. Generico o bastante pra nao depender do nome de
+     * nenhuma banca especifica.
+     */
+    private Set<String> detectRepeatedBrandingLines(String text) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String rawLine : text.split("\n", -1)) {
+            String line = rawLine.trim();
+            if (line.length() < BRANDING_LINE_MIN_LENGTH || !isAllUpperCaseLetters(line)) {
+                continue;
+            }
+            counts.merge(line, 1, Integer::sum);
+        }
+        Set<String> branding = new HashSet<>();
+        for (Map.Entry<String, Integer> e : counts.entrySet()) {
+            if (e.getValue() >= BRANDING_LINE_MIN_OCCURRENCES) {
+                branding.add(e.getKey());
+            }
+        }
+        return branding;
+    }
+
+    private boolean isAllUpperCaseLetters(String line) {
+        boolean hasLetter = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (Character.isLetter(c)) {
+                hasLetter = true;
+                if (Character.isLowerCase(c)) {
+                    return false;
+                }
+            }
+        }
+        return hasLetter;
     }
 
     private String detectOrganization(String text) {

@@ -136,6 +136,15 @@ destaque).
     preposições e conectivos ("de", "da", "e"...), ex.: "Legislação Acerca
     De Segurança Da Informação E Proteção De Dados" em vez de "...de
     Segurança da Informação e Proteção de Dados". Corrigido.
+- **[Corrigido]** Quando a última alternativa de uma questão caía bem no
+  fim de uma página do PDF, o rodapé/marca d'água do site que hospeda a
+  prova (ex.: `pcimarkpci ...`, `www.pciconcursos.com.br`, nome da
+  instituição repetido) entrava no meio do texto da alternativa. O parser
+  agora reconhece e descarta esse tipo de ruído: linhas de marca d'água e
+  URL isoladas por padrão fixo, linha de rodapé terminando em "PÁGINA N",
+  e — de forma genérica, sem depender do nome de nenhuma banca — qualquer
+  linha em CAIXA ALTA que se repete identica 3+ vezes no documento (sinal
+  de cabeçalho/rodapé reimpresso em toda página).
 - Ainda não tem tela de edição pra corrigir disciplina/categoria/assunto
   detectados errado, caso o heurístico erre em provas com formatação fora
   do padrão — hoje só ajustando direto no banco SQLite.
