@@ -1,0 +1,254 @@
+/* PDF2Questao - design system compartilhado (tema claro/escuro via [data-bs-theme]) */
+
+:root {
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-soft: rgba(79, 70, 229, .12);
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+    --shadow-md: 0 8px 24px rgba(16, 24, 40, .10);
+
+    --bs-border-radius-sm: .5rem;
+    --bs-border-radius: .65rem;
+    --bs-border-radius-lg: .9rem;
+
+    --bs-body-bg: #f7f8fb;
+    --bs-body-color: #1c1f2b;
+    --bs-secondary-color: #667085;
+    --bs-border-color: #e4e7ec;
+    --bs-tertiary-bg: #eef0f5;
+    --bs-card-bg: #ffffff;
+    --bs-link-color: var(--accent);
+    --bs-link-hover-color: var(--accent-hover);
+}
+
+[data-bs-theme="dark"] {
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-soft: rgba(129, 140, 248, .16);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, .35);
+
+    --bs-body-bg: #0f1117;
+    --bs-body-color: #e6e8ef;
+    --bs-secondary-color: #9aa1b1;
+    --bs-border-color: #262a36;
+    --bs-tertiary-bg: #191c25;
+    --bs-card-bg: #161922;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    transition: background-color .2s ease, color .2s ease;
+}
+
+h1, h2, h3, h4, h5 {
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+.page {
+    padding-top: 2rem;
+    padding-bottom: 3.5rem;
+}
+
+.text-muted {
+    color: var(--bs-secondary-color) !important;
+}
+
+/* Navbar */
+.app-navbar {
+    background-color: var(--bs-card-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+    box-shadow: var(--shadow-sm);
+    padding-top: .65rem;
+    padding-bottom: .65rem;
+}
+
+.app-navbar .navbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: .55rem;
+    font-weight: 700;
+    color: var(--bs-body-color);
+}
+
+.brand-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border-radius: .55rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+
+.app-navbar .navbar-nav .nav-link {
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+    padding: .5rem .85rem;
+    border-radius: .5rem;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.app-navbar .navbar-nav .nav-link:hover {
+    color: var(--bs-body-color);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.app-navbar .navbar-nav .nav-link.active {
+    color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: none;
+    border-radius: 999px;
+    border: 1px solid var(--bs-border-color);
+    background: transparent;
+    color: var(--bs-secondary-color);
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.theme-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.icon-sun {
+    display: none;
+}
+
+[data-bs-theme="dark"] .icon-sun {
+    display: inline-block;
+}
+
+[data-bs-theme="dark"] .icon-moon {
+    display: none;
+}
+
+/* Cards */
+.card {
+    background-color: var(--bs-card-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Buttons */
+.btn {
+    border-radius: .6rem;
+    font-weight: 600;
+    padding: .5rem 1.1rem;
+    transition: transform .05s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn-primary {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-outline-secondary {
+    color: var(--bs-secondary-color);
+    border-color: var(--bs-border-color);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+}
+
+.btn-secondary {
+    background-color: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bs-border-color);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+
+/* Forms */
+.form-control,
+.form-select {
+    background-color: var(--bs-card-bg);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+    border-radius: .55rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bs-card-bg);
+    color: var(--bs-body-color);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 .2rem var(--accent-soft);
+}
+
+.form-label {
+    font-weight: 600;
+    font-size: .875rem;
+    margin-bottom: .4rem;
+}
+
+.form-text {
+    color: var(--bs-secondary-color);
+}
+
+/* Progress */
+.progress {
+    height: .6rem;
+    border-radius: 999px;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.progress-bar {
+    background-color: var(--accent);
+}
+
+/* Tables */
+.table {
+    --bs-table-bg: transparent;
+    vertical-align: middle;
+    color: var(--bs-body-color);
+}
+
+/* Badges */
+.badge {
+    font-weight: 600;
+    padding: .4em .65em;
+}
+
+/* Alerts */
+.alert {
+    border-radius: var(--bs-border-radius);
+    border: 1px solid transparent;
+}
+
+::selection {
+    background-color: var(--accent-soft);
+}
