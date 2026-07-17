@@ -18,12 +18,26 @@
             <input type="file" name="file" accept="application/pdf" class="form-control" required/>
         </div>
         <div class="mb-3">
+            <label class="form-label">Banca</label>
+            <select name="banca" class="form-select" required>
+                <option value="" disabled selected>Selecione a banca</option>
+                <option th:each="b : ${bancas}"
+                        th:value="${b}"
+                        th:text="${b.label}"
+                        th:disabled="${!supportedBancas.contains(b)}"></option>
+            </select>
+            <div class="form-text">
+                Define qual heurística de leitura será usada para interpretar o PDF. Bancas
+                desabilitadas na lista ainda não têm um parser implementado.
+            </div>
+        </div>
+        <div class="mb-3">
             <label class="form-label">Cargo/Prova (opcional)</label>
             <input type="text" name="exam" class="form-control" placeholder="Ex: Analista Técnico"/>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Banca (opcional — sobrepõe detecção automática)</label>
+                <label class="form-label">Nome da banca para exibição (opcional — sobrepõe o rótulo padrão)</label>
                 <input type="text" name="organizationOverride" class="form-control"/>
             </div>
             <div class="col-md-6 mb-3">
@@ -32,7 +46,7 @@
             </div>
         </div>
         <p class="text-muted">
-            Banca, ano, disciplina e categoria (Conhecimentos Gerais/Específicos) são detectados
+            Ano, disciplina e categoria (Conhecimentos Gerais/Específicos) são detectados
             automaticamente a partir do próprio texto da prova. "Assunto" não é detectado e pode
             ser preenchido depois na tela de Questões.
         </p>

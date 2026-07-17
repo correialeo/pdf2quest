@@ -25,6 +25,20 @@
             <input type="file" name="file" accept="application/pdf" class="form-control" required/>
         </div>
         <div class="mb-3">
+            <label class="form-label">Banca</label>
+            <select name="banca" class="form-select" required>
+                <option value="" disabled selected>Selecione a banca</option>
+                <option th:each="b : ${bancas}"
+                        th:value="${b}"
+                        th:text="${b.label}"
+                        th:disabled="${!supportedBancas.contains(b)}"></option>
+            </select>
+            <div class="form-text">
+                Define qual heurística de leitura da tabela de gabarito será usada. Bancas
+                desabilitadas na lista ainda não têm um parser implementado.
+            </div>
+        </div>
+        <div class="mb-3">
             <label class="form-label">Título do perfil/prova no gabarito</label>
             <input type="text" name="titulo" class="form-control"
                    placeholder="Ex: ATI - DESENVOLVIMENTO DE SOFTWARE – PROVA TIPO 1" required/>

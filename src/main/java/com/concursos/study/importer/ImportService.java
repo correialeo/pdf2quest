@@ -20,18 +20,32 @@ public class ImportService {
 
     private final QuestionRepository questionRepository;
     private final ImportJobRepository importJobRepository;
-    private final PdfQuestionParser parser = new PdfQuestionParser();
-    private final GabaritoParser gabaritoParser = new GabaritoParser();
+    private final ExamParserRegistry examParserRegistry;
+    private final GabaritoParserRegistry gabaritoParserRegistry;
 
-    public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository) {
+    public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
+                          ExamParserRegistry examParserRegistry, GabaritoParserRegistry gabaritoParserRegistry) {
         this.questionRepository = questionRepository;
         this.importJobRepository = importJobRepository;
+        this.examParserRegistry = examParserRegistry;
+        this.gabaritoParserRegistry = gabaritoParserRegistry;
     }
 
-    public ImportJob importPdf(MultipartFile file, String examOverride, String organizationOverride, Integer yearOverride) {
+    public ImportJob importPdf(MultipartFile file, Banca banca, String examOverride, String organizationOverride,
+                                Integer yearOverride) {
         ImportJob job = new ImportJob();
         job.setFileName(file.getOriginalFilename());
+        job.setBanca(banca.name());
         job.setStartedAt(LocalDateTime.now());
+
+        ExamParser parser = examParserRegistry.find(banca).orElse(null);
+        if (parser == null) {
+            job.setImportedQuestions(0);
+            job.setFailedQuestions(0);
+            job.setErrorLog("Banca ainda nao suportada: " + banca.getLabel());
+            job.setFinishedAt(LocalDateTime.now());
+            return importJobRepository.save(job);
+        }
 
         String text;
         try {
@@ -49,7 +63,7 @@ public class ImportService {
 
         ParseResult result = parser.parse(text);
 
-        String organization = hasText(organizationOverride) ? organizationOverride : result.organization();
+        String organization = hasText(organizationOverride) ? organizationOverride : banca.getLabel();
         Integer year = yearOverride != null ? yearOverride : result.year();
 
         job.setImportedQuestions(0);
@@ -92,7 +106,12 @@ public class ImportService {
         return q;
     }
 
-    public GabaritoLinkResult linkGabarito(MultipartFile file, String titulo, Long importJobId) {
+    public GabaritoLinkResult linkGabarito(MultipartFile file, Banca banca, String titulo, Long importJobId) {
+        GabaritoTableParser gabaritoParser = gabaritoParserRegistry.find(banca).orElse(null);
+        if (gabaritoParser == null) {
+            return new GabaritoLinkResult(0, 0, 0, List.of(), "Banca ainda nao suportada: " + banca.getLabel());
+        }
+
         String text;
         try {
             byte[] bytes = file.getBytes();

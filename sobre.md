@@ -22,9 +22,14 @@ cujas provas venham em PDF.
 
 ### 1. Importar a prova (PDF)
 
-Você sobe o PDF da prova e o sistema lê o texto e tenta identificar sozinho:
+Você escolhe a **banca** organizadora (obrigatório) e sobe o PDF da prova. A
+banca escolhida define qual heurística de leitura vai ser usada — cada banca
+tem seu próprio jeito de formatar prova em PDF, então cada uma tem seu
+próprio parser (ver seção "Parsers por banca" abaixo). Hoje só FGV está
+implementada; as demais aparecem na lista mas desabilitadas.
 
-- a **banca** organizadora (CEBRASPE, FGV, etc.);
+A partir do texto extraído, o sistema tenta identificar sozinho:
+
 - o **ano** da prova;
 - a **disciplina** de cada questão (a partir dos títulos de seção do próprio
   PDF, ex.: "Língua Portuguesa", "Direito Previdenciário");
@@ -49,10 +54,12 @@ Muita banca solta o gabarito num PDF **diferente** do da prova, e esse PDF
 geralmente cobre vários cargos/perfis de uma vez só (ex.: "TIPO 1", "TIPO 2",
 "TIPO 3"...). Pra esse caso, tem uma tela separada onde você:
 
-1. Sobe o PDF do gabarito;
-2. Digita o título exato do perfil que quer buscar dentro do documento (ex.:
+1. Escolhe a **banca** (obrigatório — mesma lógica da importação de prova,
+   define qual parser lê a tabela de respostas);
+2. Sobe o PDF do gabarito;
+3. Digita o título exato do perfil que quer buscar dentro do documento (ex.:
    `ATI - DESENVOLVIMENTO DE SOFTWARE – PROVA TIPO 1`);
-3. Escolhe qual importação de prova (já feita antes) quer vincular.
+4. Escolhe qual importação de prova (já feita antes) quer vincular.
 
 O sistema localiza a tabela de respostas daquele perfil dentro do PDF,
 extrai as respostas (a formatação da tabela varia — às vezes vem tudo numa
@@ -102,54 +109,33 @@ não depende de ter o binário `sqlite3` instalado, só do driver que o
 projeto já usa. Serve como backup: dá pra recriar o `concursos.db` do zero
 rodando o `.sql` baixado.
 
+### 8. Parsers por banca (arquitetura heurística)
+
+O parsing de PDF é heurístico — cada banca formata prova e gabarito do seu
+próprio jeito, então em vez de um parser genérico único, o projeto usa um
+padrão de plugin por banca:
+
+- `ExamParser` e `GabaritoTableParser` são as interfaces que qualquer banca
+  nova precisa implementar (uma pra ler a prova, outra pra ler a tabela de
+  gabarito).
+- Cada implementação é um `@Component` Spring marcado com a banca que atende
+  (`banca()`), e o Spring já injeta a lista completa delas nos registries
+  (`ExamParserRegistry` / `GabaritoParserRegistry`), que indexam por banca.
+  Adicionar uma banca nova é só criar a classe nova — não precisa mexer em
+  mais nada.
+- Hoje só a **FGV** tem parser de verdade (`FgvPdfParser` /
+  `FgvGabaritoParser`, o heurístico original do projeto). As outras bancas
+  (Cesgranrio, Cebraspe, FCC, Vunesp) já existem no enum `Banca` e aparecem
+  nas telas de importação, mas desabilitadas — são placeholders pro roadmap.
+- As telas de importação de prova e de gabarito agora exigem escolher a
+  banca antes de subir o PDF; é essa escolha que decide qual parser roda.
+
+Esse desenho é o que deixa viável abrir o projeto como open-source mais pra
+frente: cada banca vira uma contribuição isolada, sem precisar entender ou
+arriscar quebrar o parser das outras.
+
 ## Limitações conhecidas / bugs a corrigir
 
-- O parsing de PDF é heurístico — provas com formatação muito fora do padrão
-  ainda podem gerar falhas de importação (ficam registradas no relatório, não
-  travam o processo).
-- **[Corrigido]** Testando com uma prova real (Dataprev/FGV, ATI -
-  Desenvolvimento de Software) apareceram três bugs no parser de questões,
-  todos já corrigidos e cobertos por testes de regressão:
-  - Textos de apoio grandes de interpretação de texto — sobretudo em Língua
-    Inglesa — têm linhas curtas (nome de autor, citação, título de obra)
-    que o heurístico de cabeçalho confundia com um novo título de
-    disciplina (nessa prova, as questões 13 a 19, todas de Língua Inglesa,
-    saíam rotuladas com disciplina "Marketing Manager, Soulcore" e "Louis
-    Ramirez" em vez de "Língua Inglesa"). O parser agora rastreia se já
-    apareceu texto "de corpo" desde a última fronteira de bloco (cabeçalho
-    de disciplina, seção CONHECIMENTOS ou frase de instrução do tipo "Use
-    the following TEXT...") e só aceita uma linha como cabeçalho de
-    disciplina se estiver logo no começo do intervalo entre questões —
-    linhas parecidas com cabeçalho no meio de um texto de apoio são
-    ignoradas.
-  - O mesmo mecanismo destravou um efeito colateral: como o bloco da
-    questão só era fechado quando a próxima questão numerada aparecia,
-    textos de apoio longos entre uma questão e a próxima acabavam grudados
-    na última alternativa da questão anterior. Agora o bloco é fechado
-    assim que uma fronteira reconhecida aparece (cabeçalho de seção ou
-    frase de instrução de texto de apoio), não só quando a próxima questão
-    é encontrada.
-  - Quando o bloco de Conhecimentos Específicos não tem cabeçalhos de
-    disciplina próprios dentro dele (banca não subdivide por matéria — caso
-    comum), as questões específicas herdavam a última disciplina vista
-    ainda em Conhecimentos Gerais (nessa prova, as 30 questões específicas,
-    41 a 70, saíam todas com a disciplina "Legislação Acerca de Segurança
-    da Informação e Proteção de Dados", puxada indevidamente do bloco de
-    Conhecimentos Gerais). Agora a disciplina é resetada para `null` toda
-    vez que uma fronteira CONHECIMENTOS GERAIS/ESPECÍFICOS é detectada.
-  - Bug de formatação: o título das disciplinas detectadas capitalizava
-    preposições e conectivos ("de", "da", "e"...), ex.: "Legislação Acerca
-    De Segurança Da Informação E Proteção De Dados" em vez de "...de
-    Segurança da Informação e Proteção de Dados". Corrigido.
-- **[Corrigido]** Quando a última alternativa de uma questão caía bem no
-  fim de uma página do PDF, o rodapé/marca d'água do site que hospeda a
-  prova (ex.: `pcimarkpci ...`, `www.pciconcursos.com.br`, nome da
-  instituição repetido) entrava no meio do texto da alternativa. O parser
-  agora reconhece e descarta esse tipo de ruído: linhas de marca d'água e
-  URL isoladas por padrão fixo, linha de rodapé terminando em "PÁGINA N",
-  e — de forma genérica, sem depender do nome de nenhuma banca — qualquer
-  linha em CAIXA ALTA que se repete identica 3+ vezes no documento (sinal
-  de cabeçalho/rodapé reimpresso em toda página).
 - Ainda não tem tela de edição pra corrigir disciplina/categoria/assunto
   detectados errado, caso o heurístico erre em provas com formatação fora
   do padrão — hoje só ajustando direto no banco SQLite.
@@ -160,5 +146,3 @@ rodando o `.sql` baixado.
   são um ponto cego.
 - Sem autenticação/multiusuário de propósito — é uma ferramenta pessoal, pra
   rodar local mesmo.
-- **[Feito]** Botão pra exportar o banco `concursos.db` como `.sql` — ver
-  seção 7 (Dashboard) acima.
