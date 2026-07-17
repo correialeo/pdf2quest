@@ -1,10 +1,17 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser.fgv;
 
+import com.concursos.study.importer.Banca;
+import com.concursos.study.importer.ParseFailure;
+import com.concursos.study.importer.ParseResult;
+import com.concursos.study.importer.ParsedQuestion;
+import com.concursos.study.importer.parser.ExamParser;
+import com.concursos.study.importer.parser.support.PdfMetadataDetector;
+import com.concursos.study.importer.parser.support.PdfNoiseFilter;
+import com.concursos.study.importer.parser.support.PdfTextUtils;
 import com.concursos.study.question.QuestionCategory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -24,12 +31,6 @@ import java.util.stream.Collectors;
 @Component
 public class FgvPdfParser implements ExamParser {
 
-    private static final String[] KNOWN_ORGANIZATIONS = {
-            "CEBRASPE", "CESPE", "CESGRANRIO", "FCC", "FGV", "VUNESP",
-            "IBFC", "IADES", "INSTITUTO AOCP", "AOCP", "QUADRIX", "CONSULPLAN", "IDECAN",
-            "IBADE", "CETRO", "SELECON", "IBGP", "LEGALLE", "OBJETIVA", "AVANÇA SP", "IUDS"
-    };
-
     private static final Pattern QUESTION_START =
             Pattern.compile("^\\s*(?:QUEST\\u00C3O\\s+|QUESTAO\\s+)?(\\d{1,3})\\s*[.\\-\\u2013\\u2014\\)]\\s*(.*)$");
 
@@ -43,15 +44,8 @@ public class FgvPdfParser implements ExamParser {
     private static final Pattern INLINE_GABARITO =
             Pattern.compile("(?i)gabarito\\s*:?\\s*([A-E])\\b");
 
-    // Preposicoes/conectivos minusculos aceitos dentro de um titulo de disciplina
-    // (ex.: "Legislacao Acerca de Seguranca da Informacao").
-    private static final Set<String> LOWER_CONNECTORS =
-            Set.of("de", "da", "do", "das", "dos", "e", "em", "a", "o", "as", "os", "ao", "aos");
-
     private static final Pattern GABARITO_ENTRY =
             Pattern.compile("(\\d{1,3})\\s*[\\-\\u2013:]\\s*([A-E])\\b");
-
-    private static final Pattern YEAR = Pattern.compile("(19|20)\\d{2}");
 
     // Frases de instrucao que introduzem um texto de apoio (interpretacao de
     // texto, comum em Lingua Inglesa/Portuguesa), ex.: "Use the following TEXT
@@ -59,19 +53,6 @@ public class FgvPdfParser implements ExamParser {
     // anterior - servem de fronteira de bloco, igual GABARITO/CONHECIMENTOS.
     private static final Pattern READING_PASSAGE_CUE = Pattern.compile(
             "(?i)^(use|read|utilize|leia|considere|analise|observe)\\b.*\\btext[oe]?s?\\b.*\\b(quest(\\u00e3|a)o|question)");
-
-    // Ruido de rodape/marca d'agua que sites como pciconcursos.com.br injetam em
-    // toda pagina do PDF. Quando a ultima alternativa de uma questao termina bem
-    // no fim de uma pagina, essas linhas caem no meio do bloco e poluem o texto.
-    private static final Pattern PAGE_WATERMARK_LINE = Pattern.compile("(?i)^pcimarkpci\\b");
-    private static final Pattern PAGE_URL_LINE = Pattern.compile("(?i)^www\\.\\S+$");
-    private static final Pattern PAGE_NUMBER_FOOTER = Pattern.compile("(?i)P[\\u00c1A]GINA\\s+\\d{1,4}\\s*$");
-
-    // Numero minimo de repeticoes identicas para uma linha em CAIXA ALTA (ex.:
-    // nome da instituicao/prova repetido em todo rodape) ser considerada ruido
-    // de pagina generico, sem precisar hardcodar o nome de nenhuma banca.
-    private static final int BRANDING_LINE_MIN_LENGTH = 15;
-    private static final int BRANDING_LINE_MIN_OCCURRENCES = 3;
 
     @Override
     public Banca banca() {
@@ -81,9 +62,9 @@ public class FgvPdfParser implements ExamParser {
     @Override
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
-        String organization = detectOrganization(text);
-        Integer year = detectYear(text);
-        Set<String> repeatedBrandingLines = detectRepeatedBrandingLines(text);
+        String organization = PdfMetadataDetector.detectOrganization(text);
+        Integer year = PdfMetadataDetector.detectYear(text);
+        Set<String> repeatedBrandingLines = PdfNoiseFilter.detectRepeatedBrandingLines(text);
 
         List<ParsedQuestion> questions = new ArrayList<>();
         List<ParseFailure> failures = new ArrayList<>();
@@ -113,7 +94,7 @@ public class FgvPdfParser implements ExamParser {
         for (String rawLine : text.split("\n", -1)) {
             String line = rawLine.trim();
 
-            if (isPageNoise(line, repeatedBrandingLines)) {
+            if (PdfNoiseFilter.isPageNoise(line, repeatedBrandingLines)) {
                 continue;
             }
 
@@ -223,7 +204,7 @@ public class FgvPdfParser implements ExamParser {
             flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
         }
 
-        Map<Integer, String> gabaritoMap = parseGabaritoTable(String.join("\n", gabaritoLines));
+        Map<Integer, String> gabaritoMap = parseInlineGabaritoSection(String.join("\n", gabaritoLines));
         if (!gabaritoMap.isEmpty()) {
             questions = questions.stream()
                     .map(q -> q.correctAnswer() != null ? q : withCorrectAnswer(q, gabaritoMap.get(q.number())))
@@ -315,7 +296,7 @@ public class FgvPdfParser implements ExamParser {
                 }
             }
             boolean startsUpper = Character.isUpperCase(w.charAt(0));
-            boolean allowedLower = LOWER_CONNECTORS.contains(w.toLowerCase(Locale.ROOT));
+            boolean allowedLower = PdfTextUtils.LOWER_CONNECTORS.contains(w.toLowerCase(Locale.ROOT));
             if (!startsUpper && !allowedLower) {
                 return false;
             }
@@ -328,111 +309,21 @@ public class FgvPdfParser implements ExamParser {
         if (pendingSubjectLines.isEmpty()) {
             return currentSubject;
         }
-        String subject = toTitleCase(String.join(" ", pendingSubjectLines));
+        String subject = PdfTextUtils.toTitleCase(String.join(" ", pendingSubjectLines));
         pendingSubjectLines.clear();
         return subject;
     }
 
-    private String toTitleCase(String line) {
-        String[] words = line.toLowerCase(Locale.ROOT).split("\\s+");
-        StringBuilder sb = new StringBuilder();
-        boolean isFirstWord = true;
-        for (String w : words) {
-            if (w.isBlank()) {
-                continue;
-            }
-            if (sb.length() > 0) {
-                sb.append(' ');
-            }
-            // Preposicoes/conectivos ficam minusculos, exceto quando abrem o titulo
-            // (ex.: "Legislacao Acerca de Seguranca da Informacao", nao "... De ...").
-            if (!isFirstWord && LOWER_CONNECTORS.contains(w)) {
-                sb.append(w);
-            } else {
-                sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
-            }
-            isFirstWord = false;
-        }
-        return sb.toString();
-    }
-
-    private boolean isPageNoise(String line, Set<String> repeatedBrandingLines) {
-        if (line.isBlank()) {
-            return false;
-        }
-        return PAGE_WATERMARK_LINE.matcher(line).find()
-                || PAGE_URL_LINE.matcher(line).matches()
-                || PAGE_NUMBER_FOOTER.matcher(line).find()
-                || repeatedBrandingLines.contains(line);
-    }
-
     /**
-     * Encontra linhas em CAIXA ALTA que se repetem identicas varias vezes no
-     * documento - tipicamente o nome da instituicao/prova reimpresso em todo
-     * rodape de pagina. Generico o bastante pra nao depender do nome de
-     * nenhuma banca especifica.
+     * Le pares numero-letra (ex.: "12 - A") de um gabarito embutido no fim da
+     * propria prova, quando o PDF de prova traz o gabarito na ultima pagina em
+     * vez de vir num PDF separado. Formato distinto do resolvido por
+     * {@link com.concursos.study.importer.parser.fgv.FgvGabaritoParser}, que
+     * localiza o gabarito por titulo de disciplina e le blocos de numero numa
+     * linha seguido da letra na proxima - layout tipico de um PDF de gabarito
+     * publicado a parte.
      */
-    private Set<String> detectRepeatedBrandingLines(String text) {
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (String rawLine : text.split("\n", -1)) {
-            String line = rawLine.trim();
-            if (line.length() < BRANDING_LINE_MIN_LENGTH || !isAllUpperCaseLetters(line)) {
-                continue;
-            }
-            counts.merge(line, 1, Integer::sum);
-        }
-        Set<String> branding = new HashSet<>();
-        for (Map.Entry<String, Integer> e : counts.entrySet()) {
-            if (e.getValue() >= BRANDING_LINE_MIN_OCCURRENCES) {
-                branding.add(e.getKey());
-            }
-        }
-        return branding;
-    }
-
-    private boolean isAllUpperCaseLetters(String line) {
-        boolean hasLetter = false;
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-            if (Character.isLetter(c)) {
-                hasLetter = true;
-                if (Character.isLowerCase(c)) {
-                    return false;
-                }
-            }
-        }
-        return hasLetter;
-    }
-
-    private String detectOrganization(String text) {
-        // Usa borda de palavra para nao confundir bancas com palavras comuns que
-        // contenham o mesmo texto (ex.: "OBJETIVA" dentro de "questoes objetivas").
-        String best = null;
-        int bestIndex = Integer.MAX_VALUE;
-        for (String org : KNOWN_ORGANIZATIONS) {
-            Matcher m = Pattern.compile("\\b" + Pattern.quote(org) + "\\b", Pattern.CASE_INSENSITIVE).matcher(text);
-            if (m.find() && m.start() < bestIndex) {
-                bestIndex = m.start();
-                best = org;
-            }
-        }
-        return best;
-    }
-
-    private Integer detectYear(String text) {
-        Matcher m = YEAR.matcher(text);
-        Map<Integer, Integer> counts = new LinkedHashMap<>();
-        while (m.find()) {
-            int y = Integer.parseInt(m.group());
-            counts.merge(y, 1, Integer::sum);
-        }
-        return counts.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
-    }
-
-    private Map<Integer, String> parseGabaritoTable(String text) {
+    private Map<Integer, String> parseInlineGabaritoSection(String text) {
         Map<Integer, String> map = new LinkedHashMap<>();
         Matcher m = GABARITO_ENTRY.matcher(text);
         while (m.find()) {

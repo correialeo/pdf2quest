@@ -1,38 +1,84 @@
-# Concursos — ferramenta local de estudos
+# Concursos
 
-Ferramenta local (single-user, sem login) para importar provas em PDF, resolver
-questões, montar simulados e acompanhar evolução nos estudos. Feita para o
-edital da Dataprev (Conhecimentos Gerais peso 1, Conhecimentos Específicos peso 2,5).
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3-6DB33F)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)
 
-## Rodando
+Ferramenta web local (single-user, sem login, sem nuvem) para importar
+provas de concurso em PDF, resolver questões, montar simulados com nota
+calculada pelo edital e acompanhar a evolução nos estudos ao longo do
+tempo.
 
-```
+Feita inicialmente com foco no edital da Dataprev, mas serve pra qualquer
+concurso cujas provas venham em PDF — a leitura de cada PDF é feita por um
+parser específico da banca organizadora, então dá pra estender pra novas
+bancas sem tocar no resto do sistema. Veja a arquitetura de parsers e como
+adicionar uma banca nova em [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Stack
+
+| Camada       | Tecnologia                          |
+| ------------ | ------------------------------------ |
+| Back-end     | Java 21 + Spring Boot 3 (MVC)        |
+| Views        | Thymeleaf + Bootstrap 5              |
+| Banco        | SQLite (arquivo único, sem servidor) |
+| Extração PDF | Apache PDFBox                        |
+| Build        | Maven                                |
+
+## Rodando localmente
+
+Pré-requisito: Java 21 (`java -version`; ajuste `JAVA_HOME` se necessário).
+
+```bash
 mvn spring-boot:run
 ```
 
-Acesse http://localhost:8080 — abre direto no dashboard.
+Acesse **http://localhost:8080** — abre direto no dashboard.
 
-Requer Java 21. Se `java -version` não mostrar 21, ajuste `JAVA_HOME`.
+## Funcionalidades
 
-## Fluxo
+1. **Importar prova (PDF)** — sobe o PDF de uma prova; banca, ano,
+   disciplina e categoria (Gerais/Específicas) são detectados
+   automaticamente a partir do próprio documento.
+2. **Importar gabarito separado (PDF)** — vincula um PDF de gabarito
+   publicado à parte a uma prova já importada.
+3. **Banco de questões / prática livre** — filtra por disciplina, assunto,
+   ano e banca para resolver questões avulsas.
+4. **Simulado** — monta um simulado por quantidade de questões de
+   Gerais/Específicas e calcula a nota conforme o peso do edital.
+5. **Caderno de erros** — lista questões erradas na última tentativa e
+   permite refazê-las de uma vez.
+6. **Dashboard** — totais, desempenho por disciplina/assunto, histórico de
+   simulados e exportação do banco (`.sql`) para backup.
 
-1. **Importar PDF** (`/import`): sobe uma prova em PDF. Banca, ano, disciplina
-   e categoria (Conhecimentos Gerais/Específicos) são detectados automaticamente
-   a partir dos títulos de seção do próprio documento. "Assunto" não é
-   detectado (raramente aparece no texto da prova).
-2. **Questões** (`/questoes`): filtra por disciplina/assunto/ano/banca e inicia
-   uma sessão de prática.
-3. **Simulado** (`/simulado`): monta um simulado por quantidade de questões de
-   Gerais/Específicas e calcula a nota do edital ao final.
-4. **Caderno de Erros** (`/caderno-erros`): lista questões cuja última tentativa
-   foi errada; permite refazer todas de uma vez.
-5. **Dashboard** (`/dashboard`): totais, percentual por disciplina/assunto e
-   histórico de simulados.
+Descrição completa de cada funcionalidade e da arquitetura de parsers por
+banca em [`sobre.md`](sobre.md).
+
+## Arquitetura
+
+A importação de PDF segue um padrão de plugin por banca organizadora
+(`ExamParser` / `GabaritoTableParser`, descobertos automaticamente pelo
+Spring e indexados por `Banca`), pensado para escalar sem acoplar bancas
+novas ao resto do sistema. Hoje só a **FGV** tem parser implementado; as
+demais (Cesgranrio, Cebraspe, FCC, Vunesp) já existem no enum `Banca` e
+aparecem nas telas de importação como placeholders para o roadmap.
+
+Detalhes da estrutura de pacotes e o passo a passo para adicionar uma
+banca nova estão em [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Limitações conhecidas
 
 - Parsing de PDF é heurístico (regex); provas com formatação incomum podem
-  gerar falhas de importação (registradas no relatório, sem travar o processo).
-- "Assunto" e correções de disciplina/categoria mal detectadas ainda não têm
-  tela de edição — hoje só é possível ajustar direto no banco SQLite
+  gerar falhas de importação — registradas no relatório final, sem travar
+  o processo.
+- Não há tela de edição para corrigir disciplina/categoria/assunto
+  detectados incorretamente; hoje o ajuste é direto no banco SQLite
   (`concursos.db`).
+- Sem autenticação/multiusuário de propósito — é uma ferramenta pessoal,
+  para rodar local.
+
+## Licença
+
+Distribuído sob a [PolyForm Noncommercial License 1.0.0](LICENSE) — uso,
+modificação e distribuição livres para fins não comerciais (pessoal,
+educacional, pesquisa). Uso comercial não é permitido por estes termos.

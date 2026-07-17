@@ -1,5 +1,7 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser.fgv;
 
+import com.concursos.study.importer.Banca;
+import com.concursos.study.importer.parser.GabaritoTableParser;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;

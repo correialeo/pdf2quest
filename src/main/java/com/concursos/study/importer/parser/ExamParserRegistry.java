@@ -1,5 +1,6 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser;
 
+import com.concursos.study.importer.Banca;
 import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;

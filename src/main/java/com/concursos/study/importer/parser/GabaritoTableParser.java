@@ -1,4 +1,7 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser;
+
+import com.concursos.study.importer.Banca;
+import com.concursos.study.importer.parser.fgv.FgvGabaritoParser;
 
 import java.util.Map;
 

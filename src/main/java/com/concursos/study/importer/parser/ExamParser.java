@@ -1,4 +1,8 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser;
+
+import com.concursos.study.importer.Banca;
+import com.concursos.study.importer.ParseResult;
+import com.concursos.study.importer.parser.fgv.FgvPdfParser;
 
 /**
  * Parser de PDF de prova especifico de uma banca. Cada banca tem formatacao

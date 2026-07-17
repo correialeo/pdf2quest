@@ -1,5 +1,9 @@
 package com.concursos.study.importer;
 
+import com.concursos.study.importer.parser.ExamParser;
+import com.concursos.study.importer.parser.ExamParserRegistry;
+import com.concursos.study.importer.parser.GabaritoParserRegistry;
+import com.concursos.study.importer.parser.GabaritoTableParser;
 import com.concursos.study.question.Question;
 import com.concursos.study.question.QuestionRepository;
 import org.apache.pdfbox.Loader;

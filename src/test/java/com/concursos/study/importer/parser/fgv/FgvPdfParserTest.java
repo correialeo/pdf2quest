@@ -1,5 +1,7 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser.fgv;
 
+import com.concursos.study.importer.ParseResult;
+import com.concursos.study.importer.ParsedQuestion;
 import com.concursos.study.question.QuestionCategory;
 import org.junit.jupiter.api.Test;
 

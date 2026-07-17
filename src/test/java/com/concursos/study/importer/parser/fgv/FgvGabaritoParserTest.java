@@ -1,4 +1,4 @@
-package com.concursos.study.importer;
+package com.concursos.study.importer.parser.fgv;
 
 import org.junit.jupiter.api.Test;
 
