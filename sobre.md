@@ -95,7 +95,12 @@ tem um botão pra refazer todas elas de uma vez numa sessão só.
 Visão geral: total de questões cadastradas, quantas já foram respondidas ao
 menos uma vez, percentual de acerto geral, desempenho por disciplina e por
 assunto, e histórico dos simulados já feitos (com a última nota Dataprev em
-destaque).
+destaque). Tem também um botão de **exportar o banco** (link "Exportar
+Banco" no menu, e um botão no topo do próprio dashboard) que baixa um dump
+`.sql` completo (schema + dados de todas as tabelas) gerado via JDBC puro —
+não depende de ter o binário `sqlite3` instalado, só do driver que o
+projeto já usa. Serve como backup: dá pra recriar o `concursos.db` do zero
+rodando o `.sql` baixado.
 
 ## Limitações conhecidas / bugs a corrigir
 
@@ -155,4 +160,5 @@ destaque).
   são um ponto cego.
 - Sem autenticação/multiusuário de propósito — é uma ferramenta pessoal, pra
   rodar local mesmo.
-- Precisamos colocar um botão para exportar o banco concursos.db (baixar o arquivo .sql).
+- **[Feito]** Botão pra exportar o banco `concursos.db` como `.sql` — ver
+  seção 7 (Dashboard) acima.
