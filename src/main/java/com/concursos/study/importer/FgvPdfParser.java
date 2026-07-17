@@ -1,6 +1,7 @@
 package com.concursos.study.importer;
 
 import com.concursos.study.question.QuestionCategory;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -14,13 +15,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Parser puro (sem dependencia de Spring) que extrai questoes de um PDF de prova
- * ja convertido em texto. Detecta automaticamente banca, ano, disciplina e
- * categoria (Conhecimentos Gerais/Especificos) a partir dos titulos de secao
- * presentes no proprio documento. "Assunto" nao e detectado (raramente aparece
- * no enunciado da prova) e fica disponivel para edicao manual depois.
+ * Parser de PDF de prova da banca FGV, ja convertido em texto. Detecta
+ * automaticamente ano, disciplina e categoria (Conhecimentos
+ * Gerais/Especificos) a partir dos titulos de secao presentes no proprio
+ * documento. "Assunto" nao e detectado (raramente aparece no enunciado da
+ * prova) e fica disponivel para edicao manual depois.
  */
-public class PdfQuestionParser {
+@Component
+public class FgvPdfParser implements ExamParser {
 
     private static final String[] KNOWN_ORGANIZATIONS = {
             "CEBRASPE", "CESPE", "CESGRANRIO", "FCC", "FGV", "VUNESP",
@@ -71,6 +73,12 @@ public class PdfQuestionParser {
     private static final int BRANDING_LINE_MIN_LENGTH = 15;
     private static final int BRANDING_LINE_MIN_OCCURRENCES = 3;
 
+    @Override
+    public Banca banca() {
+        return Banca.FGV;
+    }
+
+    @Override
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
         String organization = detectOrganization(text);

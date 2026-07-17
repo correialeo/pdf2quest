@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class PdfQuestionParserTest {
+class FgvPdfParserTest {
 
-    private final PdfQuestionParser parser = new PdfQuestionParser();
+    private final FgvPdfParser parser = new FgvPdfParser();
 
     @Test
     void detectaBancaAnoDisciplinaCategoriaEGabarito() {

@@ -7,9 +7,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class GabaritoParserTest {
+class FgvGabaritoParserTest {
 
-    private final GabaritoParser parser = new GabaritoParser();
+    private final FgvGabaritoParser parser = new FgvGabaritoParser();
 
     @Test
     void parseiaTabelaComLetrasEmUmaUnicaLinhaPorBloco() {

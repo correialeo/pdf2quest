@@ -1,5 +1,7 @@
 package com.concursos.study.importer;
 
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,23 +11,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parser puro (sem dependencia de Spring) para PDFs de gabarito que trazem
- * varias provas/perfis no mesmo arquivo. Localiza o titulo do perfil buscado
- * e le a tabela de respostas logo em seguida: uma linha com os numeros das
- * questoes (ex.: "1 2 3 ... 20"), seguida pelas letras (A-E) correspondentes
- * - que podem vir todas numa unica linha ou uma por linha, dependendo de
- * como o PDF foi extraido - repetindo em blocos ate o fim da prova.
+ * Parser de PDFs de gabarito da banca FGV que trazem varias provas/perfis no
+ * mesmo arquivo. Localiza o titulo do perfil buscado e le a tabela de
+ * respostas logo em seguida: uma linha com os numeros das questoes (ex.:
+ * "1 2 3 ... 20"), seguida pelas letras (A-E) correspondentes - que podem
+ * vir todas numa unica linha ou uma por linha, dependendo de como o PDF foi
+ * extraido - repetindo em blocos ate o fim da prova.
  */
-public class GabaritoParser {
+@Component
+public class FgvGabaritoParser implements GabaritoTableParser {
 
     private static final Pattern NUMBER_HEADER_LINE = Pattern.compile("^(\\d{1,3})(\\s+\\d{1,3})*$");
     private static final Pattern SINGLE_LETTER = Pattern.compile("^[A-E]$");
     private static final Pattern DASH_VARIANTS = Pattern.compile("[\\u2010-\\u2015]");
 
-    /**
-     * @return numero da questao -> letra correta. Mapa vazio se o titulo nao for
-     *         encontrado no texto.
-     */
+    @Override
+    public Banca banca() {
+        return Banca.FGV;
+    }
+
+    @Override
     public Map<Integer, String> parse(String rawText, String titulo) {
         String[] lines = rawText.replace("\r\n", "\n").replace("\r", "\n").split("\n", -1);
         int titleIndex = findTitleIndex(lines, titulo);
