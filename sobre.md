@@ -1,4 +1,4 @@
-# Concursos — ferramenta local de estudos para concursos públicos
+# PDF2Questao — ferramenta local de estudos para concursos públicos
 
 Uma ferramenta web **100% local**, feita para rodar na minha própria máquina,
 sem login, sem nuvem e sem depender de nenhum serviço externo. A ideia é
@@ -12,7 +12,7 @@ cujas provas venham em PDF.
 ## Stack
 
 - **Java 21 + Spring Boot 3** (MVC + Thymeleaf) no back-end e nas telas.
-- **SQLite** como banco — um único arquivo (`concursos.db`), sem servidor de
+- **SQLite** como banco — um único arquivo (`pdf2questao.db`), sem servidor de
   banco rodando, sem configuração.
 - **Apache PDFBox** para extrair o texto dos PDFs de prova e de gabarito.
 - **Bootstrap 5** + um pouco de JS puro nas telas.
@@ -106,7 +106,7 @@ destaque). Tem também um botão de **exportar o banco** (link "Exportar
 Banco" no menu, e um botão no topo do próprio dashboard) que baixa um dump
 `.sql` completo (schema + dados de todas as tabelas) gerado via JDBC puro —
 não depende de ter o binário `sqlite3` instalado, só do driver que o
-projeto já usa. Serve como backup: dá pra recriar o `concursos.db` do zero
+projeto já usa. Serve como backup: dá pra recriar o `pdf2questao.db` do zero
 rodando o `.sql` baixado.
 
 ### 8. Parsers por banca (arquitetura heurística)

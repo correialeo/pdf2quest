@@ -7,18 +7,18 @@ organizadora, pensado pra crescer sem bagunçar o pacote conforme mais bancas
 forem implementadas:
 
 ```
-com.concursos.study.importer                    # orquestração
+com.pdf2questao.importer                         # orquestração
     Banca, ImportJob, ImportService, ImportController,
     ParseResult, ParsedQuestion, ParseFailure, GabaritoLinkResult
 
-com.concursos.study.importer.parser              # contratos + descoberta
+com.pdf2questao.importer.parser                  # contratos + descoberta
     ExamParser, GabaritoTableParser,
     ExamParserRegistry, GabaritoParserRegistry
 
-com.concursos.study.importer.parser.support      # utilitários genéricos
+com.pdf2questao.importer.parser.support          # utilitários genéricos
     PdfTextUtils, PdfNoiseFilter, PdfMetadataDetector
 
-com.concursos.study.importer.parser.<banca>      # implementação por banca
+com.pdf2questao.importer.parser.<banca>          # implementação por banca
     ex.: importer.parser.fgv.FgvPdfParser, FgvGabaritoParser
 ```
 
@@ -35,7 +35,7 @@ arquitetura.
 
 1. Confirme que a banca já existe no enum `Banca` (`importer/Banca.java`).
    Se não existir, adicione o valor.
-2. Crie o pacote `com.concursos.study.importer.parser.<banca>` (nome em
+2. Crie o pacote `com.pdf2questao.importer.parser.<banca>` (nome em
    minúsculo, ex.: `cesgranrio`).
 3. Implemente `ExamParser`: uma classe `@Component` com `banca()` retornando
    o valor do enum e `parse(String rawText)` retornando um `ParseResult`.

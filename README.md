@@ -1,4 +1,4 @@
-# Concursos
+# PDF2Questao
 
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3-6DB33F)
@@ -73,7 +73,7 @@ banca nova estão em [`CONTRIBUTING.md`](CONTRIBUTING.md).
   o processo.
 - Não há tela de edição para corrigir disciplina/categoria/assunto
   detectados incorretamente; hoje o ajuste é direto no banco SQLite
-  (`concursos.db`).
+  (`pdf2questao.db`).
 - Sem autenticação/multiusuário de propósito — é uma ferramenta pessoal,
   para rodar local.
 

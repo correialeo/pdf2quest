@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.concursos</groupId>
-    <artifactId>study</artifactId>
+    <groupId>com.pdf2questao</groupId>
+    <artifactId>pdf2questao</artifactId>
     <version>1.0.0</version>
-    <name>concursos</name>
-    <description>Ferramenta local de estudos para concursos publicos</description>
+    <name>pdf2questao</name>
+    <description>Ferramenta local de estudos para concursos publicos a partir de provas em PDF</description>
 
     <properties>
         <java.version>21</java.version>
