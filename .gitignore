@@ -4,3 +4,5 @@ concursos.db
 *.class
 .idea/
 *.iml
+.tokensave/
+.claude/
