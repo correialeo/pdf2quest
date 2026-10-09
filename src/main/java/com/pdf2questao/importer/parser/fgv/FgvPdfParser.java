@@ -8,6 +8,8 @@ import com.pdf2questao.importer.parser.ExamParser;
 import com.pdf2questao.importer.parser.support.PdfMetadataDetector;
 import com.pdf2questao.importer.parser.support.PdfNoiseFilter;
 import com.pdf2questao.importer.parser.support.PdfTextUtils;
+import com.pdf2questao.importer.parser.support.QuestionBlocks;
+import com.pdf2questao.importer.parser.support.RichText;
 import com.pdf2questao.question.QuestionCategory;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -62,9 +65,10 @@ public class FgvPdfParser implements ExamParser {
     @Override
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
-        String organization = PdfMetadataDetector.detectOrganization(text);
-        Integer year = PdfMetadataDetector.detectYear(text);
-        Set<String> repeatedBrandingLines = PdfNoiseFilter.detectRepeatedBrandingLines(text);
+        String plainText = RichText.plain(text);
+        String organization = PdfMetadataDetector.detectOrganization(plainText);
+        Integer year = PdfMetadataDetector.detectYear(plainText);
+        Set<String> repeatedBrandingLines = PdfNoiseFilter.detectRepeatedBrandingLines(plainText);
 
         List<ParsedQuestion> questions = new ArrayList<>();
         List<ParseFailure> failures = new ArrayList<>();
@@ -72,11 +76,9 @@ public class FgvPdfParser implements ExamParser {
 
         String currentSubject = null;
         QuestionCategory currentCategory = null;
+        Integer currentPage = null;
 
-        List<String> blockLines = null;
-        int blockNumber = -1;
-        String blockSubject = null;
-        QuestionCategory blockCategory = null;
+        Block block = null;
 
         List<String> pendingSubjectLines = new ArrayList<>();
         boolean inGabaritoSection = false;
@@ -91,8 +93,17 @@ public class FgvPdfParser implements ExamParser {
         // cabecalho sao nome de autor/citacao dentro do texto (comum em Ingles).
         boolean gapHasBodyText = false;
 
+        // Linhas soltas entre questoes viram o texto de apoio das seguintes, ate a
+        // quantidade anunciada ("next six questions"), outro texto ou outra disciplina.
+        Passages passages = new Passages();
+
         for (String rawLine : text.split("\n", -1)) {
-            String line = rawLine.trim();
+            Integer page = RichText.pageOf(rawLine);
+            if (page != null) {
+                currentPage = page;
+            }
+            String rich = RichText.trim(rawLine);
+            String line = RichText.plain(rich);
 
             if (PdfNoiseFilter.isPageNoise(line, repeatedBrandingLines)) {
                 continue;
@@ -111,61 +122,79 @@ public class FgvPdfParser implements ExamParser {
                 String upper = line.toUpperCase(Locale.ROOT);
                 if (upper.contains("GABARITO") || upper.contains("RESPOSTAS")) {
                     currentSubject = commitPendingSubject(pendingSubjectLines, currentSubject);
-                    if (blockLines != null) {
-                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
-                        blockLines = null;
+                    if (block != null) {
+                        flush(block, questions, failures);
+                        block = null;
                     }
                     inGabaritoSection = true;
                     continue;
                 }
                 if (upper.contains("CONHECIMENTOS") && upper.contains("GERA")) {
-                    if (blockLines != null) {
-                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
-                        blockLines = null;
+                    if (block != null) {
+                        flush(block, questions, failures);
+                        block = null;
                     }
                     pendingSubjectLines.clear();
                     currentSubject = null;
                     currentCategory = QuestionCategory.GERAL;
                     gapHasBodyText = false;
+                    passages.reset();
                     continue;
                 }
                 if (upper.contains("CONHECIMENTOS") && upper.contains("ESPEC")) {
-                    if (blockLines != null) {
-                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
-                        blockLines = null;
+                    if (block != null) {
+                        flush(block, questions, failures);
+                        block = null;
                     }
                     pendingSubjectLines.clear();
                     currentSubject = null;
                     currentCategory = QuestionCategory.ESPECIFICO;
                     gapHasBodyText = false;
+                    passages.reset();
                     continue;
                 }
-                if (!gapHasBodyText) {
+                if (!gapHasBodyText && !QuestionBlocks.PASSAGE_TITLE.matcher(line).matches()) {
                     // Titulo de disciplina legitimo: fecha o bloco anterior (se houver)
                     // para o texto de apoio que vem a seguir nao grudar na ultima
                     // alternativa dele.
-                    if (blockLines != null) {
-                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
-                        blockLines = null;
+                    if (block != null) {
+                        flush(block, questions, failures);
+                        block = null;
                     }
                     pendingSubjectLines.add(line);
+                    continue;
                 }
                 // Senao: parece cabecalho mas veio depois de texto corrido ja ter
-                // comecado nesse intervalo - trata como parte do texto de apoio (ignora).
-                continue;
+                // comecado nesse intervalo - e titulo/autor dentro do texto de apoio.
+                if (block == null) {
+                    if (currentCategory != null) {
+                        passages.add(rich);
+                    }
+                    continue;
+                }
             }
-            if (READING_PASSAGE_CUE.matcher(line).find()) {
-                if (blockLines != null) {
-                    flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
-                    blockLines = null;
+            if (READING_PASSAGE_CUE.matcher(line).find()
+                    || (block != null && block.hasAlternatives()
+                    && QuestionBlocks.PASSAGE_TITLE.matcher(line).matches())) {
+                if (block != null) {
+                    flush(block, questions, failures);
+                    block = null;
                 }
                 // Essa frase ja anuncia que um texto de apoio comeca agora - nada
                 // depois dela (nem o titulo do texto) deve ser lido como titulo de
                 // disciplina, entao marca o "gap" como se ja tivesse corpo de texto.
                 gapHasBodyText = true;
+                passages.startNew(QuestionBlocks.cueCount(line));
+                if (QuestionBlocks.PASSAGE_TITLE.matcher(line).matches()) {
+                    passages.add(rich);
+                }
                 continue;
             }
+            String previousSubject = currentSubject;
             currentSubject = commitPendingSubject(pendingSubjectLines, currentSubject);
+            if (!Objects.equals(previousSubject, currentSubject)) {
+                passages.subjectChanged();
+            }
 
             Integer candidateNumber = null;
             String remainder = "";
@@ -173,95 +202,136 @@ public class FgvPdfParser implements ExamParser {
             Matcher sn = STANDALONE_NUMBER.matcher(line);
             if (qm.matches()) {
                 candidateNumber = Integer.parseInt(qm.group(1));
-                remainder = qm.group(2);
+                remainder = RichText.fromVisible(rich, qm.start(2));
             } else if (sn.matches()) {
                 candidateNumber = Integer.parseInt(sn.group(1));
             }
 
             if (candidateNumber != null && (expectedNumber == -1 || candidateNumber == expectedNumber)) {
-                if (blockLines != null) {
-                    flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                if (block != null) {
+                    flush(block, questions, failures);
                 }
-                blockNumber = candidateNumber;
                 expectedNumber = candidateNumber + 1;
-                blockSubject = currentSubject;
-                blockCategory = currentCategory;
-                blockLines = new ArrayList<>();
+                block = new Block(candidateNumber, currentSubject, currentCategory, passages.nextQuestion(),
+                        currentPage);
                 gapHasBodyText = false;
-                if (!remainder.isBlank()) {
-                    blockLines.add(remainder);
+                if (!RichText.plain(remainder).isBlank()) {
+                    block.lines.add(remainder);
                 }
                 continue;
             }
 
-            if (blockLines != null) {
-                blockLines.add(line);
-            } else if (!line.isBlank()) {
-                gapHasBodyText = true;
+            if (block != null) {
+                block.lines.add(rich);
+            } else {
+                if (!line.isBlank()) {
+                    gapHasBodyText = true;
+                }
+                if (currentCategory != null) {
+                    passages.add(rich);
+                }
             }
         }
-        if (blockLines != null) {
-            flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+        if (block != null) {
+            flush(block, questions, failures);
         }
 
         Map<Integer, String> gabaritoMap = parseInlineGabaritoSection(String.join("\n", gabaritoLines));
         if (!gabaritoMap.isEmpty()) {
             questions = questions.stream()
-                    .map(q -> q.correctAnswer() != null ? q : withCorrectAnswer(q, gabaritoMap.get(q.number())))
+                    .map(q -> q.correctAnswer() != null ? q : q.withCorrectAnswer(gabaritoMap.get(q.number())))
                     .collect(Collectors.toCollection(ArrayList::new));
         }
 
         return new ParseResult(organization, year, questions, failures);
     }
 
-    private ParsedQuestion withCorrectAnswer(ParsedQuestion q, String correctAnswer) {
-        return new ParsedQuestion(q.number(), q.statement(), q.alternativeA(), q.alternativeB(),
-                q.alternativeC(), q.alternativeD(), q.alternativeE(), correctAnswer, q.subject(), q.category());
-    }
-
-    private void flush(int number, List<String> lines, String subject, QuestionCategory category,
-                        List<ParsedQuestion> questions, List<ParseFailure> failures) {
-        String blockText = String.join("\n", lines).trim();
-        if (blockText.isBlank()) {
-            failures.add(new ParseFailure(number, "bloco vazio"));
+    private void flush(Block block, List<ParsedQuestion> questions, List<ParseFailure> failures) {
+        if (!QuestionBlocks.hasVisibleText(block.lines)) {
+            failures.add(new ParseFailure(block.number, "bloco vazio"));
             return;
         }
 
-        // ALTERNATIVE_LINE so reconhece a primeira linha de cada alternativa; o texto
-        // completo (quando a alternativa quebra em varias linhas no PDF) vai da onde
-        // essa primeira linha termina ate o inicio da proxima alternativa (ou fim do bloco).
-        record AltMatch(String letter, int contentStart, int matchStart) {
-        }
-        Matcher am = ALTERNATIVE_LINE.matcher(blockText);
-        List<AltMatch> matches = new ArrayList<>();
-        while (am.find()) {
-            matches.add(new AltMatch(am.group(1), am.start(2), am.start()));
-        }
+        QuestionBlocks.Split split = QuestionBlocks.split(block.lines, ALTERNATIVE_LINE);
+        Map<String, String> alternatives = split.alternatives();
+        String statement = split.statement();
 
-        Map<String, String> alternatives = new LinkedHashMap<>();
-        for (int i = 0; i < matches.size(); i++) {
-            AltMatch m = matches.get(i);
-            int end = (i + 1 < matches.size()) ? matches.get(i + 1).matchStart() : blockText.length();
-            String text = blockText.substring(m.contentStart(), end).trim().replaceAll("\\s+", " ");
-            alternatives.putIfAbsent(m.letter(), text);
-        }
-
-        int firstAltStart = matches.isEmpty() ? -1 : matches.get(0).matchStart();
-        String statement = firstAltStart > 0 ? blockText.substring(0, firstAltStart).trim() : blockText;
-
-        if (statement.isBlank() || alternatives.size() < 2) {
-            failures.add(new ParseFailure(number,
+        if (RichText.plain(statement).isBlank() || alternatives.size() < 2) {
+            failures.add(new ParseFailure(block.number,
                     "enunciado ou alternativas insuficientes (" + alternatives.size() + " alternativas encontradas)"));
             return;
         }
 
-        Matcher gm = INLINE_GABARITO.matcher(blockText);
+        Matcher gm = INLINE_GABARITO.matcher(RichText.plain(String.join("\n", block.lines)));
         String correct = gm.find() ? gm.group(1).toUpperCase(Locale.ROOT) : null;
 
-        questions.add(new ParsedQuestion(number, statement,
+        questions.add(new ParsedQuestion(block.number, statement,
                 alternatives.get("A"), alternatives.get("B"), alternatives.get("C"),
                 alternatives.get("D"), alternatives.get("E"),
-                correct, subject, category));
+                correct, block.subject, block.category, block.passage, block.page));
+    }
+
+    private static final class Block {
+        final int number;
+        final String subject;
+        final QuestionCategory category;
+        final String passage;
+        final Integer page;
+        final List<String> lines = new ArrayList<>();
+
+        Block(int number, String subject, QuestionCategory category, String passage, Integer page) {
+            this.number = number;
+            this.subject = subject;
+            this.category = category;
+            this.passage = passage;
+            this.page = page;
+        }
+
+        boolean hasAlternatives() {
+            return ALTERNATIVE_LINE.matcher(RichText.plain(String.join("\n", lines))).find();
+        }
+    }
+
+    private static final class Passages {
+        private final List<String> collecting = new ArrayList<>();
+        private int collectingCount = -1;
+        private String active;
+        private int remaining;
+
+        void add(String richLine) {
+            collecting.add(richLine);
+        }
+
+        void startNew(int count) {
+            collecting.clear();
+            collectingCount = count;
+        }
+
+        void subjectChanged() {
+            active = null;
+        }
+
+        void reset() {
+            collecting.clear();
+            collectingCount = -1;
+            active = null;
+        }
+
+        String nextQuestion() {
+            if (QuestionBlocks.hasVisibleText(collecting)) {
+                active = QuestionBlocks.join(collecting);
+                remaining = collectingCount;
+            }
+            collecting.clear();
+            collectingCount = -1;
+            if (active == null || remaining == 0) {
+                return null;
+            }
+            if (remaining > 0) {
+                remaining--;
+            }
+            return active;
+        }
     }
 
     /**

@@ -8,11 +8,12 @@ import com.pdf2questao.importer.parser.ExamParser;
 import com.pdf2questao.importer.parser.support.PdfMetadataDetector;
 import com.pdf2questao.importer.parser.support.PdfNoiseFilter;
 import com.pdf2questao.importer.parser.support.PdfTextUtils;
+import com.pdf2questao.importer.parser.support.QuestionBlocks;
+import com.pdf2questao.importer.parser.support.RichText;
 import com.pdf2questao.question.QuestionCategory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -45,25 +46,38 @@ public class CesgranrioPdfParser implements ExamParser {
     @Override
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
-        String organization = PdfMetadataDetector.detectOrganization(text);
-        Integer year = detectYear(text);
-        Set<String> repeatedBrandingLines = PdfNoiseFilter.detectRepeatedBrandingLines(text);
+        String plainText = RichText.plain(text);
+        String organization = PdfMetadataDetector.detectOrganization(plainText);
+        Integer year = detectYear(plainText);
+        Set<String> repeatedBrandingLines = PdfNoiseFilter.detectRepeatedBrandingLines(plainText);
 
         List<ParsedQuestion> questions = new ArrayList<>();
         List<ParseFailure> failures = new ArrayList<>();
 
         String currentSubject = null;
         QuestionCategory currentCategory = null;
+        Integer currentPage = null;
         boolean canReadQuestions = false;
 
         List<String> blockLines = null;
         int blockNumber = -1;
         String blockSubject = null;
         QuestionCategory blockCategory = null;
+        String blockPassage = null;
+        Integer blockPage = null;
         int expectedNumber = -1;
 
+        // Linhas fora de qualquer questao formam o texto de apoio das questoes seguintes.
+        List<String> passageLines = new ArrayList<>();
+        String activePassage = null;
+
         for (String rawLine : text.split("\n", -1)) {
-            String line = rawLine.trim();
+            Integer page = RichText.pageOf(rawLine);
+            if (page != null) {
+                currentPage = page;
+            }
+            String rich = RichText.trim(rawLine);
+            String line = RichText.plain(rich);
 
             if (PdfNoiseFilter.isPageNoise(line, repeatedBrandingLines) || isCesgranrioPageNoise(line)) {
                 continue;
@@ -72,12 +86,15 @@ public class CesgranrioPdfParser implements ExamParser {
             Section section = detectSection(line);
             if (section != null) {
                 if (blockLines != null) {
-                    flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                    flush(blockNumber, blockLines, blockSubject, blockCategory, blockPassage, blockPage,
+                            questions, failures);
                     blockLines = null;
                 }
                 currentCategory = section.category();
                 currentSubject = section.subject();
                 canReadQuestions = true;
+                passageLines.clear();
+                activePassage = null;
                 continue;
             }
 
@@ -85,21 +102,35 @@ public class CesgranrioPdfParser implements ExamParser {
                 continue;
             }
 
+            if (blockLines != null && hasAnyAlternative(blockLines)
+                    && QuestionBlocks.PASSAGE_TITLE.matcher(line).matches()) {
+                flush(blockNumber, blockLines, blockSubject, blockCategory, blockPassage, blockPage,
+                        questions, failures);
+                blockLines = null;
+            }
+
             Matcher qm = QUESTION_START.matcher(line);
             if (qm.matches()) {
                 int candidateNumber = Integer.parseInt(qm.group(1));
-                String remainder = qm.group(2) == null ? "" : qm.group(2).trim();
+                String remainder = qm.group(2) == null ? "" : RichText.fromVisible(rich, qm.start(2));
                 if (candidateNumber >= 1 && (expectedNumber == -1 || candidateNumber == expectedNumber)
                         && (blockLines == null || hasAnyAlternative(blockLines))) {
                     if (blockLines != null) {
-                        flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+                        flush(blockNumber, blockLines, blockSubject, blockCategory, blockPassage, blockPage,
+                                questions, failures);
                     }
+                    if (QuestionBlocks.hasVisibleText(passageLines)) {
+                        activePassage = QuestionBlocks.join(passageLines);
+                    }
+                    passageLines.clear();
                     blockNumber = candidateNumber;
                     expectedNumber = candidateNumber + 1;
                     blockSubject = currentSubject;
                     blockCategory = currentCategory;
+                    blockPassage = activePassage;
+                    blockPage = currentPage;
                     blockLines = new ArrayList<>();
-                    if (!remainder.isBlank()) {
+                    if (!RichText.plain(remainder).isBlank()) {
                         blockLines.add(remainder);
                     }
                     continue;
@@ -107,46 +138,31 @@ public class CesgranrioPdfParser implements ExamParser {
             }
 
             if (blockLines != null) {
-                blockLines.add(line);
+                blockLines.add(rich);
+            } else {
+                passageLines.add(rich);
             }
         }
 
         if (blockLines != null) {
-            flush(blockNumber, blockLines, blockSubject, blockCategory, questions, failures);
+            flush(blockNumber, blockLines, blockSubject, blockCategory, blockPassage, blockPage, questions, failures);
         }
 
         return new ParseResult(organization, year, questions, failures);
     }
 
-    private void flush(int number, List<String> lines, String subject, QuestionCategory category,
-                       List<ParsedQuestion> questions, List<ParseFailure> failures) {
-        String blockText = String.join("\n", lines).trim();
-        if (blockText.isBlank()) {
+    private void flush(int number, List<String> lines, String subject, QuestionCategory category, String passage,
+                       Integer page, List<ParsedQuestion> questions, List<ParseFailure> failures) {
+        if (!QuestionBlocks.hasVisibleText(lines)) {
             failures.add(new ParseFailure(number, "bloco vazio"));
             return;
         }
 
-        record AltMatch(String letter, int contentStart, int matchStart) {
-        }
+        QuestionBlocks.Split split = QuestionBlocks.split(lines, ALTERNATIVE_LINE);
+        Map<String, String> alternatives = split.alternatives();
+        String statement = split.statement();
 
-        Matcher am = ALTERNATIVE_LINE.matcher(blockText);
-        List<AltMatch> matches = new ArrayList<>();
-        while (am.find()) {
-            matches.add(new AltMatch(am.group(1), am.start(2), am.start()));
-        }
-
-        Map<String, String> alternatives = new LinkedHashMap<>();
-        for (int i = 0; i < matches.size(); i++) {
-            AltMatch m = matches.get(i);
-            int end = (i + 1 < matches.size()) ? matches.get(i + 1).matchStart() : blockText.length();
-            String text = blockText.substring(m.contentStart(), end).trim().replaceAll("\\s+", " ");
-            alternatives.putIfAbsent(m.letter(), text);
-        }
-
-        int firstAltStart = matches.isEmpty() ? -1 : matches.get(0).matchStart();
-        String statement = firstAltStart > 0 ? blockText.substring(0, firstAltStart).trim() : blockText;
-
-        if (statement.isBlank() || alternatives.size() < 2) {
+        if (RichText.plain(statement).isBlank() || alternatives.size() < 2) {
             failures.add(new ParseFailure(number,
                     "enunciado ou alternativas insuficientes (" + alternatives.size() + " alternativas encontradas)"));
             return;
@@ -155,11 +171,11 @@ public class CesgranrioPdfParser implements ExamParser {
         questions.add(new ParsedQuestion(number, statement,
                 alternatives.get("A"), alternatives.get("B"), alternatives.get("C"),
                 alternatives.get("D"), alternatives.get("E"),
-                null, subject, category));
+                null, subject, category, passage, page));
     }
 
     private boolean hasAnyAlternative(List<String> lines) {
-        return ALTERNATIVE_LINE.matcher(String.join("\n", lines)).find();
+        return ALTERNATIVE_LINE.matcher(RichText.plain(String.join("\n", lines))).find();
     }
 
     private Integer detectYear(String text) {

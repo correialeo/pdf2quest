@@ -261,4 +261,59 @@ class FgvPdfParserTest {
         ParsedQuestion q2 = result.questions().get(1);
         assertEquals("Alternativa C", q2.alternativeC());
     }
+
+    @Test
+    void textoDeApoioViraPassagemDasProximasQuestoesAnunciadas() {
+        String texto = """
+                Conhecimentos Gerais
+                Língua Inglesa
+                Use the following TEXT to answer the next two questions.
+                Technology Consultant Fast Track
+                Jumpstart your IT job search and land your dream job.
+                1
+                The TEXT is about
+                (A) a book.
+                (B) a movie.
+                2
+                The word "land" means
+                (A) get.
+                (B) lose.
+                Raciocínio Lógico
+                3
+                Quanto e 2 + 2?
+                (A) 4.
+                (B) 5.
+                """;
+
+        ParseResult result = parser.parse(texto);
+
+        assertEquals(3, result.questions().size());
+        ParsedQuestion q1 = result.questions().get(0);
+        ParsedQuestion q2 = result.questions().get(1);
+        assertEquals("Technology Consultant Fast Track\nJumpstart your IT job search and land your dream job.",
+                q1.passage());
+        assertEquals(q1.passage(), q2.passage());
+        assertNull(result.questions().get(2).passage());
+        assertEquals("a book.", q1.alternativeA());
+    }
+
+    @Test
+    void preservaDestaquesEPaginaDoTextoExtraidoDoPdf() {
+        String texto = "\u27E6p:3\u27E7Conhecimentos Gerais\n"
+                + "Língua Portuguesa\n"
+                + "\u27E6b\u27E72\u27E6/b\u27E7\n"
+                + "Assinale a opção em que o elemento destacado \u27E6b\u27E7não\u27E6/b\u27E7 funciona.\n"
+                + "(A) Não admira que desse um encontrão em certo homem \u27E6u\u27E7que ia devagar\u27E6/u\u27E7.\n"
+                + "(B) Catete adiante.\n";
+
+        ParsedQuestion q = parser.parse(texto).questions().get(0);
+
+        assertEquals(2, q.number());
+        assertEquals(3, q.page());
+        assertEquals("Língua Portuguesa", q.subject());
+        assertEquals("Assinale a opção em que o elemento destacado \u27E6b\u27E7não\u27E6/b\u27E7 funciona.",
+                q.statement());
+        assertEquals("Não admira que desse um encontrão em certo homem \u27E6u\u27E7que ia devagar\u27E6/u\u27E7.",
+                q.alternativeA());
+    }
 }
