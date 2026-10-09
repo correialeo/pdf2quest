@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +37,8 @@ public final class PdfRichTextExtractor {
     private static final float MIN_IMAGE_SIZE = 40f;
     // Imagem que se repete em mais paginas que isso e logotipo de cabecalho/rodape.
     private static final int MAX_IMAGE_REPEAT = 2;
+    private static final float COLUMN_GAP = 120f;
+    private static final float MIN_INDENT = 8f;
 
     public record ExtractedImage(int index, int page, byte[] png) {
     }
@@ -53,12 +56,12 @@ public final class PdfRichTextExtractor {
 
         Map<Object, Integer> pagesPerImage = new HashMap<>();
         for (PlacedImage img : stripper.images) {
-            pagesPerImage.merge(img.key, 1, Integer::sum);
+            pagesPerImage.merge(img.key(), 1, Integer::sum);
         }
         Set<Integer> dropped = new HashSet<>();
         List<ExtractedImage> images = new ArrayList<>();
         for (PlacedImage img : stripper.images) {
-            if (pagesPerImage.get(img.key) > MAX_IMAGE_REPEAT || img.png == null) {
+            if (img.png == null || pagesPerImage.get(img.key()) > MAX_IMAGE_REPEAT) {
                 dropped.add(img.index);
             } else {
                 images.add(new ExtractedImage(img.index, img.page, img.png));
@@ -74,9 +77,13 @@ public final class PdfRichTextExtractor {
     private static final class PlacedImage {
         int index;
         int page;
-        Object key;
         byte[] png;
         float x0, x1, top;
+
+        // Pelo conteudo: o mesmo logotipo pode vir como um objeto diferente em cada pagina.
+        Object key() {
+            return png == null ? this : java.nio.ByteBuffer.wrap(png);
+        }
     }
 
     private static final class Line {
@@ -95,6 +102,9 @@ public final class PdfRichTextExtractor {
 
         @Override
         protected void startPage(PDPage page) throws IOException {
+            // Pagina deitada (/Rotate) so sai legivel ordenada por posicao; nas demais isso
+            // misturaria as colunas.
+            setSortByPosition(page.getRotation() % 360 != 0);
             GraphicsCollector collector = new GraphicsCollector(page, getCurrentPageNo(), images.size());
             collector.processPage(page);
             underlines = collector.segments;
@@ -135,6 +145,7 @@ public final class PdfRichTextExtractor {
         @Override
         protected void writePageEnd() throws IOException {
             endLine();
+            markIndentedLines();
             placeImages();
             for (Line line : pageLines) {
                 output.write(line.text.toString());
@@ -196,8 +207,40 @@ public final class PdfRichTextExtractor {
             return false;
         }
 
+        /**
+         * Marca linhas recuadas em relacao a margem da propria coluna (ex.: continuacao de
+         * um item da Cebraspe, cujo numero fica na margem).
+         */
+        private void markIndentedLines() {
+            List<Float> xs = pageLines.stream().filter(l -> l.x0 != Float.MAX_VALUE)
+                    .map(l -> l.x0).sorted().toList();
+            List<Float> columnStarts = new ArrayList<>();
+            for (float x : xs) {
+                if (columnStarts.isEmpty() || x > columnStarts.get(columnStarts.size() - 1) + COLUMN_GAP) {
+                    columnStarts.add(x);
+                }
+            }
+            for (Line line : pageLines) {
+                if (line.x0 == Float.MAX_VALUE) {
+                    continue;
+                }
+                float start = columnStarts.get(0);
+                for (float c : columnStarts) {
+                    if (c <= line.x0 + 0.5f) {
+                        start = c;
+                    }
+                }
+                if (line.x0 - start >= MIN_INDENT) {
+                    line.text.insert(0, RichText.INDENT);
+                }
+            }
+        }
+
         /** Cada imagem entra logo depois da linha mais baixa acima dela na mesma coluna. */
         private void placeImages() {
+            record Placement(int lineIdx, PlacedImage img) {
+            }
+            List<Placement> placements = new ArrayList<>();
             for (PlacedImage img : pageImages) {
                 int bestIdx = 0;
                 float bestBottom = -Float.MAX_VALUE;
@@ -209,9 +252,15 @@ public final class PdfRichTextExtractor {
                         bestIdx = i + 1;
                     }
                 }
+                placements.add(new Placement(bestIdx, img));
+            }
+            // Insere de baixo para cima: imagens que caem na mesma linha ficam na ordem da pagina.
+            placements.sort(Comparator.comparingInt(Placement::lineIdx)
+                    .thenComparingDouble(pl -> pl.img().top).reversed());
+            for (Placement pl : placements) {
                 Line imageLine = new Line();
-                imageLine.text.append(RichText.image(img.index));
-                pageLines.add(bestIdx, imageLine);
+                imageLine.text.append(RichText.image(pl.img().index));
+                pageLines.add(pl.lineIdx(), imageLine);
             }
         }
     }
@@ -223,17 +272,14 @@ public final class PdfRichTextExtractor {
         final List<PlacedImage> images = new ArrayList<>();
         private final int pageNumber;
         private int nextIndex;
-        private final float top;
-        private final float left;
+        private final PDRectangle box;
         private final List<float[]> pathLines = new ArrayList<>();
         private final List<float[]> pathRects = new ArrayList<>();
         private Point2D.Float currentPoint = new Point2D.Float();
 
         GraphicsCollector(PDPage page, int pageNumber, int firstIndex) {
             super(page);
-            PDRectangle box = page.getCropBox();
-            this.top = box.getUpperRightY();
-            this.left = box.getLowerLeftX();
+            this.box = page.getCropBox();
             this.pageNumber = pageNumber;
             this.nextIndex = firstIndex;
         }
@@ -241,19 +287,18 @@ public final class PdfRichTextExtractor {
         @Override
         public void drawImage(PDImage pdImage) throws IOException {
             Matrix ctm = getGraphicsState().getCurrentTransformationMatrix();
-            Point2D.Float a = ctm.transformPoint(0, 0);
-            Point2D.Float b = ctm.transformPoint(1, 1);
-            float x0 = Math.min(a.x, b.x) - left;
-            float x1 = Math.max(a.x, b.x) - left;
-            float yTop = top - Math.max(a.y, b.y);
-            float yBottom = top - Math.min(a.y, b.y);
+            float[] r = displayBounds(ctm.transformPoint(0, 0), ctm.transformPoint(1, 1),
+                    ctm.transformPoint(0, 1), ctm.transformPoint(1, 0));
+            float x0 = r[0];
+            float x1 = r[1];
+            float yTop = r[2];
+            float yBottom = r[3];
             if (x1 - x0 < MIN_IMAGE_SIZE || yBottom - yTop < MIN_IMAGE_SIZE) {
                 return;
             }
             PlacedImage img = new PlacedImage();
             img.index = nextIndex++;
             img.page = pageNumber;
-            img.key = pdImage instanceof PDImageXObject x ? x.getCOSObject() : pdImage;
             img.x0 = x0;
             img.x1 = x1;
             img.top = yTop;
@@ -270,11 +315,7 @@ public final class PdfRichTextExtractor {
 
         @Override
         public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3) {
-            float minX = (float) Math.min(Math.min(p0.getX(), p1.getX()), Math.min(p2.getX(), p3.getX()));
-            float maxX = (float) Math.max(Math.max(p0.getX(), p1.getX()), Math.max(p2.getX(), p3.getX()));
-            float minY = (float) Math.min(Math.min(p0.getY(), p1.getY()), Math.min(p2.getY(), p3.getY()));
-            float maxY = (float) Math.max(Math.max(p0.getY(), p1.getY()), Math.max(p2.getY(), p3.getY()));
-            pathRects.add(new float[]{minX, maxX, minY, maxY});
+            pathRects.add(displayBounds(p0, p1, p2, p3));
         }
 
         @Override
@@ -284,7 +325,9 @@ public final class PdfRichTextExtractor {
 
         @Override
         public void lineTo(float x, float y) {
-            pathLines.add(new float[]{currentPoint.x, currentPoint.y, x, y});
+            Point2D.Float a = toDisplay(currentPoint.x, currentPoint.y);
+            Point2D.Float b = toDisplay(x, y);
+            pathLines.add(new float[]{a.x, a.y, b.x, b.y});
             currentPoint = new Point2D.Float(x, y);
         }
 
@@ -333,15 +376,32 @@ public final class PdfRichTextExtractor {
         private void commitPath() {
             for (float[] r : pathRects) {
                 if (r[3] - r[2] <= 2.5f && r[1] - r[0] >= 2f) {
-                    segments.add(new Segment(r[0] - left, r[1] - left, top - (r[2] + r[3]) / 2));
+                    segments.add(new Segment(r[0], r[1], (r[2] + r[3]) / 2));
                 }
             }
             for (float[] l : pathLines) {
                 if (Math.abs(l[1] - l[3]) <= 0.5f && Math.abs(l[0] - l[2]) >= 2f) {
-                    segments.add(new Segment(Math.min(l[0], l[2]) - left, Math.max(l[0], l[2]) - left, top - l[1]));
+                    segments.add(new Segment(Math.min(l[0], l[2]), Math.max(l[0], l[2]), l[1]));
                 }
             }
             clearPath();
+        }
+
+        private Point2D.Float toDisplay(double px, double py) {
+            return new Point2D.Float((float) px - box.getLowerLeftX(), box.getUpperRightY() - (float) py);
+        }
+
+        /** {minX, maxX, minY, maxY} dos pontos, em coordenadas de exibicao. */
+        private float[] displayBounds(Point2D... points) {
+            float[] r = {Float.MAX_VALUE, -Float.MAX_VALUE, Float.MAX_VALUE, -Float.MAX_VALUE};
+            for (Point2D p : points) {
+                Point2D.Float d = toDisplay(p.getX(), p.getY());
+                r[0] = Math.min(r[0], d.x);
+                r[1] = Math.max(r[1], d.x);
+                r[2] = Math.min(r[2], d.y);
+                r[3] = Math.max(r[3], d.y);
+            }
+            return r;
         }
 
         private void clearPath() {

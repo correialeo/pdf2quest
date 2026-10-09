@@ -10,8 +10,12 @@ import java.util.regex.Pattern;
  */
 public final class RichText {
 
-    public static final Pattern TOKEN = Pattern.compile("\u27E6(/?[biu]|img:\\d+|p:\\d+)\u27E7");
+    public static final Pattern TOKEN = Pattern.compile("\u27E6(/?[biu]|img:\\d+|p:\\d+|ind)\u27E7");
     private static final Pattern PAGE_TOKEN = Pattern.compile("\u27E6p:(\\d+)\u27E7");
+    private static final Pattern LAYOUT_TOKEN = Pattern.compile("\u27E6(?:p:\\d+|ind)\u27E7");
+
+    /** Linha recuada em relacao a margem da coluna. */
+    public static final String INDENT = "\u27E6ind\u27E7";
     private static final Pattern IMAGE_TOKEN = Pattern.compile("\u27E6img:(\\d+)\u27E7");
 
     private RichText() {
@@ -42,8 +46,13 @@ public final class RichText {
         return m.find() ? Integer.parseInt(m.group(1)) : null;
     }
 
-    public static String removePageTokens(String rich) {
-        return rich == null ? null : PAGE_TOKEN.matcher(rich).replaceAll("");
+    public static boolean isIndented(String rich) {
+        return rich.contains(INDENT);
+    }
+
+    /** Remove marcadores que so servem aos parsers (pagina, recuo). */
+    public static String removeLayoutTokens(String rich) {
+        return rich == null ? null : LAYOUT_TOKEN.matcher(rich).replaceAll("");
     }
 
     /** Troca os indices provisorios de imagem (ordem de extracao) pelos ids persistidos. */

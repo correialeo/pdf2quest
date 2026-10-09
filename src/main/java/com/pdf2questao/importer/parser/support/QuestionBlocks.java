@@ -58,7 +58,7 @@ public final class QuestionBlocks {
     }
 
     public static String join(List<String> richLines) {
-        return RichText.trim(RichText.removePageTokens(String.join("\n", richLines)));
+        return RichText.trim(RichText.removeLayoutTokens(String.join("\n", richLines)));
     }
 
     public static boolean hasVisibleText(List<String> richLines) {
