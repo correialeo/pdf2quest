@@ -252,3 +252,22 @@ h1, h2, h3, h4, h5 {
 ::selection {
     background-color: var(--accent-soft);
 }
+
+/* Texto importado do PDF: preserva quebras de linha e mostra os destaques da prova */
+.rich-text {
+    white-space: pre-line;
+}
+
+.rich-text u {
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+.question-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0.75rem 0;
+    background: #fff;
+    border-radius: 0.375rem;
+}

@@ -9,28 +9,36 @@
         <span class="badge bg-secondary" th:text="${studySession.mode}"></span>
     </div>
 
+    <div class="d-flex flex-wrap gap-2 mb-2" th:if="${passage != null or hasPdf}">
+        <button th:if="${passage != null}" type="button" class="btn btn-sm btn-outline-primary"
+                data-bs-toggle="modal" data-bs-target="#passageModal">Ver texto base</button>
+        <a th:if="${hasPdf}" class="btn btn-sm btn-outline-secondary" target="_blank"
+           th:href="@{/import/{id}/pdf(id=${question.importJobId})} + (${question.page != null} ? '#page=' + ${question.page} : '')"
+           th:text="${question.page != null} ? 'Abrir PDF da prova (pág. ' + ${question.page} + ')' : 'Abrir PDF da prova'"></a>
+    </div>
+
     <div class="card p-4 mb-3">
-        <p class="mb-4" style="white-space: pre-line;" th:text="${question.statement}"></p>
+        <p class="mb-4 rich-text" th:utext="${@richText.html(question.statement)}"></p>
 
         <div class="form-check mb-2" th:if="${question.alternativeA != null}">
             <input class="form-check-input answer-option" type="radio" name="answer" value="A" id="optA"/>
-            <label class="form-check-label" for="optA"><strong>A)</strong> <span th:text="${question.alternativeA}"></span></label>
+            <label class="form-check-label" for="optA"><strong>A)</strong> <span class="rich-text" th:utext="${@richText.html(question.alternativeA)}"></span></label>
         </div>
         <div class="form-check mb-2" th:if="${question.alternativeB != null}">
             <input class="form-check-input answer-option" type="radio" name="answer" value="B" id="optB"/>
-            <label class="form-check-label" for="optB"><strong>B)</strong> <span th:text="${question.alternativeB}"></span></label>
+            <label class="form-check-label" for="optB"><strong>B)</strong> <span class="rich-text" th:utext="${@richText.html(question.alternativeB)}"></span></label>
         </div>
         <div class="form-check mb-2" th:if="${question.alternativeC != null}">
             <input class="form-check-input answer-option" type="radio" name="answer" value="C" id="optC"/>
-            <label class="form-check-label" for="optC"><strong>C)</strong> <span th:text="${question.alternativeC}"></span></label>
+            <label class="form-check-label" for="optC"><strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(question.alternativeC)}"></span></label>
         </div>
         <div class="form-check mb-2" th:if="${question.alternativeD != null}">
             <input class="form-check-input answer-option" type="radio" name="answer" value="D" id="optD"/>
-            <label class="form-check-label" for="optD"><strong>D)</strong> <span th:text="${question.alternativeD}"></span></label>
+            <label class="form-check-label" for="optD"><strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(question.alternativeD)}"></span></label>
         </div>
         <div class="form-check mb-2" th:if="${question.alternativeE != null}">
             <input class="form-check-input answer-option" type="radio" name="answer" value="E" id="optE"/>
-            <label class="form-check-label" for="optE"><strong>E)</strong> <span th:text="${question.alternativeE}"></span></label>
+            <label class="form-check-label" for="optE"><strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(question.alternativeE)}"></span></label>
         </div>
 
         <div id="saveStatus" class="form-text mt-2"></div>
@@ -46,6 +54,18 @@
         </form>
     </div>
 </main>
+
+<div th:if="${passage != null}" class="modal fade" id="passageModal" tabindex="-1" aria-labelledby="passageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="passageModalLabel">Texto base</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body rich-text" th:utext="${@richText.html(passage.content)}"></div>
+        </div>
+    </div>
+</div>
 
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script th:inline="javascript">

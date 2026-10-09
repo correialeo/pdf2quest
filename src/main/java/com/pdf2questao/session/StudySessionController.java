@@ -1,5 +1,8 @@
 package com.pdf2questao.session;
 
+import com.pdf2questao.importer.ImportJobRepository;
+import com.pdf2questao.importer.PdfStorage;
+import com.pdf2questao.question.PassageRepository;
 import com.pdf2questao.question.Question;
 import com.pdf2questao.question.QuestionRepository;
 import org.springframework.stereotype.Controller;
@@ -18,10 +21,18 @@ public class StudySessionController {
 
     private final StudySessionService sessionService;
     private final QuestionRepository questionRepository;
+    private final PassageRepository passageRepository;
+    private final ImportJobRepository importJobRepository;
+    private final PdfStorage pdfStorage;
 
-    public StudySessionController(StudySessionService sessionService, QuestionRepository questionRepository) {
+    public StudySessionController(StudySessionService sessionService, QuestionRepository questionRepository,
+                                  PassageRepository passageRepository, ImportJobRepository importJobRepository,
+                                  PdfStorage pdfStorage) {
         this.sessionService = sessionService;
         this.questionRepository = questionRepository;
+        this.passageRepository = passageRepository;
+        this.importJobRepository = importJobRepository;
+        this.pdfStorage = pdfStorage;
     }
 
     @GetMapping("/simulado")
@@ -50,6 +61,10 @@ public class StudySessionController {
 
         model.addAttribute("studySession", session);
         model.addAttribute("question", question);
+        model.addAttribute("passage", question.getPassageId() == null ? null
+                : passageRepository.findById(question.getPassageId()).orElse(null));
+        model.addAttribute("hasPdf", question.getImportJobId() != null && importJobRepository
+                .findById(question.getImportJobId()).map(pdfStorage::exists).orElse(false));
         model.addAttribute("index", index);
         model.addAttribute("total", ids.size());
         model.addAttribute("hasPrevious", index > 0);
