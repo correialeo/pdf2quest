@@ -1,0 +1,8 @@
+<div th:fragment="tools(q)" class="question-tools mt-3 pt-3 border-top" th:attr="data-question-id=${q.id}">
+    <details th:open="${q.note != null}">
+        <summary>Observação</summary>
+        <textarea class="form-control form-control-sm question-note mt-2" rows="2"
+                  placeholder="Anotações sobre esta questão" th:text="${q.note}"></textarea>
+        <div class="form-text question-note-status"></div>
+    </details>
+</div>

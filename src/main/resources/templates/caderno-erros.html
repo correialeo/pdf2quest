@@ -19,6 +19,7 @@
             <span class="text-muted" th:if="${q.year != null}"> — <span th:text="${q.year}"></span></span>
         </p>
         <p class="rich-text" th:utext="${@richText.html(q.statement)}"></p>
+        <p class="text-muted rich-text" th:if="${q.note != null}" th:text="'Observação: ' + ${q.note}"></p>
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

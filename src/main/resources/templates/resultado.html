@@ -26,6 +26,8 @@
             <span th:if="${item.question.subject != null}" class="text-muted" th:text="'— ' + ${item.question.subject}"></span>
         </p>
         <p class="rich-text" th:utext="${@richText.html(item.question.statement)}"></p>
+        <p class="text-muted rich-text" th:if="${item.question.note != null}"
+           th:text="'Observação: ' + ${item.question.note}"></p>
         <p>
             <strong>Sua resposta:</strong>
             <span th:text="${item.selectedAnswer} ?: 'não respondida'"

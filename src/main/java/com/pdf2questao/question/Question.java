@@ -55,6 +55,9 @@ public class Question {
     @Lob
     private String explanation;
 
+    @Lob
+    private String note;
+
     private String subject;
     private String topic;
     private String organization;

@@ -31,8 +31,35 @@
         });
     }
 
+    function postJson(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error(response.status);
+            }
+        });
+    }
+
+    function setupQuestionTools() {
+        document.querySelectorAll('.question-tools').forEach(function (tools) {
+            var questionId = tools.getAttribute('data-question-id');
+            var note = tools.querySelector('.question-note');
+            var status = tools.querySelector('.question-note-status');
+
+            note.addEventListener('change', function () {
+                postJson('/questoes/' + questionId + '/observacao', {note: note.value})
+                    .then(function () { status.textContent = 'Observação salva.'; })
+                    .catch(function () { status.textContent = 'Falha ao salvar a observação.'; });
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         setupThemeToggle();
         highlightActiveNavLink();
+        setupQuestionTools();
     });
 })();

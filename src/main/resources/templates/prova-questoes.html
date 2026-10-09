@@ -38,6 +38,7 @@
         <p class="mb-1" th:if="${q.alternativeC != null}"><strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeC)}"></span></p>
         <p class="mb-1" th:if="${q.alternativeD != null}"><strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeD)}"></span></p>
         <p class="mb-1" th:if="${q.alternativeE != null}"><strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeE)}"></span></p>
+        <div th:replace="~{fragments/question-tools :: tools(${q})}"></div>
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

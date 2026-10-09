@@ -271,3 +271,13 @@ h1, h2, h3, h4, h5 {
     background: #fff;
     border-radius: 0.375rem;
 }
+
+.alternative-struck .form-check-label {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+.strike-toggle {
+    font-size: 0.8rem;
+    vertical-align: baseline;
+}
