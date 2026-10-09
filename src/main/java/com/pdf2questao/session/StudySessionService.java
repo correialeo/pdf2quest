@@ -106,6 +106,9 @@ public class StudySessionService {
                 }
             } else if (Boolean.FALSE.equals(attempt.getCorrect())) {
                 wrongCount++;
+                if (session.getMode() == SessionMode.SIMULADO && isCertoErrado(attempt.getQuestionId())) {
+                    nota -= dataprevWeight(attempt.getQuestionId());
+                }
             }
         }
 
@@ -135,6 +138,14 @@ public class StudySessionService {
                     attempt != null ? attempt.getCorrect() : null));
         }
         return items;
+    }
+
+    /** Na Cebraspe (Certo/Errado) cada item errado anula um certo. */
+    private boolean isCertoErrado(Long questionId) {
+        return questionRepository.findById(questionId)
+                .map(q -> q.getAlternativeA() == null && q.getAlternativeB() == null
+                        && q.getAlternativeC() != null && q.getAlternativeE() != null)
+                .orElse(false);
     }
 
     private double dataprevWeight(Long questionId) {
