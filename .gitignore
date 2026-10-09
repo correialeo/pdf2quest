@@ -6,3 +6,5 @@ concursos.db
 *.iml
 .tokensave/
 .claude/
+data/
+*.db.bak-*
