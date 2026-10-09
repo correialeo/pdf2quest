@@ -2,6 +2,10 @@ package com.pdf2questao.importer;
 
 import com.pdf2questao.importer.parser.ExamParserRegistry;
 import com.pdf2questao.importer.parser.GabaritoParserRegistry;
+import com.pdf2questao.question.Passage;
+import com.pdf2questao.question.PassageRepository;
+import com.pdf2questao.question.Question;
+import com.pdf2questao.question.QuestionRepository;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,6 +21,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Controller
 public class ImportController {
@@ -26,15 +35,20 @@ public class ImportController {
     private final ExamParserRegistry examParserRegistry;
     private final GabaritoParserRegistry gabaritoParserRegistry;
     private final PdfStorage pdfStorage;
+    private final QuestionRepository questionRepository;
+    private final PassageRepository passageRepository;
 
     public ImportController(ImportService importService, ImportJobRepository importJobRepository,
                              ExamParserRegistry examParserRegistry, GabaritoParserRegistry gabaritoParserRegistry,
-                             PdfStorage pdfStorage) {
+                             PdfStorage pdfStorage, QuestionRepository questionRepository,
+                             PassageRepository passageRepository) {
         this.importService = importService;
         this.importJobRepository = importJobRepository;
         this.examParserRegistry = examParserRegistry;
         this.gabaritoParserRegistry = gabaritoParserRegistry;
         this.pdfStorage = pdfStorage;
+        this.questionRepository = questionRepository;
+        this.passageRepository = passageRepository;
     }
 
     @GetMapping("/import")
@@ -66,6 +80,23 @@ public class ImportController {
         model.addAttribute("job", job);
         model.addAttribute("hasPdf", pdfStorage.exists(job));
         return "import-result";
+    }
+
+    @GetMapping("/import/{id}/questoes")
+    public String questions(@PathVariable Long id, Model model) {
+        ImportJob job = importJobRepository.findById(id).orElseThrow();
+        List<Question> questions = questionRepository.findByImportJobId(id).stream()
+                .sorted(Comparator.comparing(Question::getQuestionNumber,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        Map<Long, Passage> passages = passageRepository.findAllById(questions.stream()
+                        .map(Question::getPassageId).filter(Objects::nonNull).distinct().toList())
+                .stream().collect(Collectors.toMap(Passage::getId, p -> p));
+        model.addAttribute("job", job);
+        model.addAttribute("questions", questions);
+        model.addAttribute("passages", passages);
+        model.addAttribute("hasPdf", pdfStorage.exists(job));
+        return "prova-questoes";
     }
 
     @PostMapping("/import/{id}/reprocessar")

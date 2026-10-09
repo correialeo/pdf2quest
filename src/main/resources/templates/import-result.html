@@ -54,7 +54,7 @@
     </div>
 
     <a href="/import" class="btn btn-secondary mt-3">Importar outro PDF</a>
-    <a href="/questoes" class="btn btn-primary mt-3">Ver questões</a>
+    <a th:href="@{/import/{id}/questoes(id=${job.id})}" class="btn btn-primary mt-3">Ver questões</a>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

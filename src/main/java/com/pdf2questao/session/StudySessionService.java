@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,6 +45,15 @@ public class StudySessionService {
             ids.addAll(questionRepository.findRandomIdsByCategory(QuestionCategory.ESPECIFICO.name(), qtyEspecificas));
             Collections.shuffle(ids);
         }
+        return createSession(SessionMode.SIMULADO, ids);
+    }
+
+    public StudySession startProva(Long importJobId) {
+        List<Long> ids = questionRepository.findByImportJobId(importJobId).stream()
+                .sorted(Comparator.comparing(Question::getQuestionNumber,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(Question::getId)
+                .toList();
         return createSession(SessionMode.SIMULADO, ids);
     }
 

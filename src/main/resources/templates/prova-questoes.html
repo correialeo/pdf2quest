@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Questões da Prova')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h1 class="mb-1">Questões da Prova</h1>
+            <span class="text-muted" th:text="${job.fileName} + ' — ' + ${questions.size()} + ' questões'"></span>
+        </div>
+        <div class="d-flex gap-2">
+            <a th:if="${hasPdf}" th:href="@{/import/{id}/pdf(id=${job.id})}" target="_blank"
+               class="btn btn-outline-secondary">Abrir PDF</a>
+            <form method="post" th:action="@{/import/{id}/simulado(id=${job.id})}" th:if="${!questions.isEmpty()}">
+                <button type="submit" class="btn btn-success">Iniciar simulado</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card p-4 mb-3" th:each="q, it : ${questions}"
+         th:with="passage=${q.passageId != null} ? ${passages[q.passageId]} : null,
+                  firstOfPassage=${passage != null and (it.first or questions[it.index - 1].passageId != q.passageId)}">
+        <p class="mb-2">
+            <strong th:text="'Questão ' + ${q.questionNumber}"></strong>
+            <span class="text-muted" th:if="${q.subject != null}" th:text="'— ' + ${q.subject}"></span>
+            <span class="text-muted" th:if="${q.page != null}" th:text="'— pág. ' + ${q.page}"></span>
+        </p>
+
+        <details class="mb-3" th:if="${passage != null}" th:open="${firstOfPassage}">
+            <summary>Texto base</summary>
+            <div class="rich-text mt-2" th:utext="${@richText.html(passage.content)}"></div>
+        </details>
+
+        <p class="mb-3 rich-text" th:utext="${@richText.html(q.statement)}"></p>
+        <p class="mb-1" th:if="${q.alternativeA != null}"><strong>A)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeA)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeB != null}"><strong>B)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeB)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeC != null}"><strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeC)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeD != null}"><strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeD)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeE != null}"><strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeE)}"></span></p>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

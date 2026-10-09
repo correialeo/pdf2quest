@@ -47,6 +47,12 @@ public class StudySessionController {
         return "redirect:/resolver/" + session.getId() + "?index=0";
     }
 
+    @PostMapping("/import/{importJobId}/simulado")
+    public String iniciarProva(@PathVariable Long importJobId) {
+        StudySession session = sessionService.startProva(importJobId);
+        return "redirect:/resolver/" + session.getId() + "?index=0";
+    }
+
     @GetMapping("/resolver/{id}")
     public String resolver(@PathVariable Long id, @RequestParam(defaultValue = "0") int index, Model model) {
         StudySession session = sessionService.getSession(id);
