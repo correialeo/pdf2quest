@@ -43,11 +43,22 @@
         </div>
         <p class="text-muted">
             Ano, disciplina e categoria (Conhecimentos Gerais/Específicos) são detectados
-            automaticamente a partir do próprio texto da prova. "Assunto" não é detectado e pode
-            ser preenchido depois na tela de Questões.
+            automaticamente a partir do próprio texto da prova. Quando a prova não traz o título
+            da disciplina nos Conhecimentos Específicos, ela é sugerida pelo conteúdo da questão.
+            "Assunto" não é detectado e pode ser preenchido depois na tela de Questões.
         </p>
         <button type="submit" class="btn btn-primary">Importar</button>
     </form>
+
+    <div class="card p-4 mt-4" th:if="${!jobs.isEmpty()}">
+        <h5>Provas importadas</h5>
+        <ul class="list-unstyled mb-0">
+            <li th:each="j : ${jobs}" class="mb-1">
+                <a th:href="@{/import/result/{id}(id=${j.id})}" th:text="${j.fileName}"></a>
+                <span class="text-muted" th:text="'— ' + ${j.importedQuestions} + ' questões'"></span>
+            </li>
+        </ul>
+    </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

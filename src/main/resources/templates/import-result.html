@@ -16,6 +16,38 @@
             <span class="badge bg-danger" th:text="${job.failedQuestions}"></span></p>
     </div>
 
+    <div class="alert alert-danger" th:if="${reprocess != null and reprocess.error != null}" th:text="${reprocess.error}"></div>
+    <div class="alert alert-success" th:if="${reprocess != null and reprocess.error == null}">
+        <span th:text="${reprocess.updatedQuestions}"></span> questões atualizadas
+        (<span th:text="${reprocess.images}"></span> imagens,
+        <span th:text="${reprocess.passages}"></span> textos base,
+        <span th:text="${reprocess.subjectsFilled}"></span> disciplinas preenchidas).
+        <span th:if="${!reprocess.notFoundNumbers.isEmpty()}">
+            Não encontradas no PDF: <span th:text="${reprocess.notFoundNumbers}"></span>.
+        </span>
+    </div>
+
+    <div class="card p-4 mb-4">
+        <h5>PDF da prova</h5>
+        <p th:if="${hasPdf}" class="mb-2">
+            <a th:href="@{/import/{id}/pdf(id=${job.id})}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir PDF</a>
+        </p>
+        <p th:unless="${hasPdf}" class="text-muted">
+            Esta importação não tem o PDF guardado. Envie o mesmo arquivo para guardá-lo e
+            reprocessar as questões.
+        </p>
+        <form method="post" th:action="@{/import/{id}/reprocessar(id=${job.id})}" enctype="multipart/form-data">
+            <div class="mb-2" th:unless="${hasPdf}">
+                <input type="file" name="file" accept="application/pdf" class="form-control" required/>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Reprocessar questões</button>
+            <div class="form-text">
+                Lê o PDF de novo e atualiza as questões existentes (destaques, imagens, textos base,
+                página e disciplinas vazias). Gabarito, simulados e respostas são mantidos.
+            </div>
+        </form>
+    </div>
+
     <div class="card p-4" th:if="${job.errorLog != null and !job.errorLog.isBlank()}">
         <h5>Erros durante a importação</h5>
         <pre th:text="${job.errorLog}"></pre>

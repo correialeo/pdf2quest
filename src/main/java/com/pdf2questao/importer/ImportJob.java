@@ -33,4 +33,6 @@ public class ImportJob {
     private String detectedOrganization;
     private Integer detectedYear;
     private String banca;
+
+    private String pdfPath;
 }

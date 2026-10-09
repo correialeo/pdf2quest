@@ -47,6 +47,11 @@ public class Question {
     /** ImportJob que originou esta questao (usado para linkar o gabarito correto). */
     private Long importJobId;
 
+    /** Pagina do PDF original onde a questao comeca. */
+    private Integer page;
+
+    private Long passageId;
+
     @Lob
     private String explanation;
 
