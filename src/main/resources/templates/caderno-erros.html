@@ -19,6 +19,31 @@
             <span class="text-muted" th:if="${q.year != null}"> — <span th:text="${q.year}"></span></span>
         </p>
         <p class="rich-text" th:utext="${@richText.html(q.statement)}"></p>
+        <p class="mb-1 alternative" th:if="${q.alternativeA != null}"
+           th:classappend="${wrongAnswers[q.id] == 'A'} ? 'alternative-wrong'">
+            <strong>A)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeA)}"></span>
+            <span class="badge bg-danger ms-1" th:if="${wrongAnswers[q.id] == 'A'}">Sua resposta</span>
+        </p>
+        <p class="mb-1 alternative" th:if="${q.alternativeB != null}"
+           th:classappend="${wrongAnswers[q.id] == 'B'} ? 'alternative-wrong'">
+            <strong>B)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeB)}"></span>
+            <span class="badge bg-danger ms-1" th:if="${wrongAnswers[q.id] == 'B'}">Sua resposta</span>
+        </p>
+        <p class="mb-1 alternative" th:if="${q.alternativeC != null}"
+           th:classappend="${wrongAnswers[q.id] == 'C'} ? 'alternative-wrong'">
+            <strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeC)}"></span>
+            <span class="badge bg-danger ms-1" th:if="${wrongAnswers[q.id] == 'C'}">Sua resposta</span>
+        </p>
+        <p class="mb-1 alternative" th:if="${q.alternativeD != null}"
+           th:classappend="${wrongAnswers[q.id] == 'D'} ? 'alternative-wrong'">
+            <strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeD)}"></span>
+            <span class="badge bg-danger ms-1" th:if="${wrongAnswers[q.id] == 'D'}">Sua resposta</span>
+        </p>
+        <p class="mb-1 alternative" th:if="${q.alternativeE != null}"
+           th:classappend="${wrongAnswers[q.id] == 'E'} ? 'alternative-wrong'">
+            <strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeE)}"></span>
+            <span class="badge bg-danger ms-1" th:if="${wrongAnswers[q.id] == 'E'}">Sua resposta</span>
+        </p>
         <p class="text-muted rich-text" th:if="${q.note != null}" th:text="'Observação: ' + ${q.note}"></p>
     </div>
 </main>
