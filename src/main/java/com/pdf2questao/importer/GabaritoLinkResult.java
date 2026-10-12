@@ -7,6 +7,13 @@ public record GabaritoLinkResult(
         int totalGabarito,
         int totalQuestions,
         List<Integer> unmatchedQuestionNumbers,
-        String errorMessage
+        String errorMessage,
+        List<Integer> annulledQuestionNumbers,
+        List<String> report
 ) {
+
+    public GabaritoLinkResult(int matched, int totalGabarito, int totalQuestions,
+                              List<Integer> unmatchedQuestionNumbers, String errorMessage) {
+        this(matched, totalGabarito, totalQuestions, unmatchedQuestionNumbers, errorMessage, List.of(), List.of());
+    }
 }

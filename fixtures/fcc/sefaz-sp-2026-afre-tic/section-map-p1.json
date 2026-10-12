@@ -1,0 +1,8 @@
+[
+  {"from": 1,  "to": 30,  "subject": "Língua Portuguesa"},
+  {"from": 31, "to": 45,  "subject": "Matemática Financeira/Estatística"},
+  {"from": 46, "to": 60,  "subject": "Raciocínio Crítico"},
+  {"from": 61, "to": 70,  "subject": "Inglês"},
+  {"from": 71, "to": 85,  "subject": "Administração Geral e Pública"},
+  {"from": 86, "to": 100, "subject": "Economia e Finanças Públicas"}
+]

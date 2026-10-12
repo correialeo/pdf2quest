@@ -35,4 +35,8 @@ public class ImportJob {
     private String banca;
 
     private String pdfPath;
+
+    /** Relatorio da importacao (totais, questoes para revisar, divergencias com o gabarito). */
+    @Lob
+    private String report;
 }

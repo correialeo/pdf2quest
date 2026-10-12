@@ -1,7 +1,9 @@
 package com.pdf2questao.importer;
 
+import com.pdf2questao.importer.ocr.OcrService;
 import com.pdf2questao.importer.parser.ExamParser;
 import com.pdf2questao.importer.parser.ExamParserRegistry;
+import com.pdf2questao.importer.parser.GabaritoEntries;
 import com.pdf2questao.importer.parser.GabaritoParserRegistry;
 import com.pdf2questao.importer.parser.GabaritoTableParser;
 import com.pdf2questao.importer.parser.support.PdfRichTextExtractor;
@@ -42,11 +44,13 @@ public class ImportService {
     private final QuestionImageRepository questionImageRepository;
     private final PdfStorage pdfStorage;
     private final SpecificSubjectClassifier subjectClassifier;
+    private final OcrService ocrService;
 
     public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
                           ExamParserRegistry examParserRegistry, GabaritoParserRegistry gabaritoParserRegistry,
                           PassageRepository passageRepository, QuestionImageRepository questionImageRepository,
-                          PdfStorage pdfStorage, SpecificSubjectClassifier subjectClassifier) {
+                          PdfStorage pdfStorage, SpecificSubjectClassifier subjectClassifier,
+                          OcrService ocrService) {
         this.questionRepository = questionRepository;
         this.importJobRepository = importJobRepository;
         this.examParserRegistry = examParserRegistry;
@@ -55,10 +59,20 @@ public class ImportService {
         this.questionImageRepository = questionImageRepository;
         this.pdfStorage = pdfStorage;
         this.subjectClassifier = subjectClassifier;
+        this.ocrService = ocrService;
     }
 
     public ImportJob importPdf(MultipartFile file, Banca banca, String examOverride, String organizationOverride,
                                 Integer yearOverride) {
+        return importPdf(file, banca, examOverride, organizationOverride, yearOverride, null);
+    }
+
+    /**
+     * @param sectionMapJson mapa de disciplinas por faixa de questoes (ver {@link SectionMap}); tem
+     *                       prioridade sobre os titulos de secao detectados no PDF. Opcional.
+     */
+    public ImportJob importPdf(MultipartFile file, Banca banca, String examOverride, String organizationOverride,
+                                Integer yearOverride, String sectionMapJson) {
         ImportJob job = new ImportJob();
         job.setFileName(file.getOriginalFilename());
         job.setBanca(banca.name());
@@ -73,11 +87,24 @@ public class ImportService {
             return importJobRepository.save(job);
         }
 
+        SectionMap sectionMap;
+        try {
+            sectionMap = SectionMap.parse(sectionMapJson);
+        } catch (IllegalArgumentException e) {
+            job.setImportedQuestions(0);
+            job.setFailedQuestions(0);
+            job.setErrorLog(e.getMessage());
+            job.setFinishedAt(LocalDateTime.now());
+            return importJobRepository.save(job);
+        }
+
         byte[] bytes;
         PdfRichTextExtractor.Extraction extraction;
+        boolean usedOcr;
         try {
             bytes = file.getBytes();
-            extraction = extract(bytes);
+            usedOcr = ocrService.needsOcr(bytes);
+            extraction = usedOcr ? ocr(bytes) : extract(bytes);
         } catch (IOException e) {
             job.setImportedQuestions(0);
             job.setFailedQuestions(0);
@@ -96,6 +123,7 @@ public class ImportService {
         job.setErrorLog(failureLog(result));
         job.setDetectedOrganization(result.organization());
         job.setDetectedYear(result.year());
+        job.setReport(ImportReport.forExam(file.getOriginalFilename(), result, sectionMap, usedOcr));
         job.setFinishedAt(LocalDateTime.now());
         ImportJob savedJob = importJobRepository.save(job);
         storePdf(savedJob, bytes);
@@ -113,7 +141,9 @@ public class ImportService {
                     q.setSource(file.getOriginalFilename());
                     q.setImportJobId(savedJob.getId());
                     applyParsedContent(q, pq, attachments);
-                    q.setSubject(subjectFor(pq));
+                    var section = sectionMap.find(pq.number());
+                    q.setSubject(section.map(SectionMap.Section::subject).orElseGet(() -> subjectFor(pq)));
+                    section.map(SectionMap.Section::topic).ifPresent(q::setTopic);
                     return q;
                 })
                 .collect(Collectors.toList());
@@ -147,7 +177,7 @@ public class ImportService {
             } else {
                 return ReprocessResult.error("Esta importacao nao tem PDF guardado - envie o arquivo da prova.");
             }
-            extraction = extract(bytes);
+            extraction = ocrService.needsOcr(bytes) ? ocr(bytes) : extract(bytes);
         } catch (IOException e) {
             return ReprocessResult.error("Falha ao ler o PDF: " + e.getMessage());
         }
@@ -196,6 +226,15 @@ public class ImportService {
         try (PDDocument document = Loader.loadPDF(bytes)) {
             return PdfRichTextExtractor.extract(document);
         }
+    }
+
+    /** PDF sem camada de texto: o texto vem do OCR (com cache em disco), sem imagens extraidas. */
+    private PdfRichTextExtractor.Extraction ocr(byte[] bytes) throws IOException {
+        if (!ocrService.isAvailable()) {
+            throw new IOException("o PDF nao tem camada de texto e o Tesseract com o idioma configurado "
+                    + "(por) nao esta instalado - veja pdf2questao.ocr.* no application.properties");
+        }
+        return new PdfRichTextExtractor.Extraction(ocrService.recognize(bytes), List.of());
     }
 
     private void storePdf(ImportJob job, byte[] bytes) {
@@ -254,6 +293,8 @@ public class ImportService {
         q.setAlternativeE(remapImages(pq.alternativeE(), images));
         q.setPage(pq.page());
         q.setPassageId(pq.passage() == null ? null : attachments.passageIds().get(pq.passage()));
+        q.setNeedsReview(pq.needsReview());
+        q.setReviewReason(pq.reviewReason());
     }
 
     private String remapImages(String rich, Map<Integer, Long> imageIds) {
@@ -295,8 +336,9 @@ public class ImportService {
             return new GabaritoLinkResult(0, 0, 0, List.of(), "Falha ao ler o PDF: " + e.getMessage());
         }
 
-        Map<Integer, String> answers = gabaritoParser.parse(text, titulo);
-        if (answers.isEmpty()) {
+        GabaritoEntries entries = gabaritoParser.parseEntries(text, titulo);
+        Map<Integer, String> answers = entries.answers();
+        if (entries.totalRead() == 0) {
             return new GabaritoLinkResult(0, 0, 0, List.of(),
                     "Titulo nao encontrado no PDF de gabarito: " + titulo);
         }
@@ -305,11 +347,20 @@ public class ImportService {
 
         int matched = 0;
         List<Integer> unmatched = new ArrayList<>();
+        List<Integer> annulled = new ArrayList<>();
         for (Question q : questions) {
             Integer number = q.getQuestionNumber();
+            if (number != null && entries.annulled().contains(number)) {
+                q.setAnnulled(true);
+                q.setCorrectAnswer(null);
+                annulled.add(number);
+                matched++;
+                continue;
+            }
             String letter = number != null ? answers.get(number) : null;
             if (letter != null) {
                 q.setCorrectAnswer(letter);
+                q.setAnnulled(false);
                 matched++;
             } else {
                 unmatched.add(number);
@@ -317,7 +368,15 @@ public class ImportService {
         }
         questionRepository.saveAll(questions);
 
-        return new GabaritoLinkResult(matched, answers.size(), questions.size(), unmatched, null);
+        List<String> report = ImportReport.gabaritoLines(entries, questions.stream()
+                .map(Question::getQuestionNumber).filter(Objects::nonNull).toList());
+        importJobRepository.findById(importJobId).ifPresent(job -> {
+            job.setReport(appendLine(job.getReport(), String.join("\n", report)));
+            importJobRepository.save(job);
+        });
+
+        return new GabaritoLinkResult(matched, entries.totalRead(), questions.size(), unmatched, null,
+                annulled, report);
     }
 
     private boolean hasText(String s) {

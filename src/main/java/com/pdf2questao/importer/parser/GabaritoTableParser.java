@@ -21,4 +21,12 @@ public interface GabaritoTableParser {
      *         perfil nao for encontrado no texto.
      */
     Map<Integer, String> parse(String rawText, String titulo);
+
+    /**
+     * Versao completa da leitura, com questoes anuladas, total declarado e avisos. Bancas que
+     * nao distinguem esses casos herdam a leitura simples de {@link #parse}.
+     */
+    default GabaritoEntries parseEntries(String rawText, String titulo) {
+        return GabaritoEntries.ofAnswers(parse(rawText, titulo));
+    }
 }

@@ -1,0 +1,6 @@
+[
+  {"from": 1,  "to": 10, "subject": "Direito Tributário Avançado"},
+  {"from": 11, "to": 15, "subject": "Legislação Tributária Avançada"},
+  {"from": 16, "to": 20, "subject": "Contabilidade Avançada e de Custos"},
+  {"from": 21, "to": 80, "subject": "Tecnologia da Informação e Comunicação"}
+]

@@ -65,12 +65,17 @@ public class ImportController {
                           @RequestParam(value = "exam", required = false) String exam,
                           @RequestParam(value = "organizationOverride", required = false) String organizationOverride,
                           @RequestParam(value = "yearOverride", required = false) Integer yearOverride,
-                          RedirectAttributes redirectAttributes) {
+                          @RequestParam(value = "sectionMap", required = false) String sectionMap,
+                          @RequestParam(value = "sectionMapFile", required = false) MultipartFile sectionMapFile,
+                          RedirectAttributes redirectAttributes) throws IOException {
         if (file.isEmpty()) {
             redirectAttributes.addFlashAttribute("error", "Selecione um arquivo PDF.");
             return "redirect:/import";
         }
-        ImportJob job = importService.importPdf(file, banca, exam, organizationOverride, yearOverride);
+        // O arquivo JSON, quando enviado, vale mais que o texto colado.
+        String sectionMapJson = sectionMapFile != null && !sectionMapFile.isEmpty()
+                ? new String(sectionMapFile.getBytes(), StandardCharsets.UTF_8) : sectionMap;
+        ImportJob job = importService.importPdf(file, banca, exam, organizationOverride, yearOverride, sectionMapJson);
         return "redirect:/import/result/" + job.getId();
     }
 
@@ -132,7 +137,7 @@ public class ImportController {
     @PostMapping("/import/gabarito")
     public String gabaritoUpload(@RequestParam("file") MultipartFile file,
                                   @RequestParam("banca") Banca banca,
-                                  @RequestParam("titulo") String titulo,
+                                  @RequestParam(value = "titulo", required = false, defaultValue = "") String titulo,
                                   @RequestParam("importJobId") Long importJobId,
                                   RedirectAttributes redirectAttributes) {
         if (file.isEmpty()) {

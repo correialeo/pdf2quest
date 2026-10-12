@@ -52,6 +52,15 @@ public class Question {
 
     private Long passageId;
 
+    /** Leitura incerta (OCR, imagem, tabela, codigo): conferir no PDF original. */
+    private boolean needsReview;
+
+    @Column(length = 500)
+    private String reviewReason;
+
+    /** Questao anulada pela banca: conta ponto para todos e nao tem letra correta. */
+    private boolean annulled;
+
     @Lob
     private String explanation;
 

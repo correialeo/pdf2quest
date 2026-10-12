@@ -8,3 +8,6 @@ concursos.db
 .claude/
 data/
 *.db.bak-*
+
+# PDFs de provas (material da banca, nao versionar); os mapas de secao .json ficam
+fixtures/**/*.pdf

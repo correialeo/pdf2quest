@@ -41,6 +41,18 @@
                 <input type="number" name="yearOverride" class="form-control"/>
             </div>
         </div>
+        <div class="mb-3">
+            <label class="form-label">Mapa de seções por faixa de questões (opcional, JSON)</label>
+            <textarea name="sectionMap" rows="5" class="form-control font-monospace"
+                      placeholder='[{"from": 1, "to": 31, "subject": "Língua Portuguesa"}, {"from": 32, "to": 46, "subject": "Matemática Financeira/Estatística"}]'></textarea>
+            <input type="file" name="sectionMapFile" accept="application/json,.json" class="form-control mt-2"/>
+            <div class="form-text">
+                Preenche a disciplina (<code>subject</code>) de cada questão pelo número. Cada faixa aceita
+                também <code>"topic"</code>. Tem prioridade sobre os títulos de seção detectados no PDF; se
+                enviar o arquivo, ele vale mais que o texto colado. PDFs sem camada de texto (imagem) são
+                lidos por OCR (Tesseract, idioma <code>por</code>) — leva alguns segundos por página.
+            </div>
+        </div>
         <p class="text-muted">
             Ano, disciplina e categoria (Conhecimentos Gerais/Específicos) são detectados
             automaticamente a partir do próprio texto da prova. Quando a prova não traz o título

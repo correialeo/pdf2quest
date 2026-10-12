@@ -9,7 +9,7 @@
     <div class="alert alert-danger" th:if="${result.errorMessage != null}" th:text="${result.errorMessage}"></div>
 
     <div class="card p-4 mb-4" th:if="${result.errorMessage == null}">
-        <p><strong>Título buscado:</strong> <span th:text="${titulo}"></span></p>
+        <p th:if="${titulo != null and !titulo.isBlank()}"><strong>Título buscado:</strong> <span th:text="${titulo}"></span></p>
         <p><strong>Respostas encontradas no gabarito:</strong>
             <span class="badge bg-secondary" th:text="${result.totalGabarito}"></span></p>
         <p><strong>Questões da importação:</strong>
@@ -20,6 +20,11 @@
             <strong>Questões sem correspondência no gabarito:</strong>
             <span class="badge bg-warning text-dark" th:text="${result.unmatchedQuestionNumbers}"></span>
         </p>
+        <p th:if="${!result.annulledQuestionNumbers.isEmpty()}">
+            <strong>Questões anuladas (contam ponto para todos):</strong>
+            <span class="badge bg-info text-dark" th:text="${result.annulledQuestionNumbers}"></span>
+        </p>
+        <pre class="mb-0" th:if="${!result.report.isEmpty()}" th:text="${#strings.listJoin(result.report, '\n')}"></pre>
     </div>
 
     <a href="/import/gabarito" class="btn btn-secondary mt-3">Importar outro gabarito</a>

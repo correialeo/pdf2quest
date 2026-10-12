@@ -1,0 +1,7 @@
+[
+  {"from": 1,  "to": 25, "subject": "Direito (Constitucional, Administrativo, Civil, Empresarial, Financeiro e Penal)"},
+  {"from": 26, "to": 40, "subject": "Direito Tributário"},
+  {"from": 41, "to": 55, "subject": "Legislação Tributária"},
+  {"from": 56, "to": 70, "subject": "Contabilidade Geral"},
+  {"from": 71, "to": 80, "subject": "Auditoria"}
+]
