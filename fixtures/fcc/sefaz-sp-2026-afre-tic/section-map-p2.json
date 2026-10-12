@@ -1,5 +1,10 @@
 [
-  {"from": 1,  "to": 25, "subject": "Direito (Constitucional, Administrativo, Civil, Empresarial, Financeiro e Penal)"},
+  {"from": 1,  "to": 5,  "subject": "Direito Constitucional"},
+  {"from": 6,  "to": 9,  "subject": "Direito Administrativo"},
+  {"from": 10, "to": 13, "subject": "Direito Civil"},
+  {"from": 14, "to": 17, "subject": "Direito Empresarial"},
+  {"from": 18, "to": 21, "subject": "Direito Financeiro"},
+  {"from": 22, "to": 25, "subject": "Direito Penal"},
   {"from": 26, "to": 40, "subject": "Direito Tributário"},
   {"from": 41, "to": 55, "subject": "Legislação Tributária"},
   {"from": 56, "to": 70, "subject": "Contabilidade Geral"},

@@ -346,12 +346,12 @@ public class BlockService {
 
         save(draft(findByName(DIAG_1), DIAG_1, "P1: Português 1-10, Mat. Financeira/Estatística 32-46, "
                         + "Administração 71-86, Economia 87-100.", null, profileId,
-                List.of(new SourceForm(p1.toString(), "1-10, 32-46, 71-86, 87-100", null, null, null, null, null, false)),
+                List.of(new SourceForm(p1.toString(), "1-10, 31-45, 71-85, 86-100", null, null, null, null, null, false)),
                 ""));
-        // Civil (10-13), Empresarial (14-17) e Penal (22-25) dentro de P2 1-26, conforme a ordem do caderno.
-        save(draft(findByName(DIAG_2), DIAG_2, "P2: Direito 1-26 (sem Civil, Empresarial e Penal), "
-                        + "Contabilidade 57-71; P3: TIC 21-40.", null, profileId,
-                List.of(new SourceForm(p2.toString(), "1-26, 57-71", null, null, null, null, null, false),
+        // Dentro de P2 1-25: Civil (10-13), Empresarial (14-17) e Penal (22-25) ficam de fora; Financeiro (18-21) fica.
+        save(draft(findByName(DIAG_2), DIAG_2, "P2: Direito 1-25 (sem Civil, Empresarial e Penal), "
+                        + "Contabilidade 56-70; P3: TIC 21-40.", null, profileId,
+                List.of(new SourceForm(p2.toString(), "1-25, 56-70", null, null, null, null, null, false),
                         new SourceForm(p3.toString(), "21-40", null, null, null, null, null, false)),
                 p2 + ":10-17, " + p2 + ":22-25"));
         return "Blocos de diagnóstico criados/atualizados.";

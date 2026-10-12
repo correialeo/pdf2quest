@@ -4,5 +4,7 @@
   {"from": 46, "to": 60,  "subject": "Raciocínio Crítico"},
   {"from": 61, "to": 70,  "subject": "Inglês"},
   {"from": 71, "to": 85,  "subject": "Administração Geral e Pública"},
-  {"from": 86, "to": 100, "subject": "Economia e Finanças Públicas"}
+  {"from": 86, "to": 88,  "subject": "Economia"},
+  {"from": 89, "to": 89,  "subject": "Direito Financeiro e Finanças Públicas"},
+  {"from": 90, "to": 100, "subject": "Economia"}
 ]

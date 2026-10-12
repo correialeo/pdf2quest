@@ -77,12 +77,14 @@ class BlockSessionIntegrationTest {
     void criaOsDoisBlocosDeDiagnosticoIniciaSessoesEPontuaComPerfil() {
         String prefix = "fcc-2026-sefaz-sp-auditor-fiscal-";
         Long p1 = job(prefix + "conhecimentos-gerais-p1-prova.pdf", 100, new String[][]{
-                {"1", "31", "Língua Portuguesa"}, {"32", "46", "Matemática Financeira/Estatística"},
-                {"47", "70", "Outras"}, {"71", "86", "Administração Geral e Pública"},
-                {"87", "100", "Economia e Finanças Públicas"}}, false);
+                {"1", "30", "Língua Portuguesa"}, {"31", "45", "Matemática Financeira/Estatística"},
+                {"46", "70", "Outras"}, {"71", "85", "Administração Geral e Pública"},
+                {"86", "100", "Economia"}, {"89", "89", "Direito Financeiro e Finanças Públicas"}}, false);
         Long p2 = job(prefix + "conhecimentos-basicos-p2-prova.pdf", 80, new String[][]{
-                {"1", "26", "Direito (Constitucional, Administrativo, Civil, Empresarial, Financeiro e Penal)"},
-                {"27", "56", "Direito Tributário"}, {"57", "71", "Contabilidade Geral"}, {"72", "80", "Auditoria"}}, false);
+                {"1", "5", "Direito Constitucional"}, {"6", "9", "Direito Administrativo"},
+                {"10", "13", "Direito Civil"}, {"14", "17", "Direito Empresarial"}, {"18", "21", "Direito Financeiro"},
+                {"22", "25", "Direito Penal"}, {"26", "55", "Direito Tributário"},
+                {"56", "70", "Contabilidade Geral"}, {"71", "80", "Auditoria"}}, false);
         job(prefix + "conhecimentos-especificos-p3-prova.pdf", 80, new String[][]{
                 {"1", "20", "Direito Tributário Avançado"},
                 {"21", "80", "Tecnologia da Informação e Comunicação"}}, false);
@@ -98,29 +100,33 @@ class BlockSessionIntegrationTest {
         StudyBlock s2 = blocks.stream().filter(b -> b.getName().equals(BlockService.DIAG_2)).findFirst().orElseThrow();
         assertNotNull(s1.getScoringProfileId());
 
-        // Sessao 1: P1 1-10, 32-46, 71-86, 87-100 = 10 + 15 + 16 + 14.
+        // Sessao 1: P1 1-10, 31-45, 71-85, 86-100 = 10 + 15 + 15 + 15 (Q89 e Direito Financeiro e Financas Publicas).
         BlockService.Preview preview1 = blockService.preview(s1.getId());
         assertEquals(55, preview1.total());
-        assertEquals(10, preview1.bySubject().get("Língua Portuguesa"));
-        assertEquals(15, preview1.bySubject().get("Matemática Financeira/Estatística"));
-        assertEquals(16, preview1.bySubject().get("Administração Geral e Pública"));
-        assertEquals(14, preview1.bySubject().get("Economia e Finanças Públicas"));
+        assertEquals(10, preview1.bySubject().get("L\u00edngua Portuguesa"));
+        assertEquals(15, preview1.bySubject().get("Matem\u00e1tica Financeira/Estat\u00edstica"));
+        assertEquals(15, preview1.bySubject().get("Administra\u00e7\u00e3o Geral e P\u00fablica"));
+        assertEquals(14, preview1.bySubject().get("Economia"));
+        assertEquals(1, preview1.bySubject().get("Direito Financeiro e Finan\u00e7as P\u00fablicas"));
         assertTrue(preview1.unweightedSubjects().isEmpty(), preview1.unweightedSubjects().toString());
 
-        // Sessao 2: P2 1-26 sem 10-17 e 22-25 (= 14), P2 57-71 (15), P3 21-40 (20).
+        // Sessao 2: P2 1-25 sem 10-17 e 22-25 (= 1-9 e 18-21: 13), P2 56-70 (15), P3 21-40 (20).
         BlockService.Preview preview2 = blockService.preview(s2.getId());
-        assertEquals(14 + 15 + 20, preview2.total());
-        assertEquals(14, preview2.bySubject().get(
-                "Direito (Constitucional, Administrativo, Civil, Empresarial, Financeiro e Penal)"));
-        List<Question> p2Questions = questionRepository.findByImportJobId(p2);
-        assertEquals(80, p2Questions.size(), "o banco nao perde nenhuma questao");
+        assertEquals(13 + 15 + 20, preview2.total());
+        assertEquals(5, preview2.bySubject().get("Direito Constitucional"));
+        assertEquals(4, preview2.bySubject().get("Direito Administrativo"));
+        assertEquals(4, preview2.bySubject().get("Direito Financeiro"));
+        assertFalse(preview2.bySubject().containsKey("Direito Civil"));
+        assertFalse(preview2.bySubject().containsKey("Direito Empresarial"));
+        assertFalse(preview2.bySubject().containsKey("Direito Penal"));
+        assertEquals(15, preview2.bySubject().get("Contabilidade Geral"));
+        assertEquals(20, preview2.bySubject().get("Tecnologia da Informa\u00e7\u00e3o e Comunica\u00e7\u00e3o"));
+        assertTrue(preview2.unweightedSubjects().isEmpty(), preview2.unweightedSubjects().toString());
+        assertEquals(80, questionRepository.findByImportJobId(p2).size(), "o banco nao perde nenhuma questao");
         List<Integer> direito = blockService.resolve(s2.getId()).questions().stream()
-                .filter(q -> p2.equals(q.getImportJobId()) && q.getQuestionNumber() <= 26)
+                .filter(q -> p2.equals(q.getImportJobId()) && q.getQuestionNumber() <= 25)
                 .map(Question::getQuestionNumber).toList();
-        assertFalse(direito.contains(10) || direito.contains(17) || direito.contains(22) || direito.contains(25));
-        assertTrue(direito.contains(1) && direito.contains(9) && direito.contains(18) && direito.contains(21)
-                && direito.contains(26));
-        assertEquals(14, direito.size());
+        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 18, 19, 20, 21), direito);
 
         // Sessao de bloco: guarda bloco e perfil; anulada sem resposta conta ponto; resultado por disciplina.
         Question toAnnul = blockService.resolve(s1.getId()).questions().stream()

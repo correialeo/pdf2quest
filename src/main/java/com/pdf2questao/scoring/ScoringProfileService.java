@@ -41,14 +41,14 @@ public class ScoringProfileService implements ApplicationRunner {
              "groups": [
                {"name": "P1", "minScore": 45, "rules": [
                  {"subject": "Adm. Geral/P\\u00fablica/Auditoria", "aliases": ["Administra\\u00e7\\u00e3o Geral e P\\u00fablica", "Auditoria"], "weight": 1, "questionCount": 8},
-                 {"subject": "Dir. Administrativo", "weight": 1, "questionCount": 10},
-                 {"subject": "Dir. Constitucional", "weight": 1, "questionCount": 10},
+                 {"subject": "Dir. Administrativo", "aliases": ["Direito Administrativo"], "weight": 1, "questionCount": 10},
+                 {"subject": "Dir. Constitucional", "aliases": ["Direito Constitucional"], "weight": 1, "questionCount": 10},
                  {"subject": "Economia", "aliases": ["Economia e Finan\\u00e7as P\\u00fablicas"], "weight": 1, "questionCount": 4},
                  {"subject": "Portugu\\u00eas", "aliases": ["L\\u00edngua Portuguesa"], "weight": 1, "questionCount": 10},
                  {"subject": "Mat. Financeira/Estat\\u00edstica", "aliases": ["Matem\\u00e1tica Financeira/Estat\\u00edstica"], "weight": 1, "questionCount": 6},
                  {"subject": "Adm. Financeira e Or\\u00e7ament\\u00e1ria", "weight": 2, "questionCount": 8},
                  {"subject": "Contabilidade Geral e P\\u00fablica", "aliases": ["Contabilidade Geral"], "weight": 2, "questionCount": 8},
-                 {"subject": "Direito Financeiro", "weight": 2, "questionCount": 8},
+                 {"subject": "Direito Financeiro", "aliases": ["Finan\\u00e7as P\\u00fablicas", "Direito Financeiro e Finan\\u00e7as P\\u00fablicas"], "weight": 2, "questionCount": 8},
                  {"subject": "Flu\\u00eancia de Dados", "weight": 2, "questionCount": 8}]},
                {"name": "P2", "minScore": 48, "rules": [
                  {"subject": "Ci\\u00eancia de Dados e TI", "aliases": ["Tecnologia da Informa\\u00e7\\u00e3o e Comunica\\u00e7\\u00e3o"], "weight": 3, "questionCount": 40}]}
