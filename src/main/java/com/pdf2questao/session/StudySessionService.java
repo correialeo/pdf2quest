@@ -1,8 +1,14 @@
 package com.pdf2questao.session;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pdf2questao.block.BlockService;
+import com.pdf2questao.block.StudyBlock;
 import com.pdf2questao.question.Question;
 import com.pdf2questao.question.QuestionCategory;
 import com.pdf2questao.question.QuestionRepository;
+import com.pdf2questao.scoring.ScoringCalculator;
+import com.pdf2questao.scoring.ScoringProfileService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,12 +25,45 @@ public class StudySessionService {
     private final StudySessionRepository sessionRepository;
     private final AttemptRepository attemptRepository;
     private final QuestionRepository questionRepository;
+    private final BlockService blockService;
+    private final ScoringProfileService profileService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public StudySessionService(StudySessionRepository sessionRepository, AttemptRepository attemptRepository,
-                                QuestionRepository questionRepository) {
+                                QuestionRepository questionRepository, BlockService blockService,
+                                ScoringProfileService profileService) {
         this.sessionRepository = sessionRepository;
         this.attemptRepository = attemptRepository;
         this.questionRepository = questionRepository;
+        this.blockService = blockService;
+        this.profileService = profileService;
+    }
+
+    /** Inicia uma sessao com as questoes do bloco (origens, faixas e exclusoes ja aplicadas). */
+    public StudySession startBloco(Long blockId) {
+        StudyBlock block = blockService.find(blockId).orElseThrow();
+        List<Long> ids = blockService.questionIds(blockId);
+        if (ids.isEmpty()) {
+            throw new IllegalStateException("O bloco '" + block.getName() + "' nao tem questoes.");
+        }
+        StudySession session = createSession(SessionMode.SIMULADO, ids);
+        session.setBlockId(block.getId());
+        session.setBlockName(block.getName());
+        session.setScoringProfileId(block.getScoringProfileId());
+        session.setTimeLimitMinutes(block.getTimeLimitMinutes());
+        return sessionRepository.save(session);
+    }
+
+    /** Resultado do perfil de pontuacao congelado no fim da sessao (null se a sessao nao usa perfil). */
+    public ScoringCalculator.ScoreResult scoreResult(StudySession session) {
+        if (session.getScoreReport() == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(session.getScoreReport(), ScoringCalculator.ScoreResult.class);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
     }
 
     public StudySession startPractice(String subject, String topic, Integer year, String organization,
@@ -82,7 +121,9 @@ public class StudySessionService {
         attempt.setSelectedAnswer(selectedAnswer);
         attempt.setAnsweredAt(LocalDateTime.now());
         attempt.setElapsedMilliseconds(elapsedMillis);
-        Boolean correct = question.getCorrectAnswer() == null ? null
+        // Questao anulada conta ponto para todos, qualquer que seja a resposta.
+        Boolean correct = question.isAnnulled() ? Boolean.TRUE
+                : question.getCorrectAnswer() == null ? null
                 : question.getCorrectAnswer().equalsIgnoreCase(selectedAnswer);
         attempt.setCorrect(correct);
         attemptRepository.save(attempt);
@@ -112,14 +153,56 @@ public class StudySessionService {
             }
         }
 
+        // Questao anulada conta ponto para todos, mesmo sem resposta.
+        Map<Long, Attempt> answered = attempts.stream()
+                .collect(Collectors.toMap(Attempt::getQuestionId, a -> a, (a, b) -> a));
+        Map<Long, Question> sessionQuestions = questionRepository.findAllById(session.questionIds()).stream()
+                .collect(Collectors.toMap(Question::getId, q -> q));
+        for (Question q : sessionQuestions.values()) {
+            if (q.isAnnulled() && !answered.containsKey(q.getId())) {
+                correctCount++;
+            }
+        }
+
+        if (session.getScoringProfileId() != null) {
+            applyScoringProfile(session, sessionQuestions, answered);
+        }
+
         int total = session.questionIds().size();
         session.setCorrectCount(correctCount);
         session.setWrongCount(wrongCount);
         session.setPercent(total == 0 ? 0.0 : (correctCount * 100.0) / total);
         session.setTotalElapsedMillis(totalElapsed);
-        session.setNotaDataprev(session.getMode() == SessionMode.SIMULADO ? nota : null);
+        // Sessao com perfil de pontuacao usa a nota do perfil; as demais mantem a nota Dataprev de sempre.
+        session.setNotaDataprev(session.getMode() == SessionMode.SIMULADO && session.getScoringProfileId() == null
+                ? nota : null);
         session.setFinishedAt(LocalDateTime.now());
         return sessionRepository.save(session);
+    }
+
+    private void applyScoringProfile(StudySession session, Map<Long, Question> questions,
+                                     Map<Long, Attempt> answered) {
+        var spec = profileService.spec(session.getScoringProfileId()).orElse(null);
+        if (spec == null) {
+            return;
+        }
+        List<ScoringCalculator.Item> items = new ArrayList<>();
+        for (Long id : session.questionIds()) {
+            Question q = questions.get(id);
+            if (q == null) {
+                continue;
+            }
+            Attempt attempt = answered.get(id);
+            items.add(new ScoringCalculator.Item(q.getSubject(), attempt == null ? null : attempt.getCorrect(),
+                    q.isAnnulled()));
+        }
+        ScoringCalculator.ScoreResult result = ScoringCalculator.calculate(spec, items);
+        session.setScoreTotal(result.total());
+        try {
+            session.setScoreReport(objectMapper.writeValueAsString(result));
+        } catch (JsonProcessingException e) {
+            session.setScoreReport(null);
+        }
     }
 
     public List<ReviewItem> review(Long sessionId) {

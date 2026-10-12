@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Bloco')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <h1 class="mb-2" th:text="${block.name}"></h1>
+    <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+    <p class="text-muted" th:if="${block.description != null}" th:text="${block.description}"></p>
+    <p>
+        <span class="badge bg-secondary" th:if="${block.timeLimitMinutes != null}"
+              th:text="${block.timeLimitMinutes} + ' min'"></span>
+        <span class="badge bg-info text-dark" th:if="${profile != null}" th:text="'Perfil: ' + ${profile}"></span>
+        <span class="text-muted" th:if="${!exclusions.isBlank()}" th:text="'Exclusões: ' + ${exclusions}"></span>
+    </p>
+
+    <div th:replace="~{fragments/block-preview :: preview(${preview})}"></div>
+
+    <form method="post" th:action="@{/blocos/{id}/iniciar(id=${block.id})}" class="d-inline">
+        <button type="submit" class="btn btn-success" th:disabled="${preview.total == 0}">Iniciar sessão</button>
+    </form>
+    <a th:href="@{/blocos/{id}/editar(id=${block.id})}" class="btn btn-outline-secondary">Editar</a>
+    <a href="/blocos" class="btn btn-secondary">Voltar</a>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

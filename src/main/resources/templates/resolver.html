@@ -6,7 +6,11 @@
 <main class="container page">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4>Questão <span th:text="${index + 1}"></span> de <span th:text="${total}"></span></h4>
-        <span class="badge bg-secondary" th:text="${studySession.mode}"></span>
+        <span>
+            <span class="badge bg-warning text-dark" id="countdown" th:if="${remainingSeconds != null}"></span>
+            <span class="badge bg-secondary" th:if="${studySession.blockName != null}" th:text="${studySession.blockName}"></span>
+            <span class="badge bg-secondary" th:text="${studySession.mode}"></span>
+        </span>
     </div>
 
     <div class="d-flex flex-wrap gap-2 mb-2" th:if="${passage != null or hasPdf}">
@@ -78,6 +82,21 @@
     const sessionId = /*[[${studySession.id}]]*/ 0;
     const questionId = /*[[${question.id}]]*/ 0;
     const startTime = Date.now();
+
+    // Tempo limite do bloco: contagem regressiva; ao zerar apenas avisa (a sessao nao e encerrada sozinha).
+    const remainingSeconds = /*[[${remainingSeconds}]]*/ null;
+    if (remainingSeconds !== null) {
+        const deadline = Date.now() + remainingSeconds * 1000;
+        const badge = document.getElementById('countdown');
+        const tick = function () {
+            const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+            const m = Math.floor(left / 60), s = left % 60;
+            badge.textContent = left === 0 ? 'Tempo esgotado' : m + ':' + String(s).padStart(2, '0');
+            if (left === 0) { clearInterval(timer); }
+        };
+        const timer = setInterval(tick, 1000);
+        tick();
+    }
 
     // Alternativas riscadas ficam so no navegador: sao rascunho da resolucao, nao resposta.
     const strikeKey = 'strike:' + sessionId + ':' + questionId;

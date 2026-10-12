@@ -38,6 +38,17 @@ public class StudySession {
     private Double notaDataprev;
     private Long totalElapsedMillis;
 
+    /** Bloco de estudo de onde a sessao saiu (null para sessoes de prova inteira/pratica). */
+    private Long blockId;
+    private String blockName;
+    private Integer timeLimitMinutes;
+    private Long scoringProfileId;
+    private Double scoreTotal;
+
+    /** Resultado por disciplina/grupo em JSON, congelado no fim da sessao. */
+    @Lob
+    private String scoreReport;
+
     public java.util.List<Long> questionIds() {
         if (questionIdsOrder == null || questionIdsOrder.isBlank()) {
             return java.util.List.of();

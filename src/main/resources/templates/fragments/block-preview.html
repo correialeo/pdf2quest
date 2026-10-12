@@ -1,0 +1,28 @@
+<div th:fragment="preview(preview)" class="card p-4 mb-4">
+    <h5>Pré-visualização</h5>
+    <p><strong>Total de questões:</strong> <span class="badge bg-primary" th:text="${preview.total}"></span>
+        <span class="text-muted" th:if="${preview.excluded > 0}"
+              th:text="'(' + ${preview.excluded} + ' excluídas pelo bloco)'"></span></p>
+    <table class="table table-sm" th:if="${!preview.bySubject.isEmpty()}">
+        <thead><tr><th>Disciplina</th><th class="text-end">Questões</th></tr></thead>
+        <tbody>
+        <tr th:each="e : ${preview.bySubject}">
+            <td th:text="${e.key}"></td>
+            <td class="text-end" th:text="${e.value}"></td>
+        </tr>
+        </tbody>
+    </table>
+    <p class="mb-1"><strong>Por origem:</strong></p>
+    <ul>
+        <li th:each="s : ${preview.perSource}"><span th:text="${s.label}"></span> —
+            <strong th:text="${s.count}"></strong></li>
+    </ul>
+    <div class="alert alert-warning mb-2" th:if="${!preview.warnings.isEmpty()}">
+        <div th:each="w : ${preview.warnings}" th:text="${w}"></div>
+    </div>
+    <div class="alert alert-warning mb-0" th:if="${!preview.unweightedSubjects.isEmpty()}">
+        Disciplinas sem peso no perfil de pontuação (não valem ponto):
+        <span th:each="e, st : ${preview.unweightedSubjects}"
+              th:text="${e.key} + ' (' + ${e.value} + ')' + (${st.last} ? '' : ', ')"></span>
+    </div>
+</div>

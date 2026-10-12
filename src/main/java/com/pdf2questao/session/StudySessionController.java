@@ -66,6 +66,9 @@ public class StudySessionController {
         Question question = questionRepository.findById(ids.get(index)).orElseThrow();
 
         model.addAttribute("studySession", session);
+        model.addAttribute("remainingSeconds", session.getTimeLimitMinutes() == null || session.getStartedAt() == null
+                ? null : Math.max(0, session.getTimeLimitMinutes() * 60L
+                - java.time.Duration.between(session.getStartedAt(), java.time.LocalDateTime.now()).getSeconds()));
         model.addAttribute("question", question);
         model.addAttribute("passage", question.getPassageId() == null ? null
                 : passageRepository.findById(question.getPassageId()).orElse(null));
@@ -101,6 +104,7 @@ public class StudySessionController {
         model.addAttribute("total", totalQuestions);
         model.addAttribute("avgMillis", avgMillis);
         model.addAttribute("review", sessionService.review(id));
+        model.addAttribute("score", sessionService.scoreResult(session));
         return "resultado";
     }
 

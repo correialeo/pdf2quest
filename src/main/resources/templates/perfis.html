@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Perfis de pontuação')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <h1 class="mb-3">Perfis de pontuação</h1>
+    <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+    <p class="text-muted">
+        Um perfil define o peso de cada disciplina, a nota mínima de cada grupo (ex.: P1, P2) e a nota mínima
+        total. Questões anuladas contam como acerto; erros não descontam.
+    </p>
+
+    <div class="card p-4 mb-3" th:each="p : ${profiles}">
+        <h5 th:text="${p.profile.name}"></h5>
+        <p class="text-muted" th:if="${p.profile.description != null}" th:text="${p.profile.description}"></p>
+        <p th:if="${p.spec.minTotal() != null}">Mínimo total: <strong th:text="${p.spec.minTotal()}"></strong></p>
+        <div th:each="g : ${p.spec.groups()}" class="mb-2">
+            <strong th:text="${g.name()}"></strong>
+            <span th:if="${g.minScore() != null}" th:text="'— mínimo ' + ${g.minScore()}"></span>
+            <ul class="mb-0">
+                <li th:each="r : ${g.rules()}"
+                    th:text="${r.subject()} + ': ' + ${r.questionCount()} + ' q × ' + ${r.weight()}"></li>
+            </ul>
+        </div>
+    </div>
+
+    <form method="post" action="/perfis" class="card p-4">
+        <h5>Criar ou atualizar perfil (JSON)</h5>
+        <textarea name="json" rows="14" class="form-control font-monospace"
+                  th:text="${json != null} ? ${json} : ${exampleJson}"></textarea>
+        <div class="form-text">
+            Se já existir um perfil com o mesmo <code>name</code>, as regras dele são substituídas (sessões já
+            feitas mantêm o resultado que tinham). Cada regra aceita <code>aliases</code>: outros nomes de
+            disciplina que contam para ela.
+        </div>
+        <button type="submit" class="btn btn-primary mt-3 align-self-start">Salvar perfil</button>
+    </form>
+    <a href="/blocos" class="btn btn-secondary mt-3">Voltar aos blocos</a>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

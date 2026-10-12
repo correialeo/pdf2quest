@@ -19,6 +19,46 @@
         <p><strong>Tempo médio por questão:</strong> <span th:text="${#numbers.formatDecimal(avgMillis / 1000.0, 1, 1)} + 's'"></span></p>
     </div>
 
+    <div class="card p-4 mb-4" th:if="${score != null}">
+        <h4 th:text="'Pontuação — ' + ${score.profileName}"></h4>
+        <p th:if="${studySession.blockName != null}"><strong>Bloco:</strong> <span th:text="${studySession.blockName}"></span></p>
+        <p>
+            <strong>Total ponderado:</strong>
+            <span th:text="${#numbers.formatDecimal(score.total, 1, 1)} + ' de ' + ${#numbers.formatDecimal(score.maxTotal, 1, 1)}"></span>
+            <span th:if="${score.minTotal != null}" th:text="'(mínimo ' + ${#numbers.formatDecimal(score.minTotal, 1, 1)} + ')'"></span>
+            <span th:if="${score.minTotal != null}"
+                  th:classappend="${score.minTotalMet} ? 'badge bg-success' : 'badge bg-danger'"
+                  th:text="${score.minTotalMet} ? 'Bateu o mínimo total' : 'Abaixo do mínimo total'"></span>
+        </p>
+        <div th:each="g : ${score.groups}" class="mb-3">
+            <h6>
+                <span th:text="${g.name}"></span> —
+                <span th:text="${#numbers.formatDecimal(g.points, 1, 1)} + ' de ' + ${#numbers.formatDecimal(g.maxPoints, 1, 1)}"></span>
+                <span th:if="${g.minScore != null}" th:text="'(mínimo ' + ${#numbers.formatDecimal(g.minScore, 1, 1)} + ')'"></span>
+                <span th:if="${g.minScore != null}"
+                      th:classappend="${g.minMet} ? 'badge bg-success' : 'badge bg-danger'"
+                      th:text="${g.minMet} ? 'Bateu o mínimo' : 'Abaixo do mínimo'"></span>
+            </h6>
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Disciplina</th><th class="text-end">Acertos</th><th class="text-end">Peso</th>
+                    <th class="text-end">Pontos</th></tr></thead>
+                <tbody>
+                <tr th:each="r : ${g.rules}" th:if="${r.questions > 0 or r.maxPoints > 0}">
+                    <td th:text="${r.subject}"></td>
+                    <td class="text-end" th:text="${r.correct} + ' / ' + ${r.questions}"></td>
+                    <td class="text-end" th:text="${r.weight}"></td>
+                    <td class="text-end" th:text="${#numbers.formatDecimal(r.points, 1, 1)} + ' / ' + ${#numbers.formatDecimal(r.maxPoints, 1, 1)}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted mb-0" th:if="${!score.unweightedSubjects.isEmpty()}">
+            Sem peso no perfil (não pontuaram):
+            <span th:each="e, st : ${score.unweightedSubjects}"
+                  th:text="${e.key} + ' (' + ${e.value} + ')' + (${st.last} ? '' : ', ')"></span>
+        </p>
+    </div>
+
     <h2 class="mb-3">Revisão das questões</h2>
     <div class="card p-3 mb-3" th:each="item : ${review}"
          th:classappend="${item.correct == null} ? '' : (${item.correct} ? 'border-success' : 'border-danger')">
