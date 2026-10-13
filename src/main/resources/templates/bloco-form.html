@@ -4,79 +4,96 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4" th:text="${blockId == null} ? 'Novo bloco' : 'Editar bloco'"></h1>
+    <div class="page-header">
+        <div>
+            <h1 th:text="${blockId == null} ? 'Novo bloco' : 'Editar bloco'"></h1>
+            <p class="page-subtitle">Escolha de quais provas e faixas vêm as questões. Pré-visualize antes de salvar.</p>
+        </div>
+    </div>
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
 
-    <form method="post" action="/blocos/salvar" class="card p-4 mb-4">
+    <form method="post" action="/blocos/salvar" class="mb-4">
         <input type="hidden" name="id" th:value="${blockId}"/>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Nome</label>
-                <input type="text" name="name" class="form-control" th:value="${name}"/>
+
+        <div class="card p-4 mb-3">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nome</label>
+                    <input type="text" name="name" class="form-control" th:value="${name}" placeholder="Ex.: Português — prova 2024"/>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tempo limite <span class="text-muted fw-normal">(min)</span></label>
+                    <input type="number" name="timeLimit" min="1" class="form-control" th:value="${timeLimit}" placeholder="Sem limite"/>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Perfil de pontuação</label>
+                    <select name="profileId" class="form-select">
+                        <option value="">Nenhum</option>
+                        <option th:each="p : ${profiles}" th:value="${p.id}" th:text="${p.name}"
+                                th:selected="${profileId != null and profileId == p.id}"></option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Descrição <span class="text-muted fw-normal">(opcional)</span></label>
+                    <input type="text" name="description" class="form-control" th:value="${description}"/>
+                </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <label class="form-label">Tempo limite (min, opcional)</label>
-                <input type="number" name="timeLimit" min="1" class="form-control" th:value="${timeLimit}"/>
-            </div>
-            <div class="col-md-3 mb-3">
-                <label class="form-label">Perfil de pontuação (opcional)</label>
-                <select name="profileId" class="form-select">
-                    <option value="">Nenhum</option>
-                    <option th:each="p : ${profiles}" th:value="${p.id}" th:text="${p.name}"
-                            th:selected="${profileId != null and profileId == p.id}"></option>
-                </select>
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Descrição (opcional)</label>
-            <input type="text" name="description" class="form-control" th:value="${description}"/>
         </div>
 
-        <h5>Origens de questões</h5>
-        <p class="text-muted">
-            Cada linha é uma origem. Com uma <strong>prova</strong>, as <strong>faixas</strong> escolhem os números
-            (ex.: <code>1-10, 32-46, 71-100</code>; em branco = prova toda). Sem prova, os filtros de
-            disciplina/assunto/banca/ano valem para todas as provas. Os campos de uma linha se combinam.
-            Várias linhas juntam questões de várias provas; uma questão repetida entra só uma vez.
+        <div class="section-title mt-4">Origens das questões</div>
+        <p class="text-muted small">
+            Cada origem é uma prova com as faixas de números (ex.: <code>1-10, 32-46</code>; em branco = prova toda).
+            Sem prova, os filtros valem para todas as provas. Questão repetida entra uma vez só.
         </p>
         <div id="sources">
-            <div class="source-row border rounded p-3 mb-2" th:each="s : ${sources}">
-                <div class="row g-2">
-                    <div class="col-md-4">
+            <div class="source-row card p-3 mb-2" th:each="s, st : ${sources}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
                         <label class="form-label small">Prova</label>
                         <select name="srcJob" class="form-select form-select-sm">
-                            <option value="">(todas / só filtros)</option>
+                            <option value="">(todas — usar só filtros)</option>
                             <option th:each="j : ${jobs}" th:value="${j.id}"
-                                    th:text="${j.id + ' — ' + j.displayName + ' (' + j.importedQuestions + ')'}"
+                                    th:text="${'#' + j.id + ' · ' + j.displayName + ' (' + j.importedQuestions + ')'}"
                                     th:selected="${s.importJobId == j.id.toString()}"></option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col">
                         <label class="form-label small">Faixas</label>
                         <input type="text" name="srcRanges" class="form-control form-control-sm"
                                placeholder="1-10, 32-46" th:value="${s.ranges}"/>
                     </div>
+                    <div class="col-auto d-flex gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary source-filters-toggle"
+                                aria-expanded="false"><i class="bi bi-funnel me-1"></i>Filtros</button>
+                        <button type="button" class="icon-btn source-remove" title="Remover origem" aria-label="Remover origem">
+                            <i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+                <!-- Filtros extras ficam escondidos ate pedir; abrem sozinhos se ja tiverem valor. -->
+                <div class="row g-2 mt-1 source-filters"
+                     th:classappend="${#strings.isEmpty(s.subject) and #strings.isEmpty(s.topic) and #strings.isEmpty(s.organization)
+                                     and #strings.isEmpty(s.year) and #strings.isEmpty(s.max) and !s.shuffle} ? 'd-none'">
                     <div class="col-md-4">
                         <label class="form-label small">Disciplina contém</label>
                         <input type="text" name="srcSubject" class="form-control form-control-sm" th:value="${s.subject}"/>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label small">Assunto contém</label>
                         <input type="text" name="srcTopic" class="form-control form-control-sm" th:value="${s.topic}"/>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label small">Banca</label>
                         <input type="text" name="srcOrg" class="form-control form-control-sm" th:value="${s.organization}"/>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4">
                         <label class="form-label small">Ano</label>
                         <input type="number" name="srcYear" class="form-control form-control-sm" th:value="${s.year}"/>
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label small">Limite</label>
+                    <div class="col-md-4">
+                        <label class="form-label small">Limite de questões</label>
                         <input type="number" name="srcMax" min="0" class="form-control form-control-sm" th:value="${s.max}"/>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4">
                         <label class="form-label small">Embaralhar</label>
                         <select name="srcShuffle" class="form-select form-select-sm">
                             <option value="false">Não</option>
@@ -86,25 +103,25 @@
                 </div>
             </div>
         </div>
-        <div class="mb-3">
-            <button type="button" id="addSource" class="btn btn-sm btn-outline-secondary">+ Adicionar origem</button>
-        </div>
+        <button type="button" id="addSource" class="btn btn-sm btn-outline-secondary mb-4"><i class="bi bi-plus-lg me-1"></i>Adicionar origem</button>
 
-        <div class="mb-3">
-            <label class="form-label">Exclusões (opcional)</label>
-            <input type="text" name="exclusions" class="form-control font-monospace" th:value="${exclusions}"
-                   placeholder="10-17, 22-25, 42:7, #315"/>
-            <div class="form-text">
-                Questões fora do escopo deste bloco (continuam no banco). <code>10-17</code> = esses números em
-                qualquer prova do bloco; <code>42:7</code> = questão 7 só da prova 42 (o número à esquerda é o id
-                da prova na lista acima); <code>#315</code> = questão pelo id.
+        <details class="mb-4" th:open="${exclusions != null and !exclusions.isEmpty()}">
+            <summary class="section-title d-inline-block m-0">Avançado: excluir questões</summary>
+            <div class="card p-3 mt-2">
+                <input type="text" name="exclusions" class="form-control font-monospace" th:value="${exclusions}"
+                       placeholder="10-17, 22-25, 42:7, #315"/>
+                <div class="form-text">
+                    Questões fora do escopo deste bloco (continuam no banco). <code>10-17</code> = esses números em
+                    qualquer prova do bloco; <code>42:7</code> = questão 7 só da prova #42 (o número da lista de provas);
+                    <code>#315</code> = questão pelo id.
+                </div>
             </div>
-        </div>
+        </details>
 
         <div class="d-flex gap-2">
             <button type="submit" class="btn btn-primary">Salvar bloco</button>
-            <button type="submit" formaction="/blocos/preview" class="btn btn-outline-primary">Pré-visualizar</button>
-            <a href="/blocos" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" formaction="/blocos/preview" class="btn btn-outline-secondary"><i class="bi bi-eye me-1"></i>Pré-visualizar</button>
+            <a href="/blocos" class="btn btn-link text-muted">Cancelar</a>
         </div>
     </form>
 
@@ -114,13 +131,43 @@
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script>
-    document.getElementById('addSource').addEventListener('click', function () {
-        var rows = document.querySelectorAll('.source-row');
-        var clone = rows[rows.length - 1].cloneNode(true);
-        clone.querySelectorAll('input').forEach(function (i) { i.value = ''; });
-        clone.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
-        document.getElementById('sources').appendChild(clone);
-    });
+    // Origens: adicionar copia a ultima linha vazia; remover nunca apaga a ultima (o form precisa de uma).
+    (function () {
+        var container = document.getElementById('sources');
+
+        function wire(row) {
+            var filters = row.querySelector('.source-filters');
+            var toggle = row.querySelector('.source-filters-toggle');
+            toggle.setAttribute('aria-expanded', filters.classList.contains('d-none') ? 'false' : 'true');
+            toggle.addEventListener('click', function () {
+                var hidden = filters.classList.toggle('d-none');
+                toggle.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+            });
+            row.querySelector('.source-remove').addEventListener('click', function () {
+                var rows = container.querySelectorAll('.source-row');
+                if (rows.length > 1) {
+                    row.remove();
+                } else {
+                    clear(row);
+                }
+            });
+        }
+
+        function clear(row) {
+            row.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+            row.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
+            row.querySelector('.source-filters').classList.add('d-none');
+        }
+
+        container.querySelectorAll('.source-row').forEach(wire);
+        document.getElementById('addSource').addEventListener('click', function () {
+            var rows = container.querySelectorAll('.source-row');
+            var clone = rows[rows.length - 1].cloneNode(true);
+            clear(clone);
+            container.appendChild(clone);
+            wire(clone);
+        });
+    })();
 </script>
 </body>
 </html>
