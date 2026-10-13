@@ -108,11 +108,21 @@ public class StudySessionService {
         return sessionRepository.save(session);
     }
 
+    /** Resposta ja dada nesta sessao a uma questao (para repor a alternativa marcada e o "E chute?"). */
+    public java.util.Optional<Attempt> attemptOf(Long sessionId, Long questionId) {
+        return attemptRepository.findBySessionIdAndQuestionId(sessionId, questionId);
+    }
+
     public StudySession getSession(Long id) {
         return sessionRepository.findById(id).orElseThrow();
     }
 
     public void answer(Long sessionId, Long questionId, String selectedAnswer, Long elapsedMillis) {
+        answer(sessionId, questionId, selectedAnswer, elapsedMillis, null);
+    }
+
+    /** @param guess "E chute?"; null mantem o que ja estava marcado nesta resposta (ou nao informado). */
+    public void answer(Long sessionId, Long questionId, String selectedAnswer, Long elapsedMillis, Boolean guess) {
         Question question = questionRepository.findById(questionId).orElseThrow();
         Attempt attempt = attemptRepository.findBySessionIdAndQuestionId(sessionId, questionId)
                 .orElseGet(Attempt::new);
@@ -126,6 +136,9 @@ public class StudySessionService {
                 : question.getCorrectAnswer() == null ? null
                 : question.getCorrectAnswer().equalsIgnoreCase(selectedAnswer);
         attempt.setCorrect(correct);
+        if (guess != null) {
+            attempt.setGuessed(guess);
+        }
         attemptRepository.save(attempt);
     }
 
@@ -218,7 +231,8 @@ public class StudySessionService {
             Attempt attempt = byQuestion.get(id);
             items.add(new ReviewItem(index++, question,
                     attempt != null ? attempt.getSelectedAnswer() : null,
-                    attempt != null ? attempt.getCorrect() : null));
+                    attempt != null ? attempt.getCorrect() : null,
+                    attempt != null ? attempt.getGuessed() : null));
         }
         return items;
     }

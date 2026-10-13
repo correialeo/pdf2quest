@@ -70,6 +70,7 @@ public class StudySessionController {
                 ? null : Math.max(0, session.getTimeLimitMinutes() * 60L
                 - java.time.Duration.between(session.getStartedAt(), java.time.LocalDateTime.now()).getSeconds()));
         model.addAttribute("question", question);
+        model.addAttribute("attempt", sessionService.attemptOf(id, question.getId()).orElse(null));
         model.addAttribute("passage", question.getPassageId() == null ? null
                 : passageRepository.findById(question.getPassageId()).orElse(null));
         model.addAttribute("hasPdf", question.getImportJobId() != null && importJobRepository
@@ -84,7 +85,8 @@ public class StudySessionController {
     @PostMapping("/resolver/{id}/responder")
     @ResponseBody
     public void responder(@PathVariable Long id, @RequestBody AnswerRequest request) {
-        sessionService.answer(id, request.questionId(), request.selectedAnswer(), request.elapsedMillis());
+        sessionService.answer(id, request.questionId(), request.selectedAnswer(), request.elapsedMillis(),
+                request.guess());
     }
 
     @PostMapping("/resolver/{id}/finalizar")
@@ -103,11 +105,16 @@ public class StudySessionController {
         model.addAttribute("studySession", session);
         model.addAttribute("total", totalQuestions);
         model.addAttribute("avgMillis", avgMillis);
-        model.addAttribute("review", sessionService.review(id));
+        List<ReviewItem> review = sessionService.review(id);
+        model.addAttribute("review", review);
+        model.addAttribute("guessedCorrect", review.stream()
+                .filter(r -> Boolean.TRUE.equals(r.guessed()) && Boolean.TRUE.equals(r.correct())).count());
+        model.addAttribute("guessedWrong", review.stream()
+                .filter(r -> Boolean.TRUE.equals(r.guessed()) && Boolean.FALSE.equals(r.correct())).count());
         model.addAttribute("score", sessionService.scoreResult(session));
         return "resultado";
     }
 
-    public record AnswerRequest(Long questionId, String selectedAnswer, Long elapsedMillis) {
+    public record AnswerRequest(Long questionId, String selectedAnswer, Long elapsedMillis, Boolean guess) {
     }
 }

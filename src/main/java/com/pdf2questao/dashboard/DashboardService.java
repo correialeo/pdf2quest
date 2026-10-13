@@ -11,6 +11,7 @@ import com.pdf2questao.dashboard.DashboardData.ProvaGroup;
 import com.pdf2questao.dashboard.DashboardData.ProvaPanel;
 import com.pdf2questao.dashboard.DashboardData.SessionRow;
 import com.pdf2questao.dashboard.DashboardData.SubjectProgress;
+import com.pdf2questao.guess.GuessDiagnosticService;
 import com.pdf2questao.importer.Banca;
 import com.pdf2questao.importer.ImportJob;
 import com.pdf2questao.importer.ImportJobRepository;
@@ -52,11 +53,13 @@ public class DashboardService {
     private final BlockService blockService;
     private final StudySessionService sessionService;
     private final ScoringProfileService profileService;
+    private final GuessDiagnosticService guessService;
 
     public DashboardService(QuestionRepository questionRepository, AttemptRepository attemptRepository,
                             StudySessionRepository sessionRepository, ImportJobRepository importJobRepository,
                             BlockService blockService, StudySessionService sessionService,
-                            ScoringProfileService profileService) {
+                            ScoringProfileService profileService, GuessDiagnosticService guessService) {
+        this.guessService = guessService;
         this.questionRepository = questionRepository;
         this.attemptRepository = attemptRepository;
         this.sessionRepository = sessionRepository;
@@ -108,7 +111,8 @@ public class DashboardService {
         long correct = attemptRepository.countByCorrect(true);
         long wrong = attemptRepository.countByCorrect(false);
         return new Overview(cards.size(), questionRepository.count(), attemptRepository.countDistinctQuestionsAnswered(),
-                correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject()));
+                correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject()),
+                guessService.counts(null));
     }
 
     private BlockCard blockCard(StudyBlock block, java.util.Collection<StudySession> allSessions) {
@@ -149,7 +153,7 @@ public class DashboardService {
         return new ProvaPanel(job, questions.size(), answered, correct, wrong,
                 questionRepository.findErrorNotebookByJob(jobId).size(),
                 questions.stream().filter(Question::isNeedsReview).count(), subjects,
-                mapStats(attemptRepository.statsByTopicForJob(jobId)), rows);
+                mapStats(attemptRepository.statsByTopicForJob(jobId)), rows, guessService.counts(jobId));
     }
 
     // ---- painel de um bloco ----

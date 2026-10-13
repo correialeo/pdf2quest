@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Caderno de Chutes')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h1 class="mb-0">Caderno de Chutes</h1>
+        <form method="post" action="/chutes/refazer" th:if="${!report.lucky.isEmpty()}">
+            <input type="hidden" name="prova" th:value="${report.selectedJob}"/>
+            <button type="submit" class="btn btn-primary">Refazer os acertos no chute (<span th:text="${report.lucky.size()}"></span>)</button>
+        </form>
+    </div>
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+    <p class="text-muted">
+        Questões que você acertou marcando "É chute?". Acertar no chute não é saber: estude estas. O diagnóstico usa
+        a <strong>última resposta</strong> de cada questão; se você refizer e acertar sabendo, ela sai da lista.
+    </p>
+
+    <div class="d-flex flex-wrap gap-2 mb-3" th:if="${!report.jobs.isEmpty()}">
+        <a href="/chutes" class="btn btn-sm"
+           th:classappend="${report.selectedJob == null} ? 'btn-primary' : 'btn-outline-secondary'">Todas as provas</a>
+        <a th:each="o : ${report.jobs}" th:href="@{/chutes(prova=${o.job.id})}" class="btn btn-sm text-truncate mw-100"
+           th:title="${o.job.displayName}"
+           th:classappend="${report.selectedJob != null and report.selectedJob == o.job.id} ? 'btn-primary' : 'btn-outline-secondary'"
+           th:text="${o.job.displayName} + ' (' + ${o.luckyCorrect} + ')'"></a>
+    </div>
+
+    <div class="row row-cols-2 row-cols-md-5 g-3 mb-4">
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Acertos seguros</div>
+            <div class="fs-4 text-success" th:text="${report.counts.safeCorrect}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center border-warning">
+            <div class="text-muted small">Acertos no chute</div>
+            <div class="fs-4 text-warning" th:text="${report.counts.guessCorrect}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Erros no chute</div>
+            <div class="fs-4" th:text="${report.counts.guessWrong}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Erros (sabia ou achava que sabia)</div>
+            <div class="fs-4 text-danger" th:text="${report.counts.safeWrong}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Sem marcação</div>
+            <div class="fs-4 text-muted" th:text="${report.counts.unknown}"></div></div></div>
+    </div>
+
+    <div class="card p-4 mb-4" th:if="${report.counts.informed() > 0}">
+        <div class="row text-center">
+            <div class="col-md-4"><div class="text-muted small">Acerto contando os chutes</div>
+                <div class="fs-3" th:text="${#numbers.formatDecimal(report.counts.rawPercent(), 1, 1)} + '%'"></div></div>
+            <div class="col-md-4"><div class="text-muted small">Acerto real (sem os chutes)</div>
+                <div class="fs-3" th:text="${#numbers.formatDecimal(report.counts.realPercent(), 1, 1)} + '%'"></div></div>
+            <div class="col-md-4"><div class="text-muted small">Dos acertos, foram no chute</div>
+                <div class="fs-3" th:text="${#numbers.formatDecimal(report.counts.luckySharePercent(), 1, 1)} + '%'"></div></div>
+        </div>
+        <div class="form-text mt-2">
+            "Sem marcação" são respostas dadas antes do recurso existir; ficam de fora destes percentuais.
+        </div>
+    </div>
+
+    <h5 th:if="${!report.subjects.isEmpty()}">Por disciplina</h5>
+    <div class="card p-3 mb-4" th:if="${!report.subjects.isEmpty()}">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead><tr>
+                    <th>Disciplina</th><th class="text-end">Seguros</th><th class="text-end">Chute (acertou)</th>
+                    <th class="text-end">Chute (errou)</th><th class="text-end">Erros</th>
+                    <th class="text-end">Acerto</th><th class="text-end">Acerto real</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="r : ${report.subjects}">
+                    <td th:text="${r.label}"></td>
+                    <td class="text-end" th:text="${r.counts.safeCorrect}"></td>
+                    <td class="text-end" th:classappend="${r.counts.guessCorrect > 0} ? 'fw-bold text-warning'" th:text="${r.counts.guessCorrect}"></td>
+                    <td class="text-end" th:text="${r.counts.guessWrong}"></td>
+                    <td class="text-end" th:text="${r.counts.safeWrong}"></td>
+                    <td class="text-end" th:text="${r.counts.informed() > 0} ? ${#numbers.formatDecimal(r.counts.rawPercent(), 1, 0)} + '%' : '-'"></td>
+                    <td class="text-end" th:text="${r.counts.informed() > 0} ? ${#numbers.formatDecimal(r.counts.realPercent(), 1, 0)} + '%' : '-'"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="form-text">Ordenado por acertos no chute: onde há mais sorte, há mais a estudar.</div>
+    </div>
+
+    <h5>Para estudar</h5>
+    <p class="text-muted" th:if="${report.lucky.isEmpty()}">
+        Nenhum acerto no chute. Quando responder uma questão marcando "É chute?" e acertar, ela aparece aqui.
+    </p>
+    <div class="card p-3 mb-3" th:each="l : ${report.lucky}">
+        <p class="mb-1">
+            <strong th:text="${l.question.subject} ?: 'Sem disciplina'"></strong>
+            <span class="text-muted" th:if="${l.job != null}"
+                  th:text="' — ' + ${l.job.displayName} + (${l.question.questionNumber != null} ? ' · questão ' + ${l.question.questionNumber} : '')"></span>
+        </p>
+        <p class="rich-text" th:utext="${@richText.html(l.question.statement)}"></p>
+        <p class="mb-1 alternative" th:if="${l.question.alternativeA != null}" th:classappend="${l.question.correctAnswer == 'A'} ? 'alternative-correct'">
+            <strong>A)</strong> <span class="rich-text" th:utext="${@richText.html(l.question.alternativeA)}"></span>
+            <span class="badge bg-success ms-1" th:if="${l.question.correctAnswer == 'A'}">Resposta certa</span></p>
+        <p class="mb-1 alternative" th:if="${l.question.alternativeB != null}" th:classappend="${l.question.correctAnswer == 'B'} ? 'alternative-correct'">
+            <strong>B)</strong> <span class="rich-text" th:utext="${@richText.html(l.question.alternativeB)}"></span>
+            <span class="badge bg-success ms-1" th:if="${l.question.correctAnswer == 'B'}">Resposta certa</span></p>
+        <p class="mb-1 alternative" th:if="${l.question.alternativeC != null}" th:classappend="${l.question.correctAnswer == 'C'} ? 'alternative-correct'">
+            <strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(l.question.alternativeC)}"></span>
+            <span class="badge bg-success ms-1" th:if="${l.question.correctAnswer == 'C'}">Resposta certa</span></p>
+        <p class="mb-1 alternative" th:if="${l.question.alternativeD != null}" th:classappend="${l.question.correctAnswer == 'D'} ? 'alternative-correct'">
+            <strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(l.question.alternativeD)}"></span>
+            <span class="badge bg-success ms-1" th:if="${l.question.correctAnswer == 'D'}">Resposta certa</span></p>
+        <p class="mb-1 alternative" th:if="${l.question.alternativeE != null}" th:classappend="${l.question.correctAnswer == 'E'} ? 'alternative-correct'">
+            <strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(l.question.alternativeE)}"></span>
+            <span class="badge bg-success ms-1" th:if="${l.question.correctAnswer == 'E'}">Resposta certa</span></p>
+        <p class="text-muted rich-text mt-2 mb-0" th:if="${l.question.note != null}" th:text="'Observação: ' + ${l.question.note}"></p>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

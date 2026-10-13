@@ -1,6 +1,7 @@
 package com.pdf2questao.dashboard;
 
 import com.pdf2questao.block.StudyBlock;
+import com.pdf2questao.guess.GuessDiagnostic;
 import com.pdf2questao.importer.ImportJob;
 import com.pdf2questao.session.StudySession;
 
@@ -54,7 +55,7 @@ public final class DashboardData {
 
     public record Overview(long provas, long totalQuestions, long answered, long correct, long wrong,
                            List<ProvaGroup> groups, List<BlockCard> blocks, List<SessionRow> recent,
-                           List<SubjectStat> bySubject) {
+                           List<SubjectStat> bySubject, GuessDiagnostic.Counts guess) {
 
         public double percent() {
             return DashboardData.percent(correct, wrong);
@@ -75,7 +76,7 @@ public final class DashboardData {
 
     public record ProvaPanel(ImportJob job, long totalQuestions, long answered, long correct, long wrong,
                              long errors, long needsReview, List<SubjectProgress> subjects,
-                             List<SubjectStat> topics, List<SessionRow> sessions) {
+                             List<SubjectStat> topics, List<SessionRow> sessions, GuessDiagnostic.Counts guess) {
 
         public double percent() {
             return DashboardData.percent(correct, wrong);

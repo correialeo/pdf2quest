@@ -15,6 +15,12 @@
         <p th:if="${studySession.notaDataprev != null}">
             <strong>Nota Dataprev:</strong> <span th:text="${#numbers.formatDecimal(studySession.notaDataprev, 1, 2)}"></span>
         </p>
+        <p th:if="${guessedCorrect + guessedWrong > 0}">
+            <strong>Chutes:</strong>
+            <span class="badge bg-warning text-dark" th:text="${guessedCorrect} + ' acertos no chute'"></span>
+            <span class="badge bg-secondary" th:text="${guessedWrong} + ' erros no chute'"></span>
+            <a href="/chutes" class="ms-2">ver diagnóstico</a>
+        </p>
         <p><strong>Tempo total:</strong> <span th:text="${#numbers.formatDecimal(studySession.totalElapsedMillis / 1000.0, 1, 1)} + 's'"></span></p>
         <p><strong>Tempo médio por questão:</strong> <span th:text="${#numbers.formatDecimal(avgMillis / 1000.0, 1, 1)} + 's'"></span></p>
     </div>
@@ -80,6 +86,8 @@
         <span th:if="${item.correct != null}"
               th:classappend="${item.correct} ? 'badge bg-success' : 'badge bg-danger'"
               th:text="${item.correct} ? 'Acertou' : 'Errou'"></span>
+        <span class="badge bg-warning text-dark ms-1" th:if="${item.guessed == true}"
+              th:text="${item.correct == true} ? 'Foi no chute (estude)' : 'Chute'"></span>
     </div>
 
     <a href="/questoes" class="btn btn-primary">Nova sessão</a>

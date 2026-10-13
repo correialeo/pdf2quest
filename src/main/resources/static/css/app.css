@@ -351,3 +351,62 @@ h1, h2, h3, h4, h5 {
     text-overflow: ellipsis;
     vertical-align: bottom;
 }
+
+/* Bolinhas e caixas de marcar bem visiveis (o padrao do Bootstrap some no tema escuro) */
+.form-check-input {
+    width: 1.3em;
+    height: 1.3em;
+    margin-top: .15em;
+    background-color: var(--bs-body-bg);
+    border: 2px solid var(--bs-secondary-color);
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+
+.form-check-input:hover:not(:checked):not(:disabled) {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.form-check-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 .25rem var(--accent-soft);
+}
+
+.form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.form-check-input:checked[type="radio"] {
+    --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2.2' fill='%23fff'/%3e%3c/svg%3e");
+}
+
+.form-check-input:disabled {
+    opacity: .5;
+}
+
+.alternative {
+    border-radius: .55rem;
+    padding-top: .35rem;
+    padding-bottom: .35rem;
+    padding-right: .5rem;
+}
+
+.alternative:hover {
+    background-color: var(--accent-soft);
+}
+
+.alternative .form-check-label {
+    cursor: pointer;
+}
+
+.guess-check {
+    padding: .6rem .75rem .6rem 2.25rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: .55rem;
+}
+
+.alternative-correct {
+    color: var(--bs-success-text-emphasis);
+}

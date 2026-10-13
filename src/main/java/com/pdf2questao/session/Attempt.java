@@ -26,4 +26,7 @@ public class Attempt {
     private Boolean correct;
     private LocalDateTime answeredAt;
     private Long elapsedMilliseconds;
+
+    /** "E chute?": null = nao informado (resposta anterior ao recurso), true/false = marcado pelo usuario. */
+    private Boolean guessed;
 }
