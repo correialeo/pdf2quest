@@ -76,6 +76,8 @@ public class StudySessionController {
         model.addAttribute("hasPdf", question.getImportJobId() != null && importJobRepository
                 .findById(question.getImportJobId()).map(pdfStorage::exists).orElse(false));
         model.addAttribute("index", index);
+        model.addAttribute("questionIds", ids);
+        model.addAttribute("answered", sessionService.answeredQuestionIds(id));
         model.addAttribute("total", ids.size());
         model.addAttribute("hasPrevious", index > 0);
         model.addAttribute("hasNext", index < ids.size() - 1);

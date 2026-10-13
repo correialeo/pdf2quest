@@ -1,29 +1,45 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/head :: head('Resolver')}"></head>
-<body>
-<div th:replace="~{fragments/nav :: nav}"></div>
-<main class="page resolver-page" th:classappend="${passage != null} ? 'container-xxl' : 'container'">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <h4 class="mb-0 text-nowrap">Questão <span th:text="${index + 1}"></span> de <span th:text="${total}"></span></h4>
-        <span class="d-flex flex-wrap align-items-center gap-1 header-badges">
-            <span class="badge bg-warning text-dark" id="countdown" th:if="${remainingSeconds != null}"></span>
-            <span class="badge bg-secondary badge-truncate" th:if="${studySession.blockName != null}"
-                  th:text="${studySession.blockName}" th:title="${studySession.blockName}"></span>
-            <span class="badge bg-secondary" th:text="${studySession.mode}"></span>
-        </span>
+<body class="focus-mode">
+<!-- Modo foco: sem menu lateral. Barra do topo com saida, progresso, tempo e mapa de questoes. -->
+<header class="focus-bar">
+    <a href="/dashboard" class="icon-btn" title="Sair (a sessão continua aberta)" aria-label="Sair"><i class="bi bi-x-lg"></i></a>
+    <div class="focus-title">
+        <span class="fw-medium text-truncate" th:text="${studySession.blockName} ?: ${studySession.mode}"
+              th:title="${studySession.blockName}"></span>
+        <span class="text-muted small text-nowrap" th:text="${index + 1} + ' / ' + ${total}"></span>
     </div>
+    <span class="focus-timer" id="countdown" th:if="${remainingSeconds != null}"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#questionMap"
+            aria-expanded="false" aria-controls="questionMap" title="Mapa de questões (M)" id="mapToggle">
+        <i class="bi bi-grid-3x3-gap me-1"></i>Questões</button>
+    <button type="button" class="icon-btn theme-toggle" aria-label="Alternar tema claro/escuro">
+        <i class="bi bi-moon icon-moon"></i><i class="bi bi-sun icon-sun"></i></button>
+    <div class="focus-progress"><div th:style="'width: ' + ${answered.size() * 100 / total} + '%'"></div></div>
+</header>
 
-    <div class="d-flex flex-wrap gap-2 mb-2" th:if="${passage != null or hasPdf}">
+<nav class="collapse question-map-wrap" id="questionMap" aria-label="Mapa de questões">
+    <div class="question-map">
+        <a th:each="qid, st : ${questionIds}" th:href="@{/resolver/{id}(id=${studySession.id}, index=${st.index})}"
+           th:text="${st.count}"
+           th:classappend="${(st.index == index ? 'current ' : '') + (answered.contains(qid) ? 'done' : '')}"
+           th:title="${answered.contains(qid)} ? 'Respondida' : 'Sem resposta'"></a>
+    </div>
+    <div class="question-map-legend"><span class="done"></span>respondida <span></span>sem resposta</div>
+</nav>
+
+<main class="page resolver-page" th:classappend="${passage != null} ? 'container-xxl' : 'container'">
+    <div class="d-flex flex-wrap gap-2 mb-3" th:if="${passage != null or hasPdf}">
         <!-- Celular: o texto base abre/fecha acima da questao. Tablet em diante ele ja fica ao lado. -->
-        <button th:if="${passage != null}" type="button" class="btn btn-sm btn-outline-primary d-md-none"
+        <button th:if="${passage != null}" type="button" class="btn btn-sm btn-outline-secondary d-md-none"
                 data-bs-toggle="collapse" data-bs-target="#passagePanel" aria-expanded="false"
-                aria-controls="passagePanel">Ver texto base</button>
+                aria-controls="passagePanel"><i class="bi bi-file-text me-1"></i>Ver texto base</button>
         <button th:if="${passage != null}" type="button" class="btn btn-sm btn-outline-secondary d-none d-md-inline-block"
                 id="togglePassage" aria-controls="passagePanel" aria-pressed="false">Ocultar texto base</button>
         <a th:if="${hasPdf}" class="btn btn-sm btn-outline-secondary" target="_blank"
-           th:href="@{/import/{id}/pdf(id=${question.importJobId})} + (${question.page != null} ? '#page=' + ${question.page} : '')"
-           th:text="${question.page != null} ? 'Abrir PDF da prova (pág. ' + ${question.page} + ')' : 'Abrir PDF da prova'"></a>
+           th:href="@{/import/{id}/pdf(id=${question.importJobId})} + (${question.page != null} ? '#page=' + ${question.page} : '')">
+            <i class="bi bi-file-earmark-pdf me-1"></i><span th:text="${question.page != null} ? 'PDF da prova (pág. ' + ${question.page} + ')' : 'PDF da prova'"></span></a>
     </div>
 
     <div class="split-layout" id="splitLayout" th:classappend="${passage != null} ? 'has-passage'">
@@ -31,12 +47,12 @@
            th:attr="data-passage-id=${passage.id}" aria-label="Texto base">
         <div class="card p-4">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <h6 class="text-uppercase text-muted small mb-0">Texto base</h6>
+                <h6 class="text-muted small mb-0">Texto base</h6>
                 <span class="d-flex gap-1 passage-tools">
-                    <button type="button" class="btn btn-sm btn-outline-warning" id="highlightSelection"
-                            title="Grifa o trecho selecionado (no computador, basta selecionar)">Grifar seleção</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="highlightSelection"
+                            title="Grifa o trecho selecionado (no computador, basta selecionar)"><i class="bi bi-highlighter me-1"></i>Grifar</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="clearHighlights"
-                            title="Remove todos os grifos deste texto">Limpar grifos</button>
+                            title="Remove todos os grifos deste texto">Limpar</button>
                 </span>
             </div>
             <div class="form-text mb-2">Selecione um trecho para grifar. Selecione de novo dentro do grifo para tirá-lo.</div>
@@ -45,42 +61,50 @@
     </aside>
 
     <section class="question-panel">
-    <div class="card p-4 mb-3">
-        <p class="mb-4 rich-text" th:utext="${@richText.html(question.statement)}"></p>
+        <div class="question-meta" th:if="${question.subject != null}" th:text="${question.subject}"></div>
+        <div class="question-statement rich-text" th:utext="${@richText.html(question.statement)}"></div>
 
-        <div class="form-check mb-2 alternative" th:each="alt : ${question.alternatives()}" th:attr="data-letter=${alt.key}">
-            <input class="form-check-input answer-option" type="radio" name="answer" th:value="${alt.key}" th:id="'opt' + ${alt.key}"
-                   th:checked="${attempt != null and attempt.selectedAnswer == alt.key}"/>
-            <label class="form-check-label" th:for="'opt' + ${alt.key}"><strong th:text="${alt.key} + ')'"></strong>
-                <span class="rich-text" th:utext="${@richText.html(alt.value)}"></span></label>
-            <button type="button" class="btn btn-link btn-sm p-0 ms-2 strike-toggle" title="Riscar alternativa (Shift + letra)">riscar</button>
+        <div class="alternatives">
+            <label class="alternative" th:each="alt : ${question.alternatives()}" th:attr="data-letter=${alt.key}"
+                   th:for="'opt' + ${alt.key}">
+                <input class="answer-option visually-hidden" type="radio" name="answer" th:value="${alt.key}" th:id="'opt' + ${alt.key}"
+                       th:checked="${attempt != null and attempt.selectedAnswer == alt.key}"/>
+                <span class="alt-letter" th:text="${alt.key}"></span>
+                <span class="alt-text rich-text" th:utext="${@richText.html(alt.value)}"></span>
+                <button type="button" class="strike-toggle" title="Riscar alternativa (Shift + letra)"
+                        aria-label="Riscar alternativa"><i class="bi bi-slash-circle"></i></button>
+            </label>
         </div>
 
-        <div class="guess-check form-check mt-3">
-            <input class="form-check-input" type="checkbox" id="guessCheck"
-                   th:checked="${attempt != null and attempt.guessed == true}"/>
-            <label class="form-check-label" for="guessCheck">É chute? <kbd class="small">X</kbd></label>
-            <div class="form-text">Marque se não tinha certeza. Se acertar assim, a questão entra no seu diagnóstico de chutes.</div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+            <label class="guess-chip" for="guessCheck">
+                <input type="checkbox" id="guessCheck" class="visually-hidden"
+                       th:checked="${attempt != null and attempt.guessed == true}"/>
+                <i class="bi bi-question-diamond"></i>É chute? <kbd>X</kbd>
+            </label>
+            <span id="saveStatus" class="form-text m-0"></span>
         </div>
+        <div class="form-text">Marque se não tinha certeza. Se acertar assim, a questão entra no seu diagnóstico de chutes.</div>
 
-        <div id="saveStatus" class="form-text mt-2"></div>
-        <div class="form-text d-none d-md-block">Atalhos: <kbd>A</kbd>–<kbd>E</kbd> responde · <kbd>Shift</kbd>+letra risca ·
-            <kbd>X</kbd> chute · <kbd>←</kbd> <kbd>→</kbd> navega</div>
         <div th:replace="~{fragments/question-tools :: tools(${question})}"></div>
-    </div>
-
-    <div class="d-flex justify-content-between">
-        <a th:if="${hasPrevious}" th:href="@{/resolver/{id}(id=${studySession.id}, index=${index - 1})}" class="btn btn-outline-secondary" id="prevLink">Anterior</a>
-        <span th:unless="${hasPrevious}"></span>
-
-        <a th:if="${hasNext}" th:href="@{/resolver/{id}(id=${studySession.id}, index=${index + 1})}" class="btn btn-outline-secondary" id="nextLink">Próxima</a>
-        <form th:unless="${hasNext}" method="post" th:action="@{/resolver/{id}/finalizar(id=${studySession.id})}">
-            <button type="submit" class="btn btn-success">Finalizar</button>
-        </form>
-    </div>
     </section>
     </div>
 </main>
+
+<!-- Rodape fixo: navegacao sempre no mesmo lugar, independente do tamanho da questao. -->
+<footer class="focus-footer">
+    <a th:if="${hasPrevious}" th:href="@{/resolver/{id}(id=${studySession.id}, index=${index - 1})}"
+       class="btn btn-outline-secondary" id="prevLink"><i class="bi bi-arrow-left me-1"></i>Anterior</a>
+    <span th:unless="${hasPrevious}"></span>
+    <span class="text-muted small d-none d-md-inline shortcuts">
+        <kbd>A</kbd>–<kbd>E</kbd> responde · <kbd>Shift</kbd>+letra risca · <kbd>X</kbd> chute · <kbd>M</kbd> mapa · <kbd>←</kbd><kbd>→</kbd> navega</span>
+    <a th:if="${hasNext}" th:href="@{/resolver/{id}(id=${studySession.id}, index=${index + 1})}"
+       class="btn btn-primary" id="nextLink">Próxima<i class="bi bi-arrow-right ms-1"></i></a>
+    <form th:unless="${hasNext}" method="post" th:action="@{/resolver/{id}/finalizar(id=${studySession.id})}"
+          id="finishForm">
+        <button type="submit" class="btn btn-success"><i class="bi bi-check2 me-1"></i>Finalizar</button>
+    </form>
+</footer>
 
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script src="/js/passage-highlight.js"></script>
@@ -157,9 +181,10 @@
         function render() {
             const on = struck.has(letter);
             alt.classList.toggle('alternative-struck', on);
-            toggle.textContent = on ? 'desfazer' : 'riscar';
+            toggle.title = on ? 'Desfazer risco (Shift + letra)' : 'Riscar alternativa (Shift + letra)';
         }
-        toggle.addEventListener('click', function () {
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();   // o botao fica dentro do label: nao pode marcar a alternativa
             struck.has(letter) ? struck.delete(letter) : struck.add(letter);
             localStorage.setItem(strikeKey, JSON.stringify(Array.from(struck)));
             render();
@@ -185,14 +210,16 @@
             })
         }).then(function (response) {
             if (!response.ok) { throw new Error(response.status); }
-            showStatus('Resposta salva.', 'text-success');
+            showStatus('Resposta salva.', 'text-ok');
+            const current = document.querySelector('.question-map a.current');
+            if (current) { current.classList.add('done'); }
         }).catch(function () {
-            showStatus('Falha ao salvar a resposta. Escolha a alternativa de novo para tentar outra vez.', 'text-danger fw-semibold');
+            showStatus('Falha ao salvar a resposta. Escolha a alternativa de novo para tentar outra vez.', 'text-bad fw-semibold');
         });
     }
     function showStatus(text, cls) {
         const status = document.getElementById('saveStatus');
-        status.className = 'form-text mt-2 ' + cls;
+        status.className = 'form-text m-0 ' + cls;
         status.textContent = text;
     }
     document.querySelectorAll('.answer-option').forEach(function (el) {
@@ -200,7 +227,19 @@
     });
     guessCheck.addEventListener('change', save);
 
-    // Atalhos: A-E responde, Shift+letra risca, X marca chute, setas navegam (e nao trocam o radio focado).
+    // Finalizar com questoes em branco pede confirmacao (a desta tela conta se acabou de ser respondida).
+    const finishForm = document.getElementById('finishForm');
+    if (finishForm) {
+        finishForm.addEventListener('submit', function (e) {
+            const pending = document.querySelectorAll('.question-map a:not(.done)').length;
+            if (pending > 0 && !confirm(pending + (pending === 1 ? ' questão sem resposta' : ' questões sem resposta')
+                    + '. Finalizar mesmo assim?')) {
+                e.preventDefault();
+            }
+        });
+    }
+
+    // Atalhos: A-E responde, Shift+letra risca, X marca chute, M abre o mapa, setas navegam (e nao trocam o radio focado).
     // Ignorados enquanto se digita (observacao) ou com Ctrl/Cmd/Alt, para nao brigar com o navegador.
     document.addEventListener('keydown', function (e) {
         const t = e.target;
@@ -220,6 +259,9 @@
                 radio.focus();
                 radio.dispatchEvent(new Event('change'));
             }
+        } else if (key === 'M') {
+            e.preventDefault();
+            document.getElementById('mapToggle').click();
         } else if (key === 'X') {
             e.preventDefault();
             guessCheck.checked = !guessCheck.checked;

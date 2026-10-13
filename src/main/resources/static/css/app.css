@@ -438,16 +438,6 @@ a.card-link-hover:hover,
     margin-bottom: 0.25rem;
 }
 
-.alternative-struck .form-check-label {
-    text-decoration: line-through;
-    opacity: 0.5;
-}
-
-.strike-toggle {
-    font-size: 0.8rem;
-    vertical-align: baseline;
-}
-
 .alternative-wrong {
     color: var(--bs-danger-text-emphasis);
 }
@@ -468,8 +458,8 @@ a.card-link-hover:hover,
     /* O texto fica parado enquanto a pagina rola e tem rolagem propria se for maior que a tela. */
     .split-layout.has-passage .passage-panel {
         position: sticky;
-        top: 1.5rem;
-        max-height: calc(100vh - 3rem);
+        top: 4.5rem;
+        max-height: calc(100vh - 10rem);
         overflow-y: auto;
         overscroll-behavior: contain;
         border-radius: var(--bs-border-radius);
@@ -504,20 +494,6 @@ a.card-link-hover:hover,
     }
 }
 
-/* Cabecalho do resolver: nome de bloco/prova comprido nao pode alargar a pagina. */
-.header-badges {
-    min-width: 0;
-    max-width: 100%;
-}
-
-.badge-truncate {
-    display: inline-block;
-    max-width: min(100%, 32rem);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: bottom;
-}
-
 /* Bolinhas e caixas de marcar bem visiveis (o padrao do Bootstrap some no tema escuro) */
 .form-check-input {
     width: 1.3em;
@@ -550,27 +526,6 @@ a.card-link-hover:hover,
 
 .form-check-input:disabled {
     opacity: .5;
-}
-
-.alternative {
-    border-radius: .55rem;
-    padding-top: .35rem;
-    padding-bottom: .35rem;
-    padding-right: .5rem;
-}
-
-.alternative:hover {
-    background-color: var(--accent-soft);
-}
-
-.alternative .form-check-label {
-    cursor: pointer;
-}
-
-.guess-check {
-    padding: .6rem .75rem .6rem 2.25rem;
-    border: 1px dashed var(--bs-border-color);
-    border-radius: .55rem;
 }
 
 .alternative-correct {
@@ -659,16 +614,290 @@ mark.user-highlight {
     }
 }
 
-/* Resolver: questao curta fica no meio da tela; se for maior que a tela, rola normalmente a partir do topo. */
+/* ---- Resolver em modo foco ---- */
+body.focus-mode {
+    padding-left: 0 !important;
+    padding-bottom: 4.5rem;   /* espaco do rodape fixo */
+}
+
+.focus-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .6rem 1rem;
+    background-color: color-mix(in srgb, var(--bs-body-bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.focus-title {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.focus-timer {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: .875rem;
+    color: var(--guess);
+}
+
+.focus-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+}
+
+.focus-progress > div {
+    height: 100%;
+    background-color: var(--accent);
+    transition: width .2s ease;
+}
+
+.question-map-wrap {
+    border-bottom: 1px solid var(--bs-border-color);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.question-map {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: .9rem 1rem .5rem;
+}
+
+.question-map a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: .375rem;
+    border: 1px solid var(--bs-border-color);
+    background-color: var(--bs-card-bg);
+    color: var(--bs-secondary-color);
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+}
+
+.question-map a.done {
+    background-color: var(--accent-soft);
+    border-color: transparent;
+    color: var(--accent);
+}
+
+.question-map a.current {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    color: var(--bs-body-color);
+}
+
+.question-map-legend {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 1rem .8rem;
+    font-size: .75rem;
+    color: var(--bs-secondary-color);
+}
+
+.question-map-legend span {
+    display: inline-block;
+    width: .7rem;
+    height: .7rem;
+    border-radius: .2rem;
+    border: 1px solid var(--bs-border-color);
+    background-color: var(--bs-card-bg);
+    margin-left: .5rem;
+}
+
+.question-map-legend span.done {
+    background-color: var(--accent-soft);
+    border-color: transparent;
+    margin-left: 0;
+}
+
+/* Questao curta fica no meio da tela; se for maior que a tela, rola normalmente a partir do topo. */
 .resolver-page {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: 100vh;
+    min-height: calc(100vh - 3.25rem - 4.5rem);   /* desconta barra do topo e rodape */
 }
 
-@media (max-width: 991.98px) {
-    .resolver-page {
-        min-height: calc(100vh - 3.3rem);   /* desconta a barra do topo do celular */
+.resolver-page.container {
+    max-width: 52rem;
+}
+
+.question-meta {
+    font-size: .8rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: .5rem;
+}
+
+.question-statement {
+    font-size: 1.02rem;
+    line-height: 1.65;
+    margin-bottom: 1.5rem;
+}
+
+/* Alternativas como cartoes clicaveis */
+.alternatives {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.alternatives .alternative {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .7rem 2.75rem .7rem .75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-card-bg);
+    cursor: pointer;
+    transition: border-color .12s ease, background-color .12s ease;
+}
+
+.alternatives .alternative:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--bs-border-color));
+}
+
+.alt-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: .375rem;
+    border: 1px solid var(--bs-border-color);
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+}
+
+.alt-text {
+    padding-top: .1rem;
+    line-height: 1.55;
+}
+
+.alternatives .alternative:has(.answer-option:checked) {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.alternatives .alternative:has(.answer-option:checked) .alt-letter {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.alternatives .alternative:has(.answer-option:focus-visible) {
+    box-shadow: 0 0 0 .2rem var(--accent-soft);
+}
+
+.strike-toggle {
+    position: absolute;
+    top: .55rem;
+    right: .55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: .375rem;
+    background: transparent;
+    color: var(--bs-secondary-color);
+    opacity: 0;
+    transition: opacity .12s ease;
+}
+
+.alternatives .alternative:hover .strike-toggle,
+.strike-toggle:focus-visible,
+.alternative-struck .strike-toggle {
+    opacity: 1;
+}
+
+.strike-toggle:hover {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bad);
+}
+
+@media (hover: none) {
+    .strike-toggle {
+        opacity: .6;
     }
+}
+
+.alternative-struck .alt-text,
+.alternative-struck .alt-letter {
+    text-decoration: line-through;
+    opacity: .45;
+}
+
+/* "E chute?" como chip liga/desliga */
+.guess-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .3rem .7rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: 999px;
+    font-size: .84rem;
+    color: var(--bs-secondary-color);
+    cursor: pointer;
+    user-select: none;
+}
+
+.guess-chip:has(input:checked) {
+    border-style: solid;
+    border-color: var(--guess);
+    color: var(--guess);
+    background-color: color-mix(in srgb, var(--guess) 12%, transparent);
+}
+
+.guess-chip kbd {
+    font-size: .7rem;
+}
+
+.focus-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1020;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .75rem 1rem;
+    background-color: color-mix(in srgb, var(--bs-body-bg) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--bs-border-color);
+}
+
+kbd {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+    box-shadow: none;
+    font-size: .72rem;
+    padding: .05rem .35rem;
 }

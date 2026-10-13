@@ -60,6 +60,12 @@ public class StudySessionService {
         return sessionRepository.findFirstByBlockIdAndFinishedAtIsNullOrderByStartedAtDesc(blockId);
     }
 
+    /** Ids das questoes que ja tem resposta na sessao (para o mapa de questoes do resolver). */
+    public java.util.Set<Long> answeredQuestionIds(Long sessionId) {
+        return attemptRepository.findBySessionId(sessionId).stream()
+                .map(Attempt::getQuestionId).collect(java.util.stream.Collectors.toSet());
+    }
+
     /** Indice da primeira questao ainda sem resposta na sessao (a ultima, se todas ja foram respondidas). */
     public int resumeIndex(StudySession session) {
         List<Long> ids = session.questionIds();
