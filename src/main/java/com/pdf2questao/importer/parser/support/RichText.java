@@ -146,7 +146,17 @@ public final class RichText {
         StringBuilder sb = new StringBuilder();
         Matcher m = TOKEN.matcher(rich);
         int last = 0;
+        boolean hidden = false;
         while (m.find()) {
+            if (hidden) {
+                // Texto oculto nem chega ao HTML: nada para selecionar/copiar, nem altura de linhas em branco.
+                if (m.group(1).equals("/h")) {
+                    hidden = false;
+                    last = skipWhitespace(rich, m.end());
+                    m.region(last, rich.length());
+                }
+                continue;
+            }
             escape(rich.substring(last, m.start()), sb);
             String t = m.group(1);
             switch (t) {
@@ -156,8 +166,7 @@ public final class RichText {
                 case "/i" -> sb.append("</em>");
                 case "u" -> sb.append("<u>");
                 case "/u" -> sb.append("</u>");
-                case "h" -> sb.append("<span hidden>");
-                case "/h" -> sb.append("</span>");
+                case "h" -> hidden = true;
                 default -> {
                     if (t.startsWith("img:")) {
                         sb.append("<img class=\"question-image\" alt=\"Imagem da questao\" src=\"")
@@ -167,8 +176,19 @@ public final class RichText {
             }
             last = m.end();
         }
-        escape(rich.substring(last), sb);
+        if (!hidden) {
+            escape(rich.substring(last), sb);
+        }
         return sb.toString();
+    }
+
+    /** Pula as quebras de linha/espacos que separavam um trecho oculto do que vem depois. */
+    private static int skipWhitespace(String s, int from) {
+        int i = from;
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) {
+            i++;
+        }
+        return i;
     }
 
     private static void escape(String s, StringBuilder sb) {

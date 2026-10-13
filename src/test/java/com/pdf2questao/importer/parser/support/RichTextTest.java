@@ -35,11 +35,12 @@ class RichTextTest {
     }
 
     @Test
-    void textoOcultoSaiDoHtmlMasFicaNoTextoPuro() {
-        String rich = "⟦img:3⟧⟦h⟧P(X = m)⟦/h⟧";
-        assertEquals("P(X = m)", RichText.plain(rich));
-        assertEquals("<img class=\"question-image\" alt=\"Imagem da questao\" src=\"/imagens/3\"/>"
-                + "<span hidden>P(X = m)</span>", RichText.toHtml(rich, "/imagens/"));
+    void textoOcultoFicaNoTextoPuroMasNaoVaiParaOHtmlNemDeixaLinhasEmBranco() {
+        String rich = "⟦img:3⟧⟦h⟧P(X = m)⟦/h⟧\n⟦h⟧segunda linha⟦/h⟧\n\n⟦h⟧outro paragrafo⟦/h⟧";
+        assertEquals("P(X = m)\nsegunda linha\n\noutro paragrafo", RichText.plain(rich));
+        assertEquals("<img class=\"question-image\" alt=\"Imagem da questao\" src=\"/imagens/3\"/>",
+                RichText.toHtml(rich, "/imagens/"));
+        assertEquals("a b", RichText.toHtml("a ⟦h⟧x⟦/h⟧\n\nb", "/imagens/"));
     }
 
     @Test
