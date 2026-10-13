@@ -285,3 +285,69 @@ h1, h2, h3, h4, h5 {
 .alternative-wrong {
     color: var(--bs-danger-text-emphasis);
 }
+
+/* Resolver: texto base ao lado da questao (tablet, laptop e desktop) */
+.split-layout.has-passage .passage-panel .card {
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+    .split-layout.has-passage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1.25rem;
+        align-items: start;
+    }
+
+    /* O texto fica parado enquanto a pagina rola e tem rolagem propria se for maior que a tela. */
+    .split-layout.has-passage .passage-panel {
+        position: sticky;
+        top: 4.75rem;
+        max-height: calc(100vh - 5.75rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border-radius: var(--bs-border-radius);
+    }
+
+    .split-layout.has-passage .passage-panel .card {
+        margin-bottom: 0;
+    }
+
+    .split-layout.has-passage.passage-hidden {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .split-layout.has-passage.passage-hidden .passage-panel {
+        display: none !important;
+    }
+}
+
+/* Em telas largas o texto (geralmente mais longo) ganha um pouco mais de espaco. */
+@media (min-width: 1400px) {
+    .split-layout.has-passage:not(.passage-hidden) {
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    }
+}
+
+/* Celular: o texto base aparece acima da questao quando aberto. */
+@media (max-width: 767.98px) {
+    .split-layout.has-passage .passage-panel {
+        max-height: 60vh;
+        overflow-y: auto;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Cabecalho do resolver: nome de bloco/prova comprido nao pode alargar a pagina. */
+.header-badges {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.badge-truncate {
+    display: inline-block;
+    max-width: min(100%, 32rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
