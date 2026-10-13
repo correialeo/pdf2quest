@@ -432,3 +432,27 @@ mark.user-highlight {
     background-color: rgba(250, 204, 21, .6);
     color: inherit;
 }
+
+/* Submenus da navbar */
+.app-navbar .dropdown-menu {
+    background-color: var(--bs-card-bg);
+    border: 1px solid var(--bs-border-color);
+    box-shadow: var(--shadow-md);
+    padding: .35rem;
+}
+
+.app-navbar .dropdown-item {
+    border-radius: .4rem;
+    padding: .45rem .75rem;
+}
+
+.app-navbar .dropdown-item.active,
+.app-navbar .dropdown-item:active {
+    color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+/* Dashboard: o que fazer agora */
+.next-actions .card {
+    border-left: 3px solid var(--accent);
+}

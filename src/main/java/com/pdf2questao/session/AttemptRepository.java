@@ -13,6 +13,8 @@ public interface AttemptRepository extends JpaRepository<Attempt, Long> {
 
     List<Attempt> findBySessionId(Long sessionId);
 
+    void deleteBySessionId(Long sessionId);
+
     @Query(value = "SELECT a.question_id, a.selected_answer FROM attempt a " +
             "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +
             "AND a.correct = 0", nativeQuery = true)

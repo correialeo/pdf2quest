@@ -5,6 +5,7 @@ import com.pdf2questao.block.StudyBlock;
 import com.pdf2questao.dashboard.DashboardData.BlockCard;
 import com.pdf2questao.dashboard.DashboardData.BlockPanel;
 import com.pdf2questao.dashboard.DashboardData.BlockSession;
+import com.pdf2questao.dashboard.DashboardData.OpenSession;
 import com.pdf2questao.dashboard.DashboardData.Overview;
 import com.pdf2questao.dashboard.DashboardData.ProvaCard;
 import com.pdf2questao.dashboard.DashboardData.ProvaGroup;
@@ -108,11 +109,14 @@ public class DashboardService {
                 .limit(RECENT_SESSIONS)
                 .map(s -> new SessionRow(s, s.getCorrectCount(), s.getWrongCount())).toList();
 
+        List<OpenSession> open = sessionRepository.findTop3ByFinishedAtIsNullOrderByStartedAtDesc().stream()
+                .map(s -> new OpenSession(s, sessionService.resumeIndex(s))).toList();
+
         long correct = attemptRepository.countByCorrect(true);
         long wrong = attemptRepository.countByCorrect(false);
         return new Overview(cards.size(), questionRepository.count(), attemptRepository.countDistinctQuestionsAnswered(),
                 correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject()),
-                guessService.counts(null));
+                guessService.counts(null), open, questionRepository.findErrorNotebook().size());
     }
 
     private BlockCard blockCard(StudyBlock block, java.util.Collection<StudySession> allSessions) {

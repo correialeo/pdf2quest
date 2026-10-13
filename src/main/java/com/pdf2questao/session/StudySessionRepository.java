@@ -8,5 +8,7 @@ import java.util.Optional;
 public interface StudySessionRepository extends JpaRepository<StudySession, Long> {
     List<StudySession> findByFinishedAtIsNotNullOrderByStartedAtDesc();
 
+    List<StudySession> findTop3ByFinishedAtIsNullOrderByStartedAtDesc();
+
     Optional<StudySession> findFirstByBlockIdAndFinishedAtIsNullOrderByStartedAtDesc(Long blockId);
 }

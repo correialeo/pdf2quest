@@ -10,6 +10,7 @@ import com.pdf2questao.question.QuestionRepository;
 import com.pdf2questao.scoring.ScoringCalculator;
 import com.pdf2questao.scoring.ScoringProfileService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -158,6 +159,20 @@ public class StudySessionService {
             attempt.setGuessed(guess);
         }
         attemptRepository.save(attempt);
+    }
+
+    /**
+     * Descarta uma sessao ainda aberta: apaga a sessao e as respostas dela (somem tambem do caderno de erros
+     * e das estatisticas). Sessao ja finalizada nao e descartada.
+     */
+    @Transactional
+    public void discard(Long sessionId) {
+        StudySession session = getSession(sessionId);
+        if (session.getFinishedAt() != null) {
+            throw new IllegalStateException("Sessao ja finalizada nao pode ser descartada.");
+        }
+        attemptRepository.deleteBySessionId(sessionId);
+        sessionRepository.delete(session);
     }
 
     public StudySession finish(Long sessionId) {

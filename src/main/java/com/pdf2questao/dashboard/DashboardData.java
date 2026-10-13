@@ -55,10 +55,23 @@ public final class DashboardData {
 
     public record Overview(long provas, long totalQuestions, long answered, long correct, long wrong,
                            List<ProvaGroup> groups, List<BlockCard> blocks, List<SessionRow> recent,
-                           List<SubjectStat> bySubject, GuessDiagnostic.Counts guess) {
+                           List<SubjectStat> bySubject, GuessDiagnostic.Counts guess,
+                           List<OpenSession> open, long errors) {
 
         public double percent() {
             return DashboardData.percent(correct, wrong);
+        }
+    }
+
+    /** Sessao iniciada e nao finalizada: o "Continuar" do dashboard volta na primeira questao sem resposta. */
+    public record OpenSession(StudySession session, int resumeIndex) {
+
+        public String label() {
+            return session.getBlockName() != null ? session.getBlockName() : session.getMode().name();
+        }
+
+        public int total() {
+            return session.questionIds().size();
         }
     }
 

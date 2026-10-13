@@ -95,6 +95,12 @@ public class StudySessionController {
         return "redirect:/resultado/" + id;
     }
 
+    @PostMapping("/resolver/{id}/descartar")
+    public String descartar(@PathVariable Long id) {
+        sessionService.discard(id);
+        return "redirect:/dashboard";
+    }
+
     @GetMapping("/resultado/{id}")
     public String resultado(@PathVariable Long id, Model model) {
         StudySession session = sessionService.getSession(id);

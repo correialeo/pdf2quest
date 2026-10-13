@@ -5,8 +5,37 @@
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="mb-0">Dashboard</h1>
-        <a class="btn btn-outline-secondary btn-sm" href="/export/database.sql">Exportar banco (.sql)</a>
+        <h1 class="mb-0">Início</h1>
+        <a class="btn btn-primary" href="/blocos">Estudar</a>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4 next-actions"
+         th:if="${!data.open.isEmpty() or data.errors > 0}">
+        <div class="col" th:each="o : ${data.open}">
+            <div class="card h-100 p-3 d-flex flex-column">
+                <div class="text-muted small">Sessão em andamento</div>
+                <h6 class="mb-1 text-truncate" th:text="${o.label()}" th:title="${o.label()}"></h6>
+                <div class="text-muted small mb-3"
+                     th:text="'Questão ' + ${o.resumeIndex + 1} + ' de ' + ${o.total()} + ' · iniciada em '
+                              + ${#temporals.format(o.session.startedAt, 'dd/MM HH:mm')}"></div>
+                <div class="d-flex gap-2 mt-auto">
+                    <a class="btn btn-primary btn-sm"
+                       th:href="@{/resolver/{id}(id=${o.session.id}, index=${o.resumeIndex})}">Continuar</a>
+                    <form method="post" th:action="@{/resolver/{id}/descartar(id=${o.session.id})}"
+                          onsubmit="return confirm('Descartar esta sessão? As respostas dela serão apagadas.')">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Descartar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col" th:if="${data.errors > 0}">
+            <div class="card h-100 p-3 d-flex flex-column">
+                <div class="text-muted small">Revisão</div>
+                <h6 class="mb-1" th:text="${data.errors} + (${data.errors == 1} ? ' questão errada' : ' questões erradas')"></h6>
+                <div class="text-muted small mb-3">no caderno de erros, esperando revisão</div>
+                <a class="btn btn-outline-primary btn-sm mt-auto align-self-start" href="/caderno-erros">Revisar erros</a>
+            </div>
+        </div>
     </div>
 
     <div class="row row-cols-2 row-cols-md-6 g-3 mb-4">
@@ -51,7 +80,7 @@
                         <span th:if="${c.hasAttempts()}" class="badge"
                               th:classappend="${c.percent() >= 70} ? 'bg-success' : (${c.percent() >= 50} ? 'bg-warning text-dark' : 'bg-danger')"
                               th:text="${#numbers.formatDecimal(c.percent(), 1, 0)} + '% de acerto'"></span>
-                        <span th:unless="${c.hasAttempts()}" class="badge bg-light text-muted border">Sem respostas</span>
+                        <span th:unless="${c.hasAttempts()}" class="badge text-bg-secondary bg-opacity-25 text-body border">Sem respostas</span>
                         <span class="text-muted small" th:text="${c.sessions} + (${c.sessions == 1} ? ' sessão' : ' sessões')"></span>
                     </div>
                 </div>

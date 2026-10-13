@@ -79,4 +79,16 @@ public class Question {
     private QuestionCategory category;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /** Alternativas preenchidas, na ordem A-E (letra -> texto), para as telas montarem a lista num laco so. */
+    public java.util.Map<String, String> alternatives() {
+        java.util.Map<String, String> map = new java.util.LinkedHashMap<>();
+        String[] texts = {alternativeA, alternativeB, alternativeC, alternativeD, alternativeE};
+        for (int i = 0; i < texts.length; i++) {
+            if (texts[i] != null) {
+                map.put(String.valueOf((char) ('A' + i)), texts[i]);
+            }
+        }
+        return map;
+    }
 }
