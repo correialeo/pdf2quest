@@ -250,13 +250,14 @@ public class ImportService {
         }
     }
 
-    /** PDF sem camada de texto: o texto vem do OCR (com cache em disco), sem imagens extraidas. */
+    /** PDF sem camada de texto: o texto vem do OCR (com cache em disco), com recortes das questoes que o OCR nao le bem (formula, tabela). */
     private PdfRichTextExtractor.Extraction ocr(byte[] bytes) throws IOException {
         if (!ocrService.isAvailable()) {
             throw new IOException("o PDF nao tem camada de texto e o Tesseract com o idioma configurado "
                     + "(por) nao esta instalado - veja pdf2questao.ocr.* no application.properties");
         }
-        return new PdfRichTextExtractor.Extraction(ocrService.recognize(bytes), List.of());
+        OcrService.Result result = ocrService.recognize(bytes, p -> { });
+        return new PdfRichTextExtractor.Extraction(result.text(), result.images());
     }
 
     private void storePdf(ImportJob job, byte[] bytes) {

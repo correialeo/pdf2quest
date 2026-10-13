@@ -35,6 +35,14 @@ class RichTextTest {
     }
 
     @Test
+    void textoOcultoSaiDoHtmlMasFicaNoTextoPuro() {
+        String rich = "⟦img:3⟧⟦h⟧P(X = m)⟦/h⟧";
+        assertEquals("P(X = m)", RichText.plain(rich));
+        assertEquals("<img class=\"question-image\" alt=\"Imagem da questao\" src=\"/imagens/3\"/>"
+                + "<span hidden>P(X = m)</span>", RichText.toHtml(rich, "/imagens/"));
+    }
+
+    @Test
     void separaAlternativasMantendoDestaques() {
         QuestionBlocks.Split split = QuestionBlocks.split(List.of(
                 "Assinale a opção em que o elemento destacado ⟦b⟧não⟦/b⟧ funciona",

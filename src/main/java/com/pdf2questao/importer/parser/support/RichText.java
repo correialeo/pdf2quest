@@ -4,13 +4,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Marcacao que leva negrito/italico/sublinhado ({@code ⟦b⟧...⟦/b⟧}), imagens
+ * Marcacao que leva negrito/italico/sublinhado/oculto ({@code ⟦b⟧...⟦/b⟧}; oculto e o texto que
+ * fica no banco mas nao e exibido, ver {@code QuestionCropper}), imagens
  * ({@code ⟦img:N⟧}) e inicio de pagina ({@code ⟦p:N⟧}) do PDF ate o banco. Os
  * parsers decidem sempre sobre {@link #plain(String)}.
  */
 public final class RichText {
 
-    public static final Pattern TOKEN = Pattern.compile("\u27E6(/?[biu]|img:\\d+|p:\\d+|ind)\u27E7");
+    public static final Pattern TOKEN = Pattern.compile("\u27E6(/?[biuh]|img:\\d+|p:\\d+|ind)\u27E7");
     private static final Pattern PAGE_TOKEN = Pattern.compile("\u27E6p:(\\d+)\u27E7");
     private static final Pattern LAYOUT_TOKEN = Pattern.compile("\u27E6(?:p:\\d+|ind)\u27E7");
 
@@ -155,6 +156,8 @@ public final class RichText {
                 case "/i" -> sb.append("</em>");
                 case "u" -> sb.append("<u>");
                 case "/u" -> sb.append("</u>");
+                case "h" -> sb.append("<span hidden>");
+                case "/h" -> sb.append("</span>");
                 default -> {
                     if (t.startsWith("img:")) {
                         sb.append("<img class=\"question-image\" alt=\"Imagem da questao\" src=\"")

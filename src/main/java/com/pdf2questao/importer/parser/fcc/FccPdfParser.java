@@ -601,7 +601,7 @@ public class FccPdfParser implements ExamParser {
 
     /** "⟦/u⟧ ⟦u⟧" e "⟦/u⟧⟦u⟧" (mesmo estilo fechando e reabrindo) viram um estilo continuo. */
     static String mergeAdjacentStyles(String rich) {
-        return rich.replaceAll("\u27E6/([biu])\u27E7(\\s?)\u27E6\\1\u27E7", "$2");
+        return rich.replaceAll("\u27E6/([biuh])\u27E7(\\s?)\u27E6\\1\u27E7", "$2");
     }
 
     private static String confusableLetters(char letter) {

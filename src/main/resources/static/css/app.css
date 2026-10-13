@@ -272,6 +272,11 @@ h1, h2, h3, h4, h5 {
     border-radius: 0.375rem;
 }
 
+/* Recorte do enunciado: cola nas alternativas que vem logo abaixo. */
+.rich-text .question-image {
+    margin-bottom: 0.25rem;
+}
+
 .alternative-struck .form-check-label {
     text-decoration: line-through;
     opacity: 0.5;

@@ -1,5 +1,6 @@
 package com.pdf2questao.importer.ocr;
 
+import com.pdf2questao.importer.parser.support.PdfRichTextExtractor.ExtractedImage;
 import com.pdf2questao.importer.parser.support.RichText;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -95,11 +96,18 @@ public class OcrService {
         }
     }
 
-    public String recognize(byte[] pdf) throws IOException {
-        return recognize(pdf, p -> { });
+    /** Texto de todas as paginas e os recortes de questao ({@code ⟦img:N⟧} no texto aponta para eles). */
+    public record Result(String text, List<ExtractedImage> images) {
     }
 
-    public String recognize(byte[] pdf, Consumer<Progress> onProgress) throws IOException {
+    private record Page(String text, List<byte[]> crops) {
+    }
+
+    public String recognize(byte[] pdf) throws IOException {
+        return recognize(pdf, p -> { }).text();
+    }
+
+    public Result recognize(byte[] pdf, Consumer<Progress> onProgress) throws IOException {
         Path pdfCache = cacheDir.resolve(cacheKey(pdf));
         Files.createDirectories(pdfCache);
 
@@ -111,13 +119,12 @@ public class OcrService {
             AtomicInteger cached = new AtomicInteger();
             Semaphore inFlight = new Semaphore(threads * 2);
             ExecutorService pool = Executors.newFixedThreadPool(threads);
-            List<Future<String>> results = new ArrayList<>();
+            List<Future<Page>> results = new ArrayList<>();
             try {
                 for (int page = 0; page < pages; page++) {
                     Path cacheFile = pdfCache.resolve(String.format("page-%03d.txt", page + 1));
                     if (Files.isRegularFile(cacheFile)) {
-                        results.add(java.util.concurrent.CompletableFuture
-                                .completedFuture(Files.readString(cacheFile, StandardCharsets.UTF_8)));
+                        results.add(java.util.concurrent.CompletableFuture.completedFuture(readCached(cacheFile)));
                         reportProgress(onProgress, done.incrementAndGet(), pages, cached.incrementAndGet());
                         continue;
                     }
@@ -127,10 +134,10 @@ public class OcrService {
                     int pageNumber = page + 1;
                     results.add(pool.submit(() -> {
                         try {
-                            String text = runTesseract(image, pageNumber);
-                            Files.writeString(cacheFile, text, StandardCharsets.UTF_8);
+                            Page result = runTesseract(image, pageNumber);
+                            writeCache(cacheFile, result);
                             reportProgress(onProgress, done.incrementAndGet(), pages, cached.get());
-                            return text;
+                            return result;
                         } finally {
                             inFlight.release();
                         }
@@ -138,10 +145,18 @@ public class OcrService {
                 }
 
                 StringBuilder out = new StringBuilder();
+                List<ExtractedImage> images = new ArrayList<>();
                 for (int i = 0; i < results.size(); i++) {
-                    out.append(RichText.page(i + 1)).append('\n').append(await(results.get(i))).append('\n');
+                    Page page = await(results.get(i));
+                    // Os recortes de cada pagina sao numerados a partir de 1; aqui viram indices do documento.
+                    int offset = images.size();
+                    for (byte[] crop : page.crops()) {
+                        images.add(new ExtractedImage(images.size() + 1, i + 1, crop));
+                    }
+                    out.append(RichText.page(i + 1)).append('\n')
+                            .append(RichText.remapImages(page.text(), n -> offset + n)).append('\n');
                 }
-                return out.toString();
+                return new Result(out.toString(), images);
             } finally {
                 pool.shutdownNow();
             }
@@ -153,7 +168,7 @@ public class OcrService {
         onProgress.accept(new Progress(done, total, cached));
     }
 
-    private String await(Future<String> future) throws IOException {
+    private Page await(Future<Page> future) throws IOException {
         try {
             return future.get();
         } catch (InterruptedException e) {
@@ -164,7 +179,7 @@ public class OcrService {
         }
     }
 
-    private String runTesseract(BufferedImage image, int pageNumber) throws IOException {
+    private Page runTesseract(BufferedImage image, int pageNumber) throws IOException {
         Path png = Files.createTempFile("pdf2questao-ocr-" + pageNumber + "-", ".png");
         Path base = png.resolveSibling(png.getFileName().toString().replaceAll("\\.png$", ""));
         Path txt = Path.of(base + ".txt");
@@ -196,14 +211,22 @@ public class OcrService {
             }
             String text = Files.readString(txt, StandardCharsets.UTF_8);
             if (Files.isRegularFile(tsv)) {
+                String tsvText = Files.readString(tsv, StandardCharsets.UTF_8);
                 try {
-                    return UnderlineDetector.annotate(text, Files.readString(tsv, StandardCharsets.UTF_8), image, dpi);
+                    text = UnderlineDetector.annotate(text, tsvText, image, dpi);
                 } catch (RuntimeException e) {
                     // Sem sublinhado a pagina continua valida: so perde a marcacao.
                     log.warn("Sublinhado nao detectado na pagina {}: {}", pageNumber, e.toString());
                 }
+                try {
+                    QuestionCropper.Annotated annotated = QuestionCropper.annotate(text, tsvText, image, dpi);
+                    return new Page(annotated.text(), annotated.crops());
+                } catch (RuntimeException e) {
+                    // Sem recortes a pagina continua valida: so perde a imagem da formula/tabela.
+                    log.warn("Recortes de questao nao gerados na pagina {}: {}", pageNumber, e.toString());
+                }
             }
-            return text;
+            return new Page(text, List.of());
         } finally {
             Files.deleteIfExists(png);
             Files.deleteIfExists(txt);
@@ -211,11 +234,31 @@ public class OcrService {
         }
     }
 
+    private Page readCached(Path cacheFile) throws IOException {
+        List<byte[]> crops = new ArrayList<>();
+        for (int n = 1; Files.isRegularFile(cropFile(cacheFile, n)); n++) {
+            crops.add(Files.readAllBytes(cropFile(cacheFile, n)));
+        }
+        return new Page(Files.readString(cacheFile, StandardCharsets.UTF_8), crops);
+    }
+
+    private void writeCache(Path cacheFile, Page page) throws IOException {
+        for (int n = 1; n <= page.crops().size(); n++) {
+            Files.write(cropFile(cacheFile, n), page.crops().get(n - 1));
+        }
+        // O texto por ultimo: a pagina so conta como em cache quando os recortes ja estao no disco.
+        Files.writeString(cacheFile, page.text(), StandardCharsets.UTF_8);
+    }
+
+    private static Path cropFile(Path cacheFile, int n) {
+        return cacheFile.resolveSibling(cacheFile.getFileName().toString().replace(".txt", "-q" + n + ".png"));
+    }
+
     private String cacheKey(byte[] pdf) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(pdf);
-            // "-u1": formato com sublinhado; caches antigos (sem marcas) nao servem mais.
-            return HexFormat.of().formatHex(hash, 0, 12) + "-" + language + "-" + dpi + "-u1";
+            // "-u4": formato com sublinhado e recortes de questao; caches antigos nao servem mais.
+            return HexFormat.of().formatHex(hash, 0, 12) + "-" + language + "-" + dpi + "-u4";
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

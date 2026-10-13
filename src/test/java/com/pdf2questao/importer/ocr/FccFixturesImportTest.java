@@ -98,6 +98,20 @@ class FccFixturesImportTest {
     }
 
     @Test
+    void formulasETabelasGanhamORecorteDaQuestao() throws IOException {
+        for (Prova p : PROVAS) {
+            OcrService.Result ocr = OCR.recognize(Files.readAllBytes(provaPdf(p)), progress -> { });
+            ParseResult result = EXAM_PARSER.parse(ocr.text());
+            long withCrop = result.questions().stream().filter(q -> q.statement().contains("\u27E6img:")).count();
+
+            // Recorte e para o que o OCR nao le (formula, tabela, ordinal): nao pode virar quase toda questao.
+            assertFalse(ocr.images().isEmpty(), p.name());
+            assertTrue(withCrop > 0 && withCrop < p.total() / 3, p.name() + " questoes com recorte: " + withCrop);
+            assertTrue(result.failures().isEmpty(), p.name() + ": " + result.failures());
+        }
+    }
+
+    @Test
     void gabaritosImportam100e80e80RespostasSemRuido() throws IOException {
         for (Prova p : PROVAS) {
             GabaritoEntries entries = GABARITO_PARSER.parseEntries(gabaritoText(p), "");
