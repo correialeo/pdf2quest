@@ -69,8 +69,10 @@ public class FccPdfParser implements ExamParser {
     private static final Pattern MENTIONS_VISUAL = Pattern.compile(
             "(?i)\\b(figura|tabela|gr[aá]fico|quadro|diagrama|imagem|ilustra[cç][aã]o|fluxograma|organograma"
                     + "|c[oó]digo|script|trecho de programa)\\b");
+    // Negrito/italico/destaque ainda se perdem no OCR; so o sublinhado e recuperado (ver UnderlineDetector).
     private static final Pattern MENTIONS_HIGHLIGHT = Pattern.compile(
-            "(?i)\\b(destacad[oa]s?|sublinhad[oa]s?|grifad[oa]s?|em negrito|em it[aá]lico|entre aspas)\\b");
+            "(?i)\\b(destacad[oa]s?|grifad[oa]s?|em negrito|em it[aá]lico|entre aspas)\\b");
+    private static final Pattern MENTIONS_UNDERLINE = Pattern.compile("(?i)\\bsublinhad[oa]s?\\b");
     private static final Pattern CODE_LINE = Pattern.compile(
             "(?m)^\\s*(SELECT\\b|FROM\\b|WHERE\\b|INSERT\\b|CREATE\\b|def\\s|class\\s|import\\s|public\\s|for\\s*\\(|"
                     + "if\\s*\\(|while\\s*\\(|return\\b|print\\s*\\(|<[A-Za-z/][^>]*>|[{}]\\s*$).*|.*(==|!=|=>|->|\\);|\\{\\s*$).*");
@@ -129,7 +131,7 @@ public class FccPdfParser implements ExamParser {
                 heading = block.headingBefore;
             }
             String statement = join(block.head);
-            if (statement.isBlank() || block.altCount() < 2) {
+            if (RichText.plain(statement).isBlank() || block.altCount() < 2) {
                 failures.add(new ParseFailure(block.number, "enunciado ou alternativas insuficientes"));
                 continue;
             }
@@ -163,7 +165,9 @@ public class FccPdfParser implements ExamParser {
             if (linePage != null) {
                 page = linePage;
             }
-            String line = RichText.plain(RichText.removeLayoutTokens(rawLine)).replace(' ', ' ').trim();
+            // 'rich' guarda negrito/sublinhado vindos do OCR; toda decisao do parser usa 'line' (texto puro).
+            String rich = RichText.trim(RichText.removeLayoutTokens(rawLine).replace(' ', ' '));
+            String line = RichText.plain(rich);
 
             // Numero de pagina solto (o numero de questao sempre vem com ponto: "20.").
             if (HEADER_LINE.matcher(line).find() || FOOTER_LINE.matcher(line).find()
@@ -223,7 +227,7 @@ public class FccPdfParser implements ExamParser {
                     }
                     blocks.add(block);
                     expected++;
-                    block.addHead(start.group(2));
+                    block.addHead(RichText.fromVisible(rich, start.start(2)));
                     pendingBlank = false;
                     continue;
                 }
@@ -233,7 +237,7 @@ public class FccPdfParser implements ExamParser {
                 block.category = category;
                 blocks.add(block);
             }
-            block.addLine(line, pendingBlank);
+            block.addLine(line, rich, pendingBlank);
             pendingBlank = false;
         }
         return blocks.stream().anyMatch(b -> b.number > 0) ? blocks : List.of();
@@ -376,7 +380,8 @@ public class FccPdfParser implements ExamParser {
     }
 
     /** "Atencao: Para responder as questoes de numeros 54, 55 e 58 / 56 a 58, baseie-se..." -> {54,55,56,57,58}. */
-    static Set<Integer> passageNumbers(String passage) {
+    static Set<Integer> passageNumbers(String richPassage) {
+        String passage = RichText.plain(richPassage);
         Set<Integer> numbers = new LinkedHashSet<>();
         String firstLines = Arrays.stream(passage.split("\n")).limit(3).reduce("", (a, b) -> a + " " + b);
         Matcher cue = PASSAGE_CUE.matcher(firstLines);
@@ -428,7 +433,7 @@ public class FccPdfParser implements ExamParser {
             }
             int i = 0;
             while (i < paragraphs.size() && isHeading(paragraphs.get(i))) {
-                result.heading = paragraphs.get(i).get(0);
+                result.heading = RichText.plain(paragraphs.get(i).get(0));
                 i++;
             }
             if (i < paragraphs.size()) {
@@ -442,7 +447,7 @@ public class FccPdfParser implements ExamParser {
             if (paragraph.size() != 1) {
                 return false;
             }
-            String line = paragraph.get(0);
+            String line = RichText.plain(paragraph.get(0));
             // So letras, espacos e pontuacao de titulo: descarta lixo de OCR ("P(X=m+1)", "RM 001").
             return line.length() <= MAX_HEADING_LENGTH && line.matches("[\\p{L} :,/\\u2013\\u2014-]+") && !line.endsWith(".") && !line.endsWith(":")
                     && !line.toLowerCase().startsWith("aten") && Character.isUpperCase(line.charAt(0));
@@ -451,7 +456,9 @@ public class FccPdfParser implements ExamParser {
 
     // ---- sinais de leitura incerta ----
 
-    private List<String> reviewReasons(Block block, String statement) {
+    private List<String> reviewReasons(Block block, String richStatement) {
+        // Os sinais de leitura incerta olham o texto puro, sem as marcas de estilo.
+        String statement = RichText.plain(richStatement);
         List<String> reasons = new ArrayList<>();
         if (block.recoveredBare) {
             reasons.add("alternativas lidas como linhas de tabela, sem parenteses");
@@ -478,9 +485,13 @@ public class FccPdfParser implements ExamParser {
         if (MENTIONS_HIGHLIGHT.matcher(statement).find()) {
             reasons.add("cita trecho destacado (formatacao perdida no OCR)");
         }
+        // "o segmento sublinhado": so e problema se nenhum sublinhado foi achado na questao.
+        if (MENTIONS_UNDERLINE.matcher(statement).find() && !hasUnderline(block, richStatement)) {
+            reasons.add("cita trecho sublinhado, mas nenhum sublinhado foi detectado no PDF");
+        }
         StringBuilder all = new StringBuilder(statement);
         for (int i = 0; i < 5; i++) {
-            all.append('\n').append(block.alt(i) == null ? "" : block.alt(i));
+            all.append('\n').append(block.alt(i) == null ? "" : RichText.plain(block.alt(i)));
         }
         String everything = all.toString();
         if (CODE_LINE.matcher(everything).find()) {
@@ -496,6 +507,20 @@ public class FccPdfParser implements ExamParser {
             reasons.add("varias linhas curtas seguidas (tabela?)");
         }
         return reasons;
+    }
+
+    private static boolean hasUnderline(Block block, String richStatement) {
+        String open = RichText.open('u');
+        if (richStatement.contains(open)) {
+            return true;
+        }
+        for (int i = 0; i < 5; i++) {
+            String alt = block.alt(i);
+            if (alt != null && alt.contains(open)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private double symbolRatio(String s) {
@@ -517,7 +542,7 @@ public class FccPdfParser implements ExamParser {
         int run = 0;
         int best = 0;
         for (String line : lines) {
-            if (!line.isEmpty() && line.length() <= 14) {
+            if (!line.isEmpty() && RichText.plain(line).length() <= 14) {
                 best = Math.max(best, ++run);
             } else {
                 run = 0;
@@ -547,7 +572,10 @@ public class FccPdfParser implements ExamParser {
         return String.join("\n", paragraphs).trim();
     }
 
-    /** Junta linhas de um paragrafo, desfazendo hifenizacao de fim de linha ("Re-" + "ceita" -> "Receita"). */
+    /**
+     * Junta linhas de um paragrafo, desfazendo hifenizacao de fim de linha ("Re-" + "ceita" -> "Receita").
+     * As linhas podem ter marcas de estilo; um sublinhado que continua na linha seguinte vira um so.
+     */
     static String joinLines(List<String> lines) {
         StringBuilder out = new StringBuilder();
         for (String line : lines) {
@@ -555,17 +583,25 @@ public class FccPdfParser implements ExamParser {
                 out.append(line);
                 continue;
             }
-            int last = out.length() - 1;
-            boolean hyphenated = out.charAt(last) == '-' && last > 0 && Character.isLowerCase(out.charAt(last - 1))
-                    && !line.isEmpty() && Character.isLowerCase(line.charAt(0));
+            String plainOut = RichText.plain(out.toString());
+            String plainLine = RichText.plain(line);
+            int n = plainOut.length();
+            boolean hyphenated = plainOut.endsWith("-") && n > 1 && Character.isLowerCase(plainOut.charAt(n - 2))
+                    && !plainLine.isEmpty() && Character.isLowerCase(plainLine.charAt(0));
             if (hyphenated) {
-                out.setLength(last);
+                // Tira so o hifen; marcas de estilo que vinham depois dele continuam no lugar.
+                out.deleteCharAt(out.lastIndexOf("-"));
             } else {
                 out.append(' ');
             }
             out.append(line);
         }
-        return out.toString();
+        return mergeAdjacentStyles(out.toString());
+    }
+
+    /** "⟦/u⟧ ⟦u⟧" e "⟦/u⟧⟦u⟧" (mesmo estilo fechando e reabrindo) viram um estilo continuo. */
+    static String mergeAdjacentStyles(String rich) {
+        return rich.replaceAll("\u27E6/([biu])\u27E7(\\s?)\u27E6\\1\u27E7", "$2");
     }
 
     private static String confusableLetters(char letter) {
@@ -624,16 +660,17 @@ public class FccPdfParser implements ExamParser {
             for (int k = lineIndexes.size() - 5; k >= 0; k--) {
                 boolean sequence = true;
                 for (int j = 0; j < 5 && sequence; j++) {
-                    Matcher m = BARE_ROW.matcher(head.get(lineIndexes.get(k + j)));
+                    Matcher m = BARE_ROW.matcher(RichText.plain(head.get(lineIndexes.get(k + j))));
                     sequence = m.matches() && m.group(1).charAt(0) == (char) ('A' + j);
                 }
                 if (!sequence) {
                     continue;
                 }
                 for (int j = 0; j < 5; j++) {
-                    Matcher m = BARE_ROW.matcher(head.get(lineIndexes.get(k + j)));
+                    String rich = head.get(lineIndexes.get(k + j));
+                    Matcher m = BARE_ROW.matcher(RichText.plain(rich));
                     m.matches();
-                    altText.get(j).add(m.group(2).trim());
+                    altText.get(j).add(RichText.trim(RichText.fromVisible(rich, m.start(2))));
                 }
                 int first = lineIndexes.get(k);
                 int last = lineIndexes.get(k + 4);
@@ -676,13 +713,14 @@ public class FccPdfParser implements ExamParser {
             }
         }
 
-        void addLine(String line, boolean afterBlank) {
+        /** @param line texto puro (para decidir) @param rich o mesmo texto com marcas de estilo (para guardar). */
+        void addLine(String line, String rich, boolean afterBlank) {
             if (number == 0) {
-                trailing.add(line);
+                trailing.add(rich);
                 return;
             }
             if (inTrailing) {
-                trailing.add(line);
+                trailing.add(rich);
                 return;
             }
             Marker marker = altIndex + 1 < 5 || altIndex < 0 ? matchMarker(line) : null;
@@ -691,7 +729,7 @@ public class FccPdfParser implements ExamParser {
                 markerSeen[altIndex] = true;
                 blankAfterLastAlt = false;
                 if (!marker.body().isEmpty()) {
-                    altText.get(marker.index()).add(marker.body());
+                    altText.get(marker.index()).add(RichText.trim(RichText.fromVisible(rich, marker.bodyStart())));
                 }
                 if (marker.parenthesized()) {
                     parenSeen = true;
@@ -699,21 +737,21 @@ public class FccPdfParser implements ExamParser {
                 return;
             }
             if (altIndex < 0) {
-                head.add(line);
+                head.add(rich);
                 return;
             }
             // Depois de uma linha em branco, so continua a alternativa se o texto seguir minusculo
             // (quebra de pagina no meio da alternativa); senao e titulo/texto de apoio da proxima questao.
             if (altIndex == 4 && blankAfterLastAlt && !Character.isLowerCase(line.charAt(0))) {
                 inTrailing = true;
-                trailing.add(line);
+                trailing.add(rich);
                 return;
             }
-            altText.get(altIndex).add(line);
+            altText.get(altIndex).add(rich);
             blankAfterLastAlt = false;
         }
 
-        private record Marker(int index, String body, boolean parenthesized) {
+        private record Marker(int index, String body, int bodyStart, boolean parenthesized) {
         }
 
         /** Marcador de alternativa no inicio da linha. Prefere a proxima letra esperada; aceita pular letras. */
@@ -742,13 +780,13 @@ public class FccPdfParser implements ExamParser {
             }
             if (token.length() == 1 && expected < 5
                     && confusableLetters((char) ('A' + expected)).indexOf(token.charAt(0)) >= 0) {
-                return new Marker(expected, m.group(2).trim(), true);
+                return new Marker(expected, m.group(2).trim(), m.start(2), true);
             }
             Matcher strict = STRICT_MARKER.matcher(line);
             if (strict.matches()) {
                 int letter = strict.group(1).charAt(0) - 'A';
                 if (letter > expected) {
-                    return new Marker(letter, strict.group(2).trim(), true);
+                    return new Marker(letter, strict.group(2).trim(), strict.start(2), true);
                 }
             }
             return bareMarker(line, expected);
@@ -761,7 +799,7 @@ public class FccPdfParser implements ExamParser {
             Matcher m = BARE_MARKER.matcher(line);
             if (m.matches() && m.group(1).charAt(0) == (char) ('A' + expected)
                     && !Character.isLowerCase(m.group(2).charAt(0))) {
-                return new Marker(expected, m.group(2).trim(), false);
+                return new Marker(expected, m.group(2).trim(), m.start(2), false);
             }
             return null;
         }

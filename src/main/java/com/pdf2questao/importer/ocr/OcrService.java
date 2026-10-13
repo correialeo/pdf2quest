@@ -34,9 +34,10 @@ import java.util.function.Consumer;
 /**
  * OCR de PDFs sem camada de texto (paginas que sao so imagem) usando o Tesseract
  * instalado na maquina. Cada pagina e renderizada em {@code dpi} (300 por padrao),
- * reconhecida em paralelo e guardada em cache em disco, indexada pelo hash do PDF -
+ * reconhecida em paralelo e guardada em cache em disco, indexada pelo hash do PDF (e pelo formato do texto) -
  * reimportar o mesmo arquivo nao roda o OCR de novo. O texto devolvido segue o mesmo
- * formato dos extratores de PDF: uma linha {@code ⟦p:N⟧} abre cada pagina.
+ * formato dos extratores de PDF: uma linha {@code ⟦p:N⟧} abre cada pagina, e o sublinhado do PDF volta como
+ * {@code ⟦u⟧...⟦/u⟧} (ver {@link UnderlineDetector}).
  */
 @Component
 public class OcrService {
@@ -165,16 +166,20 @@ public class OcrService {
 
     private String runTesseract(BufferedImage image, int pageNumber) throws IOException {
         Path png = Files.createTempFile("pdf2questao-ocr-" + pageNumber + "-", ".png");
+        Path base = png.resolveSibling(png.getFileName().toString().replaceAll("\\.png$", ""));
+        Path txt = Path.of(base + ".txt");
+        Path tsv = Path.of(base + ".tsv");
         try {
             ImageIO.write(image, "png", png.toFile());
             // psm 4: coluna unica de texto de tamanhos variados - mantem alternativas e paragrafos separados.
-            ProcessBuilder builder = new ProcessBuilder(tesseractPath, png.toString(), "stdout",
-                    "-l", language, "--psm", "4", "--dpi", String.valueOf(dpi));
+            // txt + tsv na mesma execucao: o tsv traz as caixas das palavras para achar o sublinhado.
+            ProcessBuilder builder = new ProcessBuilder(tesseractPath, png.toString(), base.toString(),
+                    "-l", language, "--psm", "4", "--dpi", String.valueOf(dpi), "txt", "tsv");
             // Cada processo usa uma thread: o paralelismo vem das paginas, nao do OpenMP do Tesseract.
             builder.environment().put("OMP_THREAD_LIMIT", "1");
             builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             Process process = builder.start();
-            byte[] output = process.getInputStream().readAllBytes();
             try {
                 if (!process.waitFor(PAGE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     process.destroyForcibly();
@@ -185,20 +190,32 @@ public class OcrService {
                 Thread.currentThread().interrupt();
                 throw new IOException("OCR interrompido", e);
             }
-            if (process.exitValue() != 0) {
+            if (process.exitValue() != 0 || !Files.isRegularFile(txt)) {
                 throw new IOException("Tesseract falhou na pagina " + pageNumber + " (codigo " + process.exitValue()
                         + "). O idioma '" + language + "' esta instalado?");
             }
-            return new String(output, StandardCharsets.UTF_8);
+            String text = Files.readString(txt, StandardCharsets.UTF_8);
+            if (Files.isRegularFile(tsv)) {
+                try {
+                    return UnderlineDetector.annotate(text, Files.readString(tsv, StandardCharsets.UTF_8), image, dpi);
+                } catch (RuntimeException e) {
+                    // Sem sublinhado a pagina continua valida: so perde a marcacao.
+                    log.warn("Sublinhado nao detectado na pagina {}: {}", pageNumber, e.toString());
+                }
+            }
+            return text;
         } finally {
             Files.deleteIfExists(png);
+            Files.deleteIfExists(txt);
+            Files.deleteIfExists(tsv);
         }
     }
 
     private String cacheKey(byte[] pdf) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(pdf);
-            return HexFormat.of().formatHex(hash, 0, 12) + "-" + language + "-" + dpi;
+            // "-u1": formato com sublinhado; caches antigos (sem marcas) nao servem mais.
+            return HexFormat.of().formatHex(hash, 0, 12) + "-" + language + "-" + dpi + "-u1";
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

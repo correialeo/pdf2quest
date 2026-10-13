@@ -79,6 +79,25 @@ class FccFixturesImportTest {
     }
 
     @Test
+    void sublinhadoDoPdfApareceNasQuestoes() throws IOException {
+        Prova p1 = PROVAS.get(0);
+        ParseResult result = EXAM_PARSER.parse(OCR.recognize(Files.readAllBytes(provaPdf(p1))));
+        ParsedQuestion q6 = result.questions().stream().filter(q -> q.number() == 6).findFirst().orElseThrow();
+        ParsedQuestion q7 = result.questions().stream().filter(q -> q.number() == 7).findFirst().orElseThrow();
+
+        assertTrue(q6.statement().contains("\u27E6u\u27E7que teria sido poss\u00edvel se tiv\u00e9ssemos feito a escolha"),
+                q6.statement());
+        for (String alt : new String[]{q7.alternativeA(), q7.alternativeB(), q7.alternativeC(), q7.alternativeD(),
+                q7.alternativeE()}) {
+            assertTrue(alt.contains("\u27E6u\u27E7") && alt.contains("\u27E6/u\u27E7"), alt);
+        }
+        // Sublinhado e raro: nao pode aparecer em quase todas as questoes (falso positivo em massa).
+        long underlined = result.questions().stream().filter(q -> q.statement().contains("\u27E6u\u27E7")
+                || q.alternativeA().contains("\u27E6u\u27E7")).count();
+        assertTrue(underlined >= 3 && underlined <= 12, "questoes com sublinhado: " + underlined);
+    }
+
+    @Test
     void gabaritosImportam100e80e80RespostasSemRuido() throws IOException {
         for (Prova p : PROVAS) {
             GabaritoEntries entries = GABARITO_PARSER.parseEntries(gabaritoText(p), "");

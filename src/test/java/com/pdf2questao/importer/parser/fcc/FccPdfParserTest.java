@@ -241,4 +241,74 @@ class FccPdfParserTest {
         assertTrue(FccPdfParser.edgeNoise("\u27E6p:1\u27E7\nrodape repetido\n\u27E6p:2\u27E7\nrodape repetido\n").isEmpty(),
                 "com poucas paginas nao ha como saber o que e repeticao");
     }
+
+    private static final String U = "\u27E6u\u27E7";
+    private static final String UE = "\u27E6/u\u27E7";
+
+    @Test
+    void sublinhadoDoOcrChegaAoEnunciadoAsAlternativasEOTextoDeApoio() {
+        String text = "\u27E6p:1\u27E7\nPROVA 1 \u2013 CONHECIMENTOS GERAIS\n\n"
+                + "Aten\u00e7\u00e3o: Para responder \u00e0s quest\u00f5es de n\u00fameros 1 a 2, baseie-se no texto.\n\n"
+                + "O texto base fala de alguma coisa.\n\n"
+                + "1. O passado funciona como a miragem da felicidade " + U + "que teria sido poss\u00edvel se" + UE + "\n"
+                + U + "tiv\u00e9ssemos feito a escolha" + UE + "\n"
+                + "Mant\u00eam-se o sentido substituindo-se o segmento sublinhado por\n"
+                + "(A) para a qual a possibilidade de acerto seria leg\u00edtima.\n"
+                + "(B) " + U + "dada como certa" + UE + " no caso de decorrer de uma melhor sele\u00e7\u00e3o.\n"
+                + "(C) cuja poss\u00edvel escolha fosse dada por n\u00f3s como a mais perfeita.\n"
+                + "(D) em que sua plena realiza\u00e7\u00e3o ensejaria a corre\u00e7\u00e3o da escolha.\n"
+                + "(E) " + U + "com\u00e7ar" + UE + " de novo.\n\n"
+                + "2. Outro enunciado completo com " + U + "uma palavra" + UE + " sublinhada.\n(A) um.\n(B) dois.\n(C) tr\u00eas.\n(D) quatro.\n(E) cinco.\n";
+
+        ParseResult result = parser.parse(text);
+        ParsedQuestion q1 = result.questions().get(0);
+
+        assertEquals(2, result.questions().size());
+        assertTrue(result.failures().isEmpty(), result.failures().toString());
+        // o sublinhado que atravessa duas linhas vira um so, sem emenda no meio
+        assertTrue(q1.statement().contains(U + "que teria sido poss\u00edvel se tiv\u00e9ssemos feito a escolha" + UE),
+                q1.statement());
+        assertEquals(U + "dada como certa" + UE + " no caso de decorrer de uma melhor sele\u00e7\u00e3o.", q1.alternativeB());
+        assertEquals(U + "com\u00e7ar" + UE + " de novo.", q1.alternativeE());
+        assertEquals("para a qual a possibilidade de acerto seria leg\u00edtima.", q1.alternativeA());
+        assertFalse(q1.needsReview(), q1.reviewReason());
+        assertTrue(q1.passage().contains("texto base"), q1.passage());
+        assertTrue(q1.passage().startsWith("Aten\u00e7\u00e3o:"), "sem o sublinhado da capa, sem alterar o texto");
+        assertTrue(parser.parse(text).questions().get(1).statement().contains(U + "uma palavra" + UE));
+    }
+
+    @Test
+    void hifenizacaoDentroDeSublinhadoEJuncaoDeLinhas() {
+        assertEquals(U + "Secretaria Receita Federal" + UE + " do Brasil",
+                FccPdfParser.joinLines(List.of(U + "Secretaria Re-" + UE, U + "ceita Federal" + UE + " do Brasil")));
+        assertEquals("a " + U + "frase inteira" + UE + " segue",
+                FccPdfParser.joinLines(List.of("a " + U + "frase" + UE, U + "inteira" + UE + " segue")));
+        assertEquals("sem " + U + "um" + UE + " e " + U + "outro" + UE,
+                FccPdfParser.joinLines(List.of("sem " + U + "um" + UE, "e " + U + "outro" + UE)));
+    }
+
+    @Test
+    void textoComSublinhadoDecideIgualAoTextoSemSublinhado() {
+        String plain = "\u27E6p:1\u27E7\nPROVA 1 \u2013 CONHECIMENTOS GERAIS\n\n1. Enunciado da quest\u00e3o completo aqui.\n"
+                + "(A) um.\n(B) dois.\n(C) tr\u00eas.\n(D) quatro.\n(E) cinco.\n";
+        String marked = plain.replace("Enunciado da", U + "Enunciado da" + UE).replace("(B) dois.", "(B) " + U + "dois" + UE + ".");
+
+        ParsedQuestion a = parser.parse(plain).questions().get(0);
+        ParsedQuestion b = parser.parse(marked).questions().get(0);
+
+        assertEquals(a.needsReview(), b.needsReview());
+        assertEquals(com.pdf2questao.importer.parser.support.RichText.plain(b.statement()), a.statement());
+        assertEquals("dois.", a.alternativeB());
+        assertEquals(U + "dois" + UE + ".", b.alternativeB());
+    }
+
+    @Test
+    void citaSublinhadoSemNenhumSublinhadoDetectadoVaiParaRevisao() {
+        String semMarca = "\u27E6p:1\u27E7\nPROVA 1 \u2013 CONHECIMENTOS GERAIS\n\n1. Substitua o segmento sublinhado por outro equivalente.\n" + ALTS;
+
+        ParsedQuestion q = parser.parse(semMarca).questions().get(0);
+
+        assertTrue(q.needsReview());
+        assertTrue(q.reviewReason().contains("sublinhad"), q.reviewReason());
+    }
 }
