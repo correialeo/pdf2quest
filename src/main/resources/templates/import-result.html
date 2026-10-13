@@ -6,7 +6,9 @@
 <main class="container page">
     <h1 class="mb-4">Resultado da Importação</h1>
 
+    <div class="alert alert-success" th:if="${info}" th:text="${info}"></div>
     <div class="card p-4 mb-4">
+        <h5 class="mb-3" th:text="${job.displayName}"></h5>
         <p><strong>Arquivo:</strong> <span th:text="${job.fileName}"></span></p>
         <p><strong>Banca detectada:</strong> <span th:text="${job.detectedOrganization} ?: 'não detectada'"></span></p>
         <p><strong>Ano detectado:</strong> <span th:text="${job.detectedYear} ?: 'não detectado'"></span></p>
@@ -25,6 +27,22 @@
         <span th:if="${!reprocess.notFoundNumbers.isEmpty()}">
             Não encontradas no PDF: <span th:text="${reprocess.notFoundNumbers}"></span>.
         </span>
+    </div>
+
+    <div class="card p-4 mb-4">
+        <h5>Dados da prova</h5>
+        <form method="post" th:action="@{/import/{id}/editar(id=${job.id})}" class="row g-2">
+            <div class="col-md-6"><label class="form-label small">Título</label>
+                <input type="text" name="title" class="form-control" th:value="${job.title}"
+                       placeholder="Ex.: SEFAZ-SP AFRE TIC – P1 Conhecimentos Gerais"/></div>
+            <div class="col-md-4"><label class="form-label small">Banca exibida nas questões</label>
+                <input type="text" name="organization" class="form-control" placeholder="(manter)"/></div>
+            <div class="col-md-2"><label class="form-label small">Ano</label>
+                <input type="number" name="year" class="form-control" th:value="${job.detectedYear}"/></div>
+            <div class="col-12"><button type="submit" class="btn btn-sm btn-primary">Salvar dados</button>
+                <span class="form-text">Atualiza o título e, se preenchidos, banca e ano das questões desta prova.
+                    Enunciados, alternativas e gabarito não são alterados.</span></div>
+        </form>
     </div>
 
     <div class="card p-4 mb-4">
@@ -60,6 +78,9 @@
 
     <a href="/import" class="btn btn-secondary mt-3">Importar outro PDF</a>
     <a th:href="@{/import/{id}/questoes(id=${job.id})}" class="btn btn-primary mt-3">Ver questões</a>
+    <a th:href="@{/dashboard/prova/{id}(id=${job.id})}" class="btn btn-outline-primary mt-3">Painel da prova</a>
+    <form method="post" th:action="@{/import/{id}/bloco(id=${job.id})}" class="d-inline">
+        <button type="submit" class="btn btn-outline-primary mt-3">Criar bloco desta prova</button></form>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

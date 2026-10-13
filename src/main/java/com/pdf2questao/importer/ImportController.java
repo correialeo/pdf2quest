@@ -112,6 +112,17 @@ public class ImportController {
         return "redirect:/import/result/" + id;
     }
 
+    @PostMapping("/import/{id}/editar")
+    public String updateInfo(@PathVariable Long id,
+                             @RequestParam(defaultValue = "") String title,
+                             @RequestParam(defaultValue = "") String organization,
+                             @RequestParam(required = false) Integer year,
+                             RedirectAttributes redirectAttributes) {
+        importService.updateInfo(id, title, organization, year);
+        redirectAttributes.addFlashAttribute("info", "Dados da prova atualizados.");
+        return "redirect:/import/result/" + id;
+    }
+
     @GetMapping("/import/{id}/pdf")
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) throws IOException {
         ImportJob job = importJobRepository.findById(id).orElseThrow();

@@ -123,6 +123,7 @@ public class ImportService {
         job.setErrorLog(failureLog(result));
         job.setDetectedOrganization(result.organization());
         job.setDetectedYear(result.year());
+        job.setTitle(hasText(examOverride) ? examOverride.trim() : result.title());
         job.setReport(ImportReport.forExam(file.getOriginalFilename(), result, sectionMap, usedOcr));
         job.setFinishedAt(LocalDateTime.now());
         ImportJob savedJob = importJobRepository.save(job);
@@ -220,6 +221,27 @@ public class ImportService {
 
         return new ReprocessResult(updated, subjectsFilled, attachments.imageIds().size(),
                 attachments.passageIds().size(), notFound, null);
+    }
+
+    /**
+     * Corrige os dados de uma prova ja importada (titulo, banca exibida e ano), a pedido do usuario.
+     * Atualiza tambem as questoes dela; o enunciado, as alternativas e o gabarito nao sao tocados.
+     */
+    @Transactional
+    public void updateInfo(Long importJobId, String title, String organization, Integer year) {
+        ImportJob job = importJobRepository.findById(importJobId).orElseThrow();
+        job.setTitle(hasText(title) ? title.trim() : null);
+        importJobRepository.save(job);
+        List<Question> questions = questionRepository.findByImportJobId(importJobId);
+        for (Question q : questions) {
+            if (hasText(organization)) {
+                q.setOrganization(organization.trim());
+            }
+            if (year != null) {
+                q.setYear(year);
+            }
+        }
+        questionRepository.saveAll(questions);
     }
 
     private PdfRichTextExtractor.Extraction extract(byte[] bytes) throws IOException {

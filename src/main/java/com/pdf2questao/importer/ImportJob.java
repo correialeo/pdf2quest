@@ -36,7 +36,21 @@ public class ImportJob {
 
     private String pdfPath;
 
+    /** Nome amigavel da prova, editavel; ver {@link #getDisplayName()}. */
+    private String title;
+
     /** Relatorio da importacao (totais, questoes para revisar, divergencias com o gabarito). */
     @Lob
     private String report;
+
+    /** Titulo da prova, ou o nome do arquivo (sem ".pdf") enquanto ninguem deu um titulo. */
+    public String getDisplayName() {
+        if (title != null && !title.isBlank()) {
+            return title;
+        }
+        if (fileName == null) {
+            return "Prova " + id;
+        }
+        return fileName.replaceAll("(?i)\\.pdf$", "");
+    }
 }

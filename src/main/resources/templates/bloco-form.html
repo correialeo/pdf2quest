@@ -47,7 +47,7 @@
                         <select name="srcJob" class="form-select form-select-sm">
                             <option value="">(todas / só filtros)</option>
                             <option th:each="j : ${jobs}" th:value="${j.id}"
-                                    th:text="${j.id + ' — ' + j.fileName + ' (' + j.importedQuestions + ')'}"
+                                    th:text="${j.id + ' — ' + j.displayName + ' (' + j.importedQuestions + ')'}"
                                     th:selected="${s.importJobId == j.id.toString()}"></option>
                         </select>
                     </div>

@@ -17,6 +17,26 @@
 
     <div th:replace="~{fragments/block-preview :: preview(${preview})}"></div>
 
+    <h4 class="mt-4 mb-3" th:if="${preview.total > 0}">Questões do bloco</h4>
+    <div class="card p-4 mb-3" th:each="q, it : ${preview.questions}"
+         th:with="passage=${q.passageId != null} ? ${passages[q.passageId]} : null,
+                  firstOfPassage=${passage != null and (it.first or preview.questions[it.index - 1].passageId != q.passageId)}">
+        <p class="mb-2">
+            <strong th:text="${it.count} + '. Questão ' + ${q.questionNumber}"></strong>
+            <span class="text-muted" th:if="${q.subject != null}" th:text="'— ' + ${q.subject}"></span>
+        </p>
+        <details class="mb-3" th:if="${passage != null}" th:open="${firstOfPassage}">
+            <summary>Texto base</summary>
+            <div class="rich-text mt-2" th:utext="${@richText.html(passage.content)}"></div>
+        </details>
+        <p class="mb-3 rich-text" th:utext="${@richText.html(q.statement)}"></p>
+        <p class="mb-1" th:if="${q.alternativeA != null}"><strong>A)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeA)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeB != null}"><strong>B)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeB)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeC != null}"><strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeC)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeD != null}"><strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeD)}"></span></p>
+        <p class="mb-1" th:if="${q.alternativeE != null}"><strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeE)}"></span></p>
+    </div>
+
     <form method="post" th:action="@{/blocos/{id}/iniciar(id=${block.id})}" class="d-inline">
         <button type="submit" class="btn btn-success" th:disabled="${preview.total == 0}">Iniciar sessão</button>
     </form>

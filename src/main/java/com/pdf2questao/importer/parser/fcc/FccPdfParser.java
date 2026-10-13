@@ -39,9 +39,15 @@ import java.util.regex.Pattern;
 public class FccPdfParser implements ExamParser {
 
     private static final Pattern HEADER_LINE = Pattern.compile("(?i)(\\bde\\s+prova\\b.{0,15}\\bti?po\\s*\\d+|\\bti?po\\s*00\\d\\b)");
-    private static final Pattern FOOTER_LINE = Pattern.compile("(?i)\\bFA[ZS2]\\s?SP\\b.*prova\\s*\\d");
-    private static final Pattern PROVA_TITLE = Pattern.compile(
-            "(?i)prova\\s*\\d.{0,6}conhecimentos\\s+(b\\S+sicos|gerais|espec\\S+ficos)");
+    // Rodape conhecido da FAZSP; o ruido de outras provas e pego por repeticao nas bordas das paginas
+    // (ver edgeNoise), sem depender do nome do orgao.
+    private static final Pattern FOOTER_LINE = Pattern.compile(
+            "(?i)(\\bFA[ZS2]\\s?SP\\b.*prova\\s*\\d|^p[a\u00E1]gina\\s+\\d+)");
+    // "PROVA 2 - CONHECIMENTOS BASICOS", "Prova 1 - Lingua Portuguesa"... O texto depois do tracado e o titulo.
+    private static final Pattern PROVA_TITLE = Pattern.compile("(?i)\\bprova\\s*(\\d+)\\s*[\\-\u2013\\u2014]+\\s*(\\S.*)$");
+    // Titulo de secao sozinho na linha, usado quando o caderno nao tem "PROVA N -" (cadernos unicos).
+    private static final Pattern STANDALONE_SECTION = Pattern.compile(
+            "(?i)^\\W*(conhecimentos\\s+(gerais|b\\S+sicos|espec\\S+ficos))\\W*(\\(.*\\))?$");
     // O OCR troca digitos por simbolos parecidos ("53." vira "&3."), entao o token e comparado ao numero
     // esperado caractere a caractere (ver isQuestionNumber) em vez de exigir digitos.
     private static final Pattern QUESTION_START = Pattern.compile("^([A-Za-z0-9&$|!]{1,3})\\s*\\.\\s*(.*)$");
@@ -83,32 +89,35 @@ public class FccPdfParser implements ExamParser {
     public ParseResult parse(String rawText) {
         String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
         String plainText = RichText.plain(text);
-        String organization = PdfMetadataDetector.detectOrganization(plainText);
-        Integer year = PdfMetadataDetector.detectYear(plainText);
+        // Provas da FCC sao sempre da FCC; o detector generico confundia com palavras do texto ("OBJETIVA").
+        String organization = "FCC";
+        Integer year = detectYear(text, plainText);
+        Set<String> noise = edgeNoise(text);
 
-        List<Block> blocks = splitBlocks(text, true);
+        String[] title = new String[1];
+        List<Block> blocks = splitBlocks(text, true, noise, title);
         if (blocks.isEmpty()) {
-            // Sem o titulo "PROVA N - CONHECIMENTOS ..." (documento fora do padrao): tenta desde o inicio.
-            blocks = splitBlocks(text, false);
+            // Sem o titulo "PROVA N - ..." (caderno unico, documento fora do padrao): tenta desde o inicio,
+            // reconhecendo "CONHECIMENTOS GERAIS/ESPECIFICOS" sozinhos na linha como secoes.
+            blocks = splitBlocks(text, false, noise, title);
         }
 
         List<ParsedQuestion> questions = new ArrayList<>();
         List<ParseFailure> failures = new ArrayList<>();
         Map<Integer, String> passages = new LinkedHashMap<>();
         String heading = null;
-        QuestionCategory category = null;
 
         // O bloco 0 guarda o que vem antes da questao 1 (titulo de secao, texto de apoio).
         for (int i = 0; i < blocks.size(); i++) {
             Block block = blocks.get(i);
-            if (block.category != null) {
-                category = block.category;
-            }
             Block next = i + 1 < blocks.size() ? blocks.get(i + 1) : null;
             if (next != null) {
                 Trailing trailing = Trailing.of(block.trailing);
                 next.headingBefore = trailing.heading;
-                registerPassage(trailing.passage, next.number, passages);
+                // Antes da questao 1 so ha capa/instrucoes: so vira texto de apoio se disser a que questoes se refere.
+                boolean coverText = block.number == 0 && (trailing.passage == null
+                        || passageNumbers(trailing.passage).isEmpty());
+                registerPassage(coverText ? null : trailing.passage, next.number, passages);
             }
         }
 
@@ -127,11 +136,11 @@ public class FccPdfParser implements ExamParser {
             List<String> reasons = reviewReasons(block, statement);
             questions.add(new ParsedQuestion(block.number, statement,
                     block.alt(0), block.alt(1), block.alt(2), block.alt(3), block.alt(4),
-                    null, heading, category == null ? categoryFromBlocks(blocks) : category,
+                    null, heading, block.category != null ? block.category : categoryFromBlocks(blocks),
                     passages.get(block.number), block.page, !reasons.isEmpty(), String.join("; ", reasons),
                     block.headingBefore));
         }
-        return new ParseResult(organization, year, questions, failures);
+        return new ParseResult(organization, year, questions, failures, title[0]);
     }
 
     private QuestionCategory categoryFromBlocks(List<Block> blocks) {
@@ -140,7 +149,7 @@ public class FccPdfParser implements ExamParser {
 
     // ---- segmentacao em blocos de questao ----
 
-    private List<Block> splitBlocks(String text, boolean requireProvaTitle) {
+    private List<Block> splitBlocks(String text, boolean requireProvaTitle, Set<String> noise, String[] titleOut) {
         List<Block> blocks = new ArrayList<>();
         Block block = null;
         QuestionCategory category = null;
@@ -158,14 +167,26 @@ public class FccPdfParser implements ExamParser {
 
             // Numero de pagina solto (o numero de questao sempre vem com ponto: "20.").
             if (HEADER_LINE.matcher(line).find() || FOOTER_LINE.matcher(line).find()
-                    || line.matches("\\d{1,3}")) {
+                    || line.matches("\\d{1,3}") || noise.contains(normalizeEdge(line))) {
                 continue;
             }
             Matcher title = PROVA_TITLE.matcher(line);
-            if (title.find()) {
+            Matcher standalone = STANDALONE_SECTION.matcher(line);
+            boolean isTitle = title.find();
+            if (isTitle || (!requireProvaTitle && standalone.matches())) {
                 started = true;
-                category = title.group(1).toLowerCase().startsWith("espec")
-                        ? QuestionCategory.ESPECIFICO : QuestionCategory.GERAL;
+                String name = isTitle ? title.group(2) : standalone.group(1);
+                QuestionCategory detected = categoryOf(name);
+                if (detected != null) {
+                    category = detected;
+                }
+                if (block != null && block.number == 0) {
+                    // Capa/instrucoes que vieram antes do titulo da secao nao sao titulo nem texto de apoio.
+                    block.trailing.clear();
+                }
+                if (titleOut[0] == null) {
+                    titleOut[0] = isTitle ? "Prova " + title.group(1) + " \u2013 " + titleCase(name) : titleCase(name);
+                }
                 if (block == null) {
                     block = new Block(0, page);
                     block.category = category;
@@ -216,6 +237,91 @@ public class FccPdfParser implements ExamParser {
             pendingBlank = false;
         }
         return blocks.stream().anyMatch(b -> b.number > 0) ? blocks : List.of();
+    }
+
+    private static QuestionCategory categoryOf(String sectionName) {
+        String n = sectionName.toLowerCase();
+        if (n.contains("espec")) {
+            return QuestionCategory.ESPECIFICO;
+        }
+        return n.contains("gerais") || n.contains("b\u00E1sicos") || n.contains("basicos")
+                || n.matches(".*b\\S+sicos.*") ? QuestionCategory.GERAL : null;
+    }
+
+    private static String titleCase(String s) {
+        StringBuilder out = new StringBuilder();
+        for (String word : s.trim().toLowerCase().split("\\s+")) {
+            if (out.length() > 0) {
+                out.append(' ');
+            }
+            boolean small = word.length() <= 2 || word.equals("das") || word.equals("dos");
+            out.append(small && out.length() > 0 ? word : Character.toUpperCase(word.charAt(0)) + word.substring(1));
+        }
+        return out.toString();
+    }
+
+    private static final Pattern MONTH_YEAR = Pattern.compile(
+            "(?i)(janeiro|fevereiro|mar[c\u00E7]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)"
+                    + "\\s*/\\s*((?:19|20)\\d{2})");
+
+    /** Ano da capa ("Marco/2026"); o ano mais frequente no texto inteiro erra (enunciados citam anos de fatos). */
+    private static Integer detectYear(String text, String plainText) {
+        int secondPage = text.indexOf(RichText.page(2));
+        String cover = secondPage > 0 ? RichText.plain(text.substring(0, secondPage)) : plainText;
+        Matcher m = MONTH_YEAR.matcher(cover);
+        if (m.find()) {
+            return Integer.parseInt(m.group(2));
+        }
+        Matcher any = PdfMetadataDetector.YEAR.matcher(cover);
+        return any.find() ? Integer.valueOf(any.group()) : PdfMetadataDetector.detectYear(plainText);
+    }
+
+    private static String normalizeEdge(String line) {
+        return line.toLowerCase().replaceAll("[^\\p{L}]+", " ").trim();
+    }
+
+    /**
+     * Linhas que se repetem nas bordas (2 primeiras e 2 ultimas linhas) de boa parte das paginas:
+     * cabecalho e rodape do caderno, qualquer que seja o orgao. Numeros sao ignorados na comparacao
+     * (o numero da pagina muda). Linhas que parecem questao ou alternativa nunca entram.
+     */
+    static Set<String> edgeNoise(String text) {
+        List<List<String>> pages = new ArrayList<>();
+        List<String> current = null;
+        for (String raw : text.split("\n", -1)) {
+            if (RichText.pageOf(raw) != null) {
+                current = new ArrayList<>();
+                pages.add(current);
+            }
+            String line = RichText.plain(RichText.removeLayoutTokens(raw)).trim();
+            if (current != null && !line.isEmpty()) {
+                current.add(line);
+            }
+        }
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (List<String> page : pages) {
+            Set<String> edges = new LinkedHashSet<>();
+            for (int i = 0; i < page.size(); i++) {
+                if (i < 2 || i >= page.size() - 2) {
+                    String line = page.get(i);
+                    String norm = normalizeEdge(line);
+                    boolean looksLikeContent = QUESTION_START.matcher(line).matches()
+                            || ALTERNATIVE_MARKER.matcher(line).matches() || line.startsWith("(");
+                    if (norm.length() >= 8 && !looksLikeContent) {
+                        edges.add(norm);
+                    }
+                }
+            }
+            edges.forEach(e -> counts.merge(e, 1, Integer::sum));
+        }
+        int threshold = Math.max(3, (int) Math.ceil(pages.size() * 0.4));
+        Set<String> noise = new LinkedHashSet<>();
+        counts.forEach((line, n) -> {
+            if (pages.size() >= 4 && n >= threshold) {
+                noise.add(line);
+            }
+        });
+        return noise;
     }
 
     /** O token e o numero esperado, aceitando confusoes de OCR (S/&/$ por 5, O por 0, I/l por 1...). */

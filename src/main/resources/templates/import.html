@@ -66,7 +66,7 @@
         <h5>Provas importadas</h5>
         <ul class="list-unstyled mb-0">
             <li th:each="j : ${jobs}" class="mb-1">
-                <a th:href="@{/import/result/{id}(id=${j.id})}" th:text="${j.fileName}"></a>
+                <a th:href="@{/import/result/{id}(id=${j.id})}" th:text="${j.displayName}"></a>
                 <span class="text-muted" th:text="'— ' + ${j.importedQuestions} + ' questões'"></span>
             </li>
         </ul>

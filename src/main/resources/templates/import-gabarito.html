@@ -48,7 +48,7 @@
             <select name="importJobId" class="form-select" required>
                 <option value="" disabled selected>Selecione a importação</option>
                 <option th:each="job : ${jobs}" th:value="${job.id}"
-                        th:text="${job.fileName + ' — ' + job.importedQuestions + ' questões — ' + job.startedAt}">
+                        th:text="${job.id + ' — ' + job.displayName + ' — ' + job.importedQuestions + ' questões'}">
                 </option>
             </select>
         </div>

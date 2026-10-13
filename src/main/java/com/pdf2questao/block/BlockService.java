@@ -44,7 +44,7 @@ public class BlockService {
     }
 
     public record Preview(int total, Map<String, Integer> bySubject, List<SourceCount> perSource, int excluded,
-                          List<String> warnings, Map<String, Integer> unweightedSubjects) {
+                          List<String> warnings, Map<String, Integer> unweightedSubjects, List<Question> questions) {
     }
 
     private final StudyBlockRepository blockRepository;
@@ -272,7 +272,7 @@ public class BlockService {
                     .orElse(Map.of());
         }
         return new Preview(selection.questions().size(), BlockSelector.bySubject(selection.questions()), perSource,
-                selection.excluded(), selection.warnings(), unweighted);
+                selection.excluded(), selection.warnings(), unweighted, selection.questions());
     }
 
     public Preview preview(Long blockId) {
@@ -315,17 +315,21 @@ public class BlockService {
 
     // ---- blocos de diagnostico de exemplo ----
 
+    /** Diagnostico com as provas achadas pelo nome do arquivo ({@code -p1-prova}, {@code -p2-}, {@code -p3-}). */
+    @Transactional
+    public String createDiagnosticBlocks() {
+        return createDiagnosticBlocks(jobFor("-p1-prova"), jobFor("-p2-prova"), jobFor("-p3-prova"));
+    }
+
     /**
-     * Cria (ou atualiza) os dois blocos de diagnostico a partir das provas FCC ja importadas,
-     * achadas pelo nome do arquivo ({@code ...-p1-prova.pdf}, {@code -p2-}, {@code -p3-}).
+     * Cria (ou atualiza) os dois blocos de diagnostico APOFP sobre as provas escolhidas: a P1 (Conhecimentos
+     * Gerais), a P2 (Conhecimentos Basicos) e a P3 (Especificos) de uma mesma prova FCC. As faixas sao as da
+     * prova AFRE-TIC; para outras provas, crie os blocos pela tela de blocos.
      *
      * @return mensagem de resultado; se faltar prova, diz qual.
      */
     @Transactional
-    public String createDiagnosticBlocks() {
-        Long p1 = jobFor("-p1-prova");
-        Long p2 = jobFor("-p2-prova");
-        Long p3 = jobFor("-p3-prova");
+    public String createDiagnosticBlocks(Long p1, Long p2, Long p3) {
         List<String> missing = new ArrayList<>();
         if (p1 == null) {
             missing.add("P1");
@@ -337,8 +341,7 @@ public class BlockService {
             missing.add("P3");
         }
         if (!missing.isEmpty()) {
-            return "Importe antes as provas: " + String.join(", ", missing)
-                    + " (o nome do arquivo precisa conter -p1-prova, -p2-prova, -p3-prova).";
+            return "Escolha as provas que faltam: " + String.join(", ", missing) + ".";
         }
         Long profileId = profileService.findAll().stream()
                 .filter(p -> ScoringProfileService.EXAMPLE_NAME.equals(p.getName())).map(ScoringProfile::getId)
@@ -357,9 +360,27 @@ public class BlockService {
         return "Blocos de diagnóstico criados/atualizados.";
     }
 
+    /** Bloco com a prova inteira, nomeado pela prova; se ja existir um com esse nome, so o atualiza. */
+    @Transactional
+    public StudyBlock createBlockForProva(Long importJobId) {
+        ImportJob job = importJobRepository.findById(importJobId).orElseThrow();
+        String name = job.getDisplayName();
+        return save(draft(findByName(name), name, "Prova inteira.", null, null,
+                List.of(new SourceForm(importJobId.toString(), null, null, null, null, null, null, false)), ""));
+    }
+
     private Long findByName(String name) {
         return blockRepository.findAll().stream().filter(b -> name.equals(b.getName())).map(StudyBlock::getId)
                 .findFirst().orElse(null);
+    }
+
+    /** Provas que o diagnostico escolheria sozinho (por nome de arquivo), para pre-selecionar no formulario. */
+    public Map<String, Long> suggestedDiagnosticJobs() {
+        Map<String, Long> suggested = new java.util.LinkedHashMap<>();
+        suggested.put("p1", jobFor("-p1-prova"));
+        suggested.put("p2", jobFor("-p2-prova"));
+        suggested.put("p3", jobFor("-p3-prova"));
+        return suggested;
     }
 
     private Long jobFor(String marker) {

@@ -67,10 +67,10 @@ public class StudySessionService {
     }
 
     public StudySession startPractice(String subject, String topic, Integer year, String organization,
-                                       int quantity, boolean keepExamOrder) {
+                                       Long importJobId, int quantity, boolean keepExamOrder) {
         List<Long> ids = keepExamOrder
-                ? questionRepository.findOrderedIds(subject, topic, year, organization, quantity)
-                : questionRepository.findRandomIds(subject, topic, year, organization, quantity);
+                ? questionRepository.findOrderedIds(subject, topic, year, organization, importJobId, quantity)
+                : questionRepository.findRandomIds(subject, topic, year, organization, importJobId, quantity);
         return createSession(SessionMode.PRATICA, ids);
     }
 

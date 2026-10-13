@@ -62,6 +62,10 @@ public final class ImportReport {
                 }
             }
         }
+        if (map.isEmpty() && !headings.isEmpty()) {
+            lines.add("Mapa de secoes sugerido (copie, ajuste e use ao importar/reprocessar):");
+            lines.add(suggestedMap(result, headings));
+        }
         lines.add("Titulos de secao detectados pelo OCR (sugestao): " + headings.size());
         for (ParsedQuestion q : headings) {
             String verdict = "";
@@ -76,6 +80,19 @@ public final class ImportReport {
             lines.add("  - antes da questao " + q.number() + ": \"" + q.sectionHeading() + "\"" + verdict);
         }
         return lines;
+    }
+
+    /** JSON de mapa de secoes montado a partir dos titulos detectados: cada titulo vale ate o proximo. */
+    static String suggestedMap(ParseResult result, List<ParsedQuestion> headings) {
+        int last = result.questions().stream().mapToInt(ParsedQuestion::number).max().orElse(0);
+        List<String> entries = new ArrayList<>();
+        for (int i = 0; i < headings.size(); i++) {
+            int from = headings.get(i).number();
+            int to = i + 1 < headings.size() ? headings.get(i + 1).number() - 1 : last;
+            entries.add("  {\"from\": " + from + ", \"to\": " + to + ", \"subject\": \""
+                    + headings.get(i).sectionHeading().replace("\\", "\\\\").replace("\"", "\\\"") + "\"}");
+        }
+        return "[\n" + String.join(",\n", entries) + "\n]";
     }
 
     /** Divergencias entre as questoes importadas da prova e as linhas do gabarito. */

@@ -9,6 +9,13 @@
 
     <form method="post" action="/questoes/iniciar" class="card p-4">
         <div class="row">
+            <div class="col-12 mb-3">
+                <label class="form-label">Prova</label>
+                <select name="importJobId" class="form-select">
+                    <option value="">Todas as provas</option>
+                    <option th:each="j : ${jobs}" th:value="${j.id}" th:text="${j.displayName}"></option>
+                </select>
+            </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Disciplina</label>
                 <select name="subject" class="form-select">

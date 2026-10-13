@@ -44,12 +44,24 @@
     </div>
     <p th:if="${blocks.isEmpty()}" class="text-muted">Nenhum bloco ainda.</p>
 
-    <form method="post" action="/blocos/diagnostico" class="mt-4">
-        <button type="submit" class="btn btn-outline-primary">Criar blocos de diagnóstico APOFP</button>
-        <div class="form-text">
-            Cria "Diagnóstico APOFP – Sessão 1" e "– Sessão 2" a partir das provas FCC P1, P2 e P3 já
-            importadas (o nome do arquivo precisa conter -p1-prova, -p2-prova e -p3-prova).
+    <form method="post" action="/blocos/diagnostico" class="card p-4 mt-4">
+        <h5>Blocos de diagnóstico APOFP</h5>
+        <p class="text-muted mb-2">
+            Cria (ou atualiza) "Diagnóstico APOFP – Sessão 1" e "– Sessão 2" sobre as três provas FCC do AFRE-TIC.
+            As faixas são as dessa prova; para outras provas, use "Novo bloco" ou o botão "Criar bloco desta prova"
+            na tela da prova.
+        </p>
+        <div class="row">
+            <div class="col-md-4 mb-2" th:each="k : ${#strings.arraySplit('p1,p2,p3', ',')}">
+                <label class="form-label" th:text="${#strings.toUpperCase(k)} + ' – ' + (${k == 'p1'} ? 'Conhecimentos Gerais' : (${k == 'p2'} ? 'Conhecimentos Básicos' : 'Conhecimentos Específicos'))"></label>
+                <select th:name="${k}" class="form-select">
+                    <option value="">(escolha a prova)</option>
+                    <option th:each="j : ${jobs}" th:value="${j.id}" th:text="${j.displayName}"
+                            th:selected="${suggested[k] != null and suggested[k] == j.id}"></option>
+                </select>
+            </div>
         </div>
+        <button type="submit" class="btn btn-outline-primary align-self-start">Criar blocos de diagnóstico</button>
     </form>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

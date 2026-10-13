@@ -7,8 +7,18 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Caderno de Erros</h1>
         <form method="post" action="/caderno-erros/refazer" th:if="${!questions.isEmpty()}">
+            <input type="hidden" name="prova" th:value="${selectedProva}"/>
             <button type="submit" class="btn btn-primary">Refazer todas (<span th:text="${questions.size()}"></span>)</button>
         </form>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-3" th:if="${provas.size() > 0}">
+        <a href="/caderno-erros" class="btn btn-sm"
+           th:classappend="${selectedProva == null} ? 'btn-primary' : 'btn-outline-secondary'"
+           th:text="'Todas (' + ${totalErrors} + ')'"></a>
+        <a th:each="j : ${provas}" th:href="@{/caderno-erros(prova=${j.id})}" class="btn btn-sm"
+           th:classappend="${selectedProva != null and selectedProva == j.id} ? 'btn-primary' : 'btn-outline-secondary'"
+           th:text="${j.displayName} + ' (' + ${perProva[j.id]} + ')'"></a>
     </div>
 
     <p class="text-muted" th:if="${questions.isEmpty()}">Nenhuma questão pendente de revisão. Bom trabalho!</p>

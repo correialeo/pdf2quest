@@ -2,6 +2,7 @@ package com.pdf2questao.session;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,4 +34,43 @@ public interface AttemptRepository extends JpaRepository<Attempt, Long> {
             "WHERE a.correct IS NOT NULL AND q.topic IS NOT NULL " +
             "GROUP BY q.topic ORDER BY q.topic", nativeQuery = true)
     List<Object[]> statsByTopic();
+
+    // ---- estatisticas por prova (import_job) ----
+
+    /** [import_job_id, questoes distintas respondidas, acertos, erros] de todas as provas. */
+    @Query(value = "SELECT q.import_job_id, COUNT(DISTINCT a.question_id), " +
+            "COALESCE(SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), 0), " +
+            "COALESCE(SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END), 0) " +
+            "FROM attempt a JOIN question q ON q.id = a.question_id " +
+            "WHERE q.import_job_id IS NOT NULL GROUP BY q.import_job_id", nativeQuery = true)
+    List<Object[]> totalsByJob();
+
+    /** [import_job_id, session_id] das sessoes que tem resposta em questoes de cada prova. */
+    @Query(value = "SELECT DISTINCT q.import_job_id, a.session_id FROM attempt a " +
+            "JOIN question q ON q.id = a.question_id WHERE q.import_job_id IS NOT NULL", nativeQuery = true)
+    List<Object[]> sessionsByJob();
+
+    /** [disciplina, questoes da prova, respondidas, acertos, erros], na ordem da prova. */
+    @Query(value = "SELECT COALESCE(q.subject, '(sem disciplina)'), COUNT(DISTINCT q.id), " +
+            "COUNT(DISTINCT a.question_id), " +
+            "COALESCE(SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), 0), " +
+            "COALESCE(SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END), 0) " +
+            "FROM question q LEFT JOIN attempt a ON a.question_id = q.id " +
+            "WHERE q.import_job_id = :jobId GROUP BY COALESCE(q.subject, '(sem disciplina)') " +
+            "ORDER BY MIN(q.question_number)", nativeQuery = true)
+    List<Object[]> subjectProgressForJob(@Param("jobId") Long jobId);
+
+    @Query(value = "SELECT q.topic, SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), COUNT(*) " +
+            "FROM attempt a JOIN question q ON q.id = a.question_id " +
+            "WHERE a.correct IS NOT NULL AND q.topic IS NOT NULL AND q.import_job_id = :jobId " +
+            "GROUP BY q.topic ORDER BY q.topic", nativeQuery = true)
+    List<Object[]> statsByTopicForJob(@Param("jobId") Long jobId);
+
+    /** [session_id, acertos, erros] das respostas dadas a questoes da prova, por sessao. */
+    @Query(value = "SELECT a.session_id, " +
+            "COALESCE(SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), 0), " +
+            "COALESCE(SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END), 0) " +
+            "FROM attempt a JOIN question q ON q.id = a.question_id " +
+            "WHERE q.import_job_id = :jobId GROUP BY a.session_id", nativeQuery = true)
+    List<Object[]> sessionStatsForJob(@Param("jobId") Long jobId);
 }

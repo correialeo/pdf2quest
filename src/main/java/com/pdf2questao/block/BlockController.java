@@ -1,6 +1,9 @@
 package com.pdf2questao.block;
 
 import com.pdf2questao.importer.ImportJobRepository;
+import com.pdf2questao.question.Passage;
+import com.pdf2questao.question.PassageRepository;
+import com.pdf2questao.question.Question;
 import com.pdf2questao.scoring.ScoringProfile;
 import com.pdf2questao.scoring.ScoringProfileService;
 import com.pdf2questao.session.StudySession;
@@ -17,6 +20,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Controller
 public class BlockController {
@@ -27,13 +32,16 @@ public class BlockController {
     private final StudySessionService sessionService;
     private final ScoringProfileService profileService;
     private final ImportJobRepository importJobRepository;
+    private final PassageRepository passageRepository;
 
     public BlockController(BlockService blockService, StudySessionService sessionService,
-                           ScoringProfileService profileService, ImportJobRepository importJobRepository) {
+                           ScoringProfileService profileService, ImportJobRepository importJobRepository,
+                           PassageRepository passageRepository) {
         this.blockService = blockService;
         this.sessionService = sessionService;
         this.profileService = profileService;
         this.importJobRepository = importJobRepository;
+        this.passageRepository = passageRepository;
     }
 
     @GetMapping("/blocos")
@@ -48,6 +56,8 @@ public class BlockController {
         model.addAttribute("blocks", blocks);
         model.addAttribute("totals", totals);
         model.addAttribute("profileNames", profileNames);
+        model.addAttribute("jobs", importJobRepository.findAllByOrderByStartedAtDesc());
+        model.addAttribute("suggested", blockService.suggestedDiagnosticJobs());
         return "blocos";
     }
 
@@ -132,7 +142,11 @@ public class BlockController {
     public String detail(@PathVariable Long id, Model model) {
         StudyBlock block = blockService.find(id).orElseThrow();
         model.addAttribute("block", block);
-        model.addAttribute("preview", blockService.preview(id));
+        BlockService.Preview preview = blockService.preview(id);
+        model.addAttribute("preview", preview);
+        model.addAttribute("passages", passageRepository.findAllById(preview.questions().stream()
+                        .map(Question::getPassageId).filter(Objects::nonNull).distinct().toList())
+                .stream().collect(Collectors.toMap(Passage::getId, p -> p)));
         model.addAttribute("profile", block.getScoringProfileId() == null ? null
                 : profileService.find(block.getScoringProfileId()).map(ScoringProfile::getName).orElse(null));
         model.addAttribute("exclusions", blockService.exclusionText(blockService.exclusions(id)));
@@ -158,9 +172,17 @@ public class BlockController {
     }
 
     @PostMapping("/blocos/diagnostico")
-    public String diagnostic(RedirectAttributes redirect) {
-        redirect.addFlashAttribute("message", blockService.createDiagnosticBlocks());
+    public String diagnostic(@RequestParam(required = false) Long p1, @RequestParam(required = false) Long p2,
+                             @RequestParam(required = false) Long p3, RedirectAttributes redirect) {
+        redirect.addFlashAttribute("message", blockService.createDiagnosticBlocks(p1, p2, p3));
         return "redirect:/blocos";
+    }
+
+    @PostMapping("/import/{id}/bloco")
+    public String blockForProva(@PathVariable Long id, RedirectAttributes redirect) {
+        StudyBlock block = blockService.createBlockForProva(id);
+        redirect.addFlashAttribute("message", "Bloco criado: " + block.getName());
+        return "redirect:/blocos/" + block.getId();
     }
 
     @GetMapping("/perfis")

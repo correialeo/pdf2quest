@@ -182,4 +182,63 @@ class FccPdfParserTest {
                 "Atenção: Para responder às questões de números 1 a 8, baseie-se no texto seguinte."));
         assertTrue(FccPdfParser.passageNumbers("Um texto qualquer sem indicação.").isEmpty());
     }
+
+    // Outro layout da FCC: caderno unico, sem "PROVA N -", secoes "CONHECIMENTOS ..." sozinhas na linha e um
+    // rodape de outro orgao ("TRT15 ...") repetido em todas as paginas.
+    private static String page(int n, String body) {
+        return "\u27E6p:" + n + "\u27E7\nTRT15 Analista Judici\u00e1rio Caderno 1\n\n" + body
+                + "\nTRT15 Analista Judici\u00e1rio Caderno 1 " + n + "\n";
+    }
+
+    private static final String ALTS = "(A) um.\n(B) dois.\n(C) tr\u00eas.\n(D) quatro.\n(E) cinco.\n";
+
+    private static final String CADERNO_UNICO = "\u27E6p:1\u27E7\nTRIBUNAL REGIONAL DO TRABALHO\nCaderno de provas - Agosto/2024\n"
+            + "Leia as instru\u00e7\u00f5es com aten\u00e7\u00e3o antes de iniciar a prova.\n\nCONHECIMENTOS GERAIS\n"
+            + page(2, "\nL\u00cdNGUA PORTUGUESA\n\n1. Enunciado da primeira quest\u00e3o de portugu\u00eas.\n" + ALTS)
+            + page(3, "\n2. Enunciado da segunda quest\u00e3o de portugu\u00eas.\n" + ALTS)
+            + page(4, "\nCONHECIMENTOS ESPEC\u00cdFICOS\n\nDireito do Trabalho\n\n3. Enunciado da terceira quest\u00e3o.\n" + ALTS)
+            + page(5, "\n4. Enunciado da quarta quest\u00e3o.\n" + ALTS);
+
+    @Test
+    void cadernoUnicoSemTituloDeProvaUsaSecoesRodapeGenericoECapa() {
+        ParseResult result = parser.parse(CADERNO_UNICO);
+
+        assertEquals(List.of(1, 2, 3, 4), result.questions().stream().map(ParsedQuestion::number).toList());
+        assertTrue(result.failures().isEmpty());
+        assertEquals("FCC", result.organization());
+        assertEquals(2024, result.year());
+        assertEquals("Conhecimentos Gerais", result.title());
+        assertEquals(QuestionCategory.GERAL, result.questions().get(0).category());
+        assertEquals(QuestionCategory.GERAL, result.questions().get(1).category());
+        assertEquals(QuestionCategory.ESPECIFICO, result.questions().get(2).category());
+        assertEquals(QuestionCategory.ESPECIFICO, result.questions().get(3).category());
+        assertEquals("L\u00cdNGUA PORTUGUESA", result.questions().get(0).subject());
+        assertEquals("Direito do Trabalho", result.questions().get(2).subject());
+        for (ParsedQuestion q : result.questions()) {
+            assertFalse((q.statement() + q.alternativeE()).contains("TRT15"), q.statement());
+            assertNull(q.passage(), "a capa nao vira texto de apoio");
+        }
+    }
+
+    @Test
+    void anoEOTituloVemDaCapaEDoNomeDaProva() {
+        String text = "\u27E6p:1\u27E7\nGoverno\nMar\u00e7o/2026\nResultado em 2025 e 2025 e 2025 e 2025\n"
+                + "\u27E6p:2\u27E7\nPROVA 2 \u2014- CONHECIMENTOS B\u00c1SICOS\n\n1. Enunciado completo da quest\u00e3o.\n" + ALTS;
+
+        ParseResult result = parser.parse(text);
+
+        assertEquals(2026, result.year(), "o ano mais repetido no texto nao pode ganhar da capa");
+        assertEquals("Prova 2 \u2013 Conhecimentos B\u00e1sicos", result.title());
+        assertEquals(QuestionCategory.GERAL, result.questions().get(0).category());
+    }
+
+    @Test
+    void ruidoDeBordaSoValeParaLinhasQueRepetemEmVariasPaginas() {
+        Set<String> noise = FccPdfParser.edgeNoise(CADERNO_UNICO);
+
+        assertTrue(noise.contains("trt analista judiciário caderno"), noise.toString());
+        assertFalse(noise.stream().anyMatch(n -> n.contains("enunciado")));
+        assertTrue(FccPdfParser.edgeNoise("\u27E6p:1\u27E7\nrodape repetido\n\u27E6p:2\u27E7\nrodape repetido\n").isEmpty(),
+                "com poucas paginas nao ha como saber o que e repeticao");
+    }
 }

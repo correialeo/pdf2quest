@@ -16,10 +16,13 @@ public class QuestionController {
 
     private final QuestionRepository questionRepository;
     private final StudySessionService sessionService;
+    private final com.pdf2questao.importer.ImportJobRepository importJobRepository;
 
-    public QuestionController(QuestionRepository questionRepository, StudySessionService sessionService) {
+    public QuestionController(QuestionRepository questionRepository, StudySessionService sessionService,
+                              com.pdf2questao.importer.ImportJobRepository importJobRepository) {
         this.questionRepository = questionRepository;
         this.sessionService = sessionService;
+        this.importJobRepository = importJobRepository;
     }
 
     @PostMapping("/questoes/{id}/observacao")
@@ -37,6 +40,8 @@ public class QuestionController {
         model.addAttribute("years", questionRepository.findDistinctYears());
         model.addAttribute("organizations", questionRepository.findDistinctOrganizations());
         model.addAttribute("total", questionRepository.count());
+        model.addAttribute("jobs", importJobRepository.findAll().stream()
+                .filter(j -> j.getImportedQuestions() > 0).toList());
         return "questoes";
     }
 
@@ -45,10 +50,12 @@ public class QuestionController {
                            @RequestParam(required = false) String topic,
                            @RequestParam(required = false) Integer year,
                            @RequestParam(required = false) String organization,
+                           @RequestParam(required = false) Long importJobId,
                            @RequestParam int quantity,
                            @RequestParam(defaultValue = "false") boolean keepExamOrder) {
         StudySession session = sessionService.startPractice(
-                blankToNull(subject), blankToNull(topic), year, blankToNull(organization), quantity, keepExamOrder);
+                blankToNull(subject), blankToNull(topic), year, blankToNull(organization), importJobId, quantity,
+                keepExamOrder);
         return "redirect:/resolver/" + session.getId() + "?index=0";
     }
 

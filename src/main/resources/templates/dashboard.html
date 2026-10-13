@@ -9,103 +9,106 @@
         <a class="btn btn-outline-secondary btn-sm" href="/export/database.sql">Exportar banco (.sql)</a>
     </div>
 
-    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-        <div class="col">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Total de questões</div>
-                <div class="fs-3" th:text="${data.totalQuestions}"></div>
-            </div>
-        </div>
-        <div class="col">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Resolvidas</div>
-                <div class="fs-3" th:text="${data.resolved}"></div>
-            </div>
-        </div>
-        <div class="col">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Pendentes</div>
-                <div class="fs-3" th:text="${data.pending}"></div>
-            </div>
-        </div>
-        <div class="col">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Percentual geral</div>
-                <div class="fs-3" th:text="${#numbers.formatDecimal(data.percentGeral, 1, 1)} + '%'"></div>
-            </div>
-        </div>
-        <div class="col">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Acertos</div>
-                <div class="fs-3 text-success" th:text="${data.correct}"></div>
-            </div>
-        </div>
-        <div class="col">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Erros</div>
-                <div class="fs-3 text-danger" th:text="${data.wrong}"></div>
-            </div>
-        </div>
-        <div class="col" th:if="${data.latestNotaDataprev != null}">
-            <div class="card p-3 text-center">
-                <div class="text-muted small">Nota Dataprev (último simulado)</div>
-                <div class="fs-3" th:text="${#numbers.formatDecimal(data.latestNotaDataprev, 1, 2)}"></div>
+    <div class="row row-cols-2 row-cols-md-5 g-3 mb-4">
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Provas</div><div class="fs-4" th:text="${data.provas}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Questões</div><div class="fs-4" th:text="${data.totalQuestions}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Já resolvidas</div><div class="fs-4" th:text="${data.answered}"></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Acertos / erros</div>
+            <div class="fs-4"><span class="text-success" th:text="${data.correct}"></span> /
+                <span class="text-danger" th:text="${data.wrong}"></span></div></div></div>
+        <div class="col"><div class="card p-3 text-center">
+            <div class="text-muted small">Aproveitamento</div>
+            <div class="fs-4" th:text="${#numbers.formatDecimal(data.percent(), 1, 1)} + '%'"></div></div></div>
+    </div>
+
+    <h4 class="mb-3">Provas</h4>
+    <p class="text-muted" th:if="${data.groups.isEmpty()}">
+        Nenhuma prova importada ainda. <a href="/import">Importe um PDF</a>.
+    </p>
+    <div th:each="g : ${data.groups}" class="mb-4">
+        <h6 class="text-uppercase text-muted mb-2" th:text="${g.banca}"></h6>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+            <div class="col" th:each="c : ${g.provas}">
+                <div class="card h-100 p-3">
+                    <h6 class="mb-0"><a th:href="@{/dashboard/prova/{id}(id=${c.job.id})}" th:text="${c.job.displayName}"></a></h6>
+                    <div class="text-muted small mb-2"
+                         th:text="${c.job.detectedYear != null ? c.job.detectedYear + ' · ' : ''} + ${c.totalQuestions} + ' questões'"></div>
+                    <div class="d-flex justify-content-between small">
+                        <span>Resolvidas</span>
+                        <span th:text="${c.answered} + '/' + ${c.totalQuestions}"></span>
+                    </div>
+                    <div class="progress mb-2" style="height: 6px">
+                        <div class="progress-bar bg-secondary" th:style="'width: ' + ${c.coverage()} + '%'"></div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-auto">
+                        <span th:if="${c.hasAttempts()}" class="badge"
+                              th:classappend="${c.percent() >= 70} ? 'bg-success' : (${c.percent() >= 50} ? 'bg-warning text-dark' : 'bg-danger')"
+                              th:text="${#numbers.formatDecimal(c.percent(), 1, 0)} + '% de acerto'"></span>
+                        <span th:unless="${c.hasAttempts()}" class="badge bg-light text-muted border">Sem respostas</span>
+                        <span class="text-muted small" th:text="${c.sessions} + (${c.sessions == 1} ? ' sessão' : ' sessões')"></span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <h4>Percentual por disciplina</h4>
+    <h4 class="mb-3 mt-4" th:if="${!data.blocks.isEmpty()}">Blocos de estudo</h4>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4" th:if="${!data.blocks.isEmpty()}">
+        <div class="col" th:each="b : ${data.blocks}">
+            <div class="card h-100 p-3">
+                <h6 class="mb-0"><a th:href="@{/dashboard/bloco/{id}(id=${b.block.id})}" th:text="${b.block.name}"></a></h6>
+                <div class="text-muted small mb-2"
+                     th:text="${b.questions} + ' questões · ' + ${b.sessions} + (${b.sessions == 1} ? ' sessão' : ' sessões')"></div>
+                <div class="mt-auto" th:if="${b.lastScore != null}">
+                    <span>Última nota: <strong th:text="${#numbers.formatDecimal(b.lastScore, 1, 1)}"></strong></span>
+                    <span class="badge ms-1" th:if="${b.lastPassed != null}"
+                          th:classappend="${b.lastPassed} ? 'bg-success' : 'bg-danger'"
+                          th:text="${b.lastPassed} ? 'Bateu os mínimos' : 'Abaixo dos mínimos'"></span>
+                    <div class="text-muted small" th:if="${b.bestScore != null}"
+                         th:text="'Melhor: ' + ${#numbers.formatDecimal(b.bestScore, 1, 1)}"></div>
+                </div>
+                <div class="mt-auto text-muted small" th:if="${b.lastScore == null}">
+                    <span th:text="${b.sessions == 0} ? 'Ainda não iniciado' : 'Sem nota (bloco sem perfil de pontuação)'"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="mb-3 mt-4">Sessões recentes</h4>
     <div class="card p-3 mb-4">
-        <p class="text-muted" th:if="${data.bySubject.isEmpty()}">Sem dados ainda.</p>
-        <div th:each="s : ${data.bySubject}" class="mb-3">
-            <div class="d-flex justify-content-between">
-                <span th:text="${s.label}"></span>
-                <span th:text="${#numbers.formatDecimal(s.percent(), 1, 1)} + '% (' + ${s.correct} + '/' + ${s.total} + ')'"></span>
-            </div>
-            <div class="progress">
-                <div class="progress-bar" th:style="'width: ' + ${s.percent()} + '%'"></div>
-            </div>
-        </div>
-    </div>
-
-    <h4>Percentual por assunto</h4>
-    <div class="card p-3 mb-4">
-        <p class="text-muted" th:if="${data.byTopic.isEmpty()}">Sem dados ainda (assunto é preenchido manualmente após a importação).</p>
-        <div th:each="s : ${data.byTopic}" class="mb-3">
-            <div class="d-flex justify-content-between">
-                <span th:text="${s.label}"></span>
-                <span th:text="${#numbers.formatDecimal(s.percent(), 1, 1)} + '% (' + ${s.correct} + '/' + ${s.total} + ')'"></span>
-            </div>
-            <div class="progress">
-                <div class="progress-bar bg-info" th:style="'width: ' + ${s.percent()} + '%'"></div>
-            </div>
-        </div>
-    </div>
-
-    <h4>Histórico de simulados</h4>
-    <div class="card p-3">
-        <p class="text-muted" th:if="${data.history.isEmpty()}">Nenhuma sessão finalizada ainda.</p>
-        <table class="table" th:if="${!data.history.isEmpty()}">
-            <thead>
-            <tr>
-                <th>Data</th>
-                <th>Modo</th>
-                <th>Acertos</th>
-                <th>Percentual</th>
-                <th>Nota Dataprev</th>
-            </tr>
-            </thead>
+        <p class="text-muted mb-0" th:if="${data.recent.isEmpty()}">Nenhuma sessão finalizada ainda.</p>
+        <table class="table table-sm mb-0" th:if="${!data.recent.isEmpty()}">
+            <thead><tr><th>Data</th><th>Sessão</th><th>Acertos</th><th>Aproveitamento</th><th>Nota</th><th></th></tr></thead>
             <tbody>
-            <tr th:each="h : ${data.history}">
-                <td th:text="${#temporals.format(h.startedAt, 'dd/MM/yyyy HH:mm')}"></td>
-                <td th:text="${h.mode}"></td>
-                <td th:text="${h.correctCount} + '/' + ${h.correctCount + h.wrongCount}"></td>
-                <td th:text="${#numbers.formatDecimal(h.percent, 1, 1)} + '%'"></td>
-                <td th:text="${h.notaDataprev != null} ? ${#numbers.formatDecimal(h.notaDataprev, 1, 2)} : '-'"></td>
+            <tr th:each="r : ${data.recent}">
+                <td th:text="${#temporals.format(r.session.startedAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${r.label()}"></td>
+                <td th:text="${r.correct} + '/' + ${r.correct + r.wrong}"></td>
+                <td th:text="${#numbers.formatDecimal(r.percent(), 1, 1)} + '%'"></td>
+                <td th:text="${r.session.scoreTotal != null} ? ${#numbers.formatDecimal(r.session.scoreTotal, 1, 1)}
+                             : (${r.session.notaDataprev != null} ? ${#numbers.formatDecimal(r.session.notaDataprev, 1, 2)} : '-')"></td>
+                <td><a th:href="@{/resultado/{id}(id=${r.session.id})}">ver</a></td>
             </tr>
             </tbody>
         </table>
     </div>
+
+    <details class="mb-4" th:if="${!data.bySubject.isEmpty()}">
+        <summary class="text-muted">Desempenho por disciplina, todas as provas juntas</summary>
+        <div class="card p-3 mt-2">
+            <div th:each="s : ${data.bySubject}" class="mb-2">
+                <div class="d-flex justify-content-between small">
+                    <span th:text="${s.label}"></span>
+                    <span th:text="${#numbers.formatDecimal(s.percent(), 1, 1)} + '% (' + ${s.correct} + '/' + ${s.total} + ')'"></span>
+                </div>
+                <div class="progress" style="height: 6px"><div class="progress-bar" th:style="'width: ' + ${s.percent()} + '%'"></div></div>
+            </div>
+        </div>
+    </details>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

@@ -24,24 +24,28 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
             "(:subject IS NULL OR subject = :subject) AND " +
             "(:topic IS NULL OR topic = :topic) AND " +
             "(:year IS NULL OR year = :year) AND " +
-            "(:organization IS NULL OR organization = :organization) " +
+            "(:organization IS NULL OR organization = :organization) AND " +
+            "(:jobId IS NULL OR import_job_id = :jobId) " +
             "ORDER BY RANDOM() LIMIT :quantity", nativeQuery = true)
     List<Long> findRandomIds(@Param("subject") String subject,
                               @Param("topic") String topic,
                               @Param("year") Integer year,
                               @Param("organization") String organization,
+                              @Param("jobId") Long jobId,
                               @Param("quantity") int quantity);
 
     @Query(value = "SELECT id FROM question WHERE " +
             "(:subject IS NULL OR subject = :subject) AND " +
             "(:topic IS NULL OR topic = :topic) AND " +
             "(:year IS NULL OR year = :year) AND " +
-            "(:organization IS NULL OR organization = :organization) " +
+            "(:organization IS NULL OR organization = :organization) AND " +
+            "(:jobId IS NULL OR import_job_id = :jobId) " +
             "ORDER BY question_number ASC, id ASC LIMIT :quantity", nativeQuery = true)
     List<Long> findOrderedIds(@Param("subject") String subject,
                                @Param("topic") String topic,
                                @Param("year") Integer year,
                                @Param("organization") String organization,
+                               @Param("jobId") Long jobId,
                                @Param("quantity") int quantity);
 
     @Query(value = "SELECT id FROM question WHERE category = :category ORDER BY RANDOM() LIMIT :quantity",
@@ -58,6 +62,18 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
             "  AND a.correct = 0" +
             ") ORDER BY q.id DESC", nativeQuery = true)
     List<Question> findErrorNotebook();
+
+    /** [import_job_id, quantidade de questoes] de cada prova. */
+    @Query(value = "SELECT import_job_id, COUNT(*) FROM question WHERE import_job_id IS NOT NULL " +
+            "GROUP BY import_job_id", nativeQuery = true)
+    List<Object[]> countsByJob();
+
+    @Query(value = "SELECT q.* FROM question q WHERE q.import_job_id = :jobId AND q.id IN (" +
+            "  SELECT a.question_id FROM attempt a " +
+            "  WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +
+            "  AND a.correct = 0" +
+            ") ORDER BY q.question_number, q.id", nativeQuery = true)
+    List<Question> findErrorNotebookByJob(@Param("jobId") Long jobId);
 
     long countBySubject(String subject);
 
