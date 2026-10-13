@@ -37,6 +37,26 @@
         }
     }
 
+    // Menu lateral recolhido (so icones) no desktop; a escolha fica salva e o head.html aplica antes de pintar.
+    function setupSidebarCollapse() {
+        var button = document.querySelector('.sidebar-collapse');
+        if (!button) {
+            return;
+        }
+        function toggle() {
+            var collapsed = document.documentElement.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+        }
+        button.addEventListener('click', toggle);
+        document.addEventListener('keydown', function (e) {
+            var t = e.target;
+            if (e.key === '\\' && !e.ctrlKey && !e.metaKey && !e.altKey && !t.isContentEditable
+                    && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) < 0) {
+                toggle();
+            }
+        });
+    }
+
     function postJson(url, body) {
         return fetch(url, {
             method: 'POST',
@@ -66,6 +86,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         setupThemeToggle();
         highlightActiveNavLink();
+        setupSidebarCollapse();
         setupQuestionTools();
     });
 })();

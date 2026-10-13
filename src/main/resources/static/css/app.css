@@ -603,3 +603,63 @@ mark.user-highlight {
 .page.container-xxl {
     max-width: 100rem;
 }
+
+/* Topo do menu: marca + botao de recolher */
+.sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .25rem;
+    padding-bottom: .9rem;
+}
+
+.sidebar-top .sidebar-brand {
+    padding-bottom: .25rem;
+    min-width: 0;
+}
+
+.sidebar-collapse {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-color: transparent;
+}
+
+/* Menu recolhido (desktop): so icones, o texto aparece no title ao passar o mouse. */
+@media (min-width: 992px) {
+    html.sidebar-collapsed {
+        --sidebar-w: 3.6rem;
+    }
+
+    html.sidebar-collapsed .sidebar-label,
+    html.sidebar-collapsed .sidebar-section {
+        display: none;
+    }
+
+    html.sidebar-collapsed .sidebar-top {
+        flex-direction: column;
+    }
+
+    html.sidebar-collapsed .sidebar-brand {
+        padding: .25rem 0;
+    }
+
+    html.sidebar-collapsed .sidebar-link {
+        justify-content: center;
+        padding: .5rem 0;
+    }
+
+    html.sidebar-collapsed .sidebar-section + .sidebar-link,
+    html.sidebar-collapsed .sidebar-link + .sidebar-section + .sidebar-link {
+        margin-top: .75rem;
+    }
+
+    body,
+    .sidebar {
+        transition: padding-left .15s ease, width .15s ease;
+    }
+}
+
+/* Resolver: questao numa coluna central de leitura confortavel (sem texto base). */
+.resolver-page.container {
+    max-width: 50rem;
+}

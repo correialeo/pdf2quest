@@ -8,28 +8,32 @@
 
 <aside class="sidebar offcanvas-lg offcanvas-start" id="sidebar" tabindex="-1" aria-label="Menu">
     <div class="sidebar-inner">
-        <a class="sidebar-brand" href="/dashboard"><span class="brand-badge">P2Q</span><span>PDF2Questao</span></a>
+        <div class="sidebar-top">
+            <a class="sidebar-brand" href="/dashboard"><span class="brand-badge">P2Q</span><span class="sidebar-label">PDF2Questao</span></a>
+            <button type="button" class="icon-btn sidebar-collapse d-none d-lg-inline-flex" aria-label="Recolher menu"
+                    title="Recolher/expandir menu (\)"><i class="bi bi-layout-sidebar"></i></button>
+        </div>
 
-        <a class="sidebar-link" href="/dashboard"><i class="bi bi-house"></i>Início</a>
+        <a class="sidebar-link" href="/dashboard" title="Início"><i class="bi bi-house"></i><span class="sidebar-label">Início</span></a>
 
         <div class="sidebar-section">Estudar</div>
-        <a class="sidebar-link" href="/blocos"><i class="bi bi-collection"></i>Blocos de estudo</a>
-        <a class="sidebar-link" href="/questoes"><i class="bi bi-lightning"></i>Sessão rápida</a>
-        <a class="sidebar-link" href="/simulado"><i class="bi bi-stopwatch"></i>Simulado</a>
+        <a class="sidebar-link" href="/blocos" title="Blocos de estudo"><i class="bi bi-collection"></i><span class="sidebar-label">Blocos de estudo</span></a>
+        <a class="sidebar-link" href="/questoes" title="Sessão rápida"><i class="bi bi-lightning"></i><span class="sidebar-label">Sessão rápida</span></a>
+        <a class="sidebar-link" href="/simulado" title="Simulado"><i class="bi bi-stopwatch"></i><span class="sidebar-label">Simulado</span></a>
 
         <div class="sidebar-section">Revisar</div>
-        <a class="sidebar-link" href="/caderno-erros"><i class="bi bi-journal-x"></i>Caderno de erros</a>
-        <a class="sidebar-link" href="/chutes"><i class="bi bi-question-diamond"></i>Chutes</a>
+        <a class="sidebar-link" href="/caderno-erros" title="Caderno de erros"><i class="bi bi-journal-x"></i><span class="sidebar-label">Caderno de erros</span></a>
+        <a class="sidebar-link" href="/chutes" title="Chutes"><i class="bi bi-question-diamond"></i><span class="sidebar-label">Chutes</span></a>
 
         <div class="sidebar-section">Provas</div>
-        <a class="sidebar-link" href="/import"><i class="bi bi-file-earmark-arrow-up"></i>Importar PDF</a>
-        <a class="sidebar-link" href="/import/gabarito"><i class="bi bi-check2-square"></i>Importar gabarito</a>
+        <a class="sidebar-link" href="/import" title="Importar PDF"><i class="bi bi-file-earmark-arrow-up"></i><span class="sidebar-label">Importar PDF</span></a>
+        <a class="sidebar-link" href="/import/gabarito" title="Importar gabarito"><i class="bi bi-check2-square"></i><span class="sidebar-label">Importar gabarito</span></a>
 
         <div class="sidebar-footer">
-            <a class="sidebar-link" href="/perfis"><i class="bi bi-sliders"></i>Perfis de pontuação</a>
-            <a class="sidebar-link" href="/export/database.sql"><i class="bi bi-download"></i>Exportar banco</a>
-            <button type="button" class="sidebar-link theme-toggle" aria-label="Alternar tema claro/escuro">
-                <i class="bi bi-moon icon-moon"></i><i class="bi bi-sun icon-sun"></i>Alternar tema
+            <a class="sidebar-link" href="/perfis" title="Perfis de pontuação"><i class="bi bi-sliders"></i><span class="sidebar-label">Perfis de pontuação</span></a>
+            <a class="sidebar-link" href="/export/database.sql" title="Exportar banco"><i class="bi bi-download"></i><span class="sidebar-label">Exportar banco</span></a>
+            <button type="button" class="sidebar-link theme-toggle" title="Alternar tema" aria-label="Alternar tema claro/escuro">
+                <i class="bi bi-moon icon-moon"></i><i class="bi bi-sun icon-sun"></i><span class="sidebar-label">Alternar tema</span>
             </button>
         </div>
     </div>
