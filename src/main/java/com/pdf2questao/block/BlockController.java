@@ -53,7 +53,12 @@ public class BlockController {
         }
         Map<Long, String> profileNames = new LinkedHashMap<>();
         profileService.findAll().forEach(p -> profileNames.put(p.getId(), p.getName()));
+        Map<Long, Boolean> openSessions = new LinkedHashMap<>();
+        for (StudyBlock b : blocks) {
+            openSessions.put(b.getId(), sessionService.openBlocoSession(b.getId()).isPresent());
+        }
         model.addAttribute("blocks", blocks);
+        model.addAttribute("openSessions", openSessions);
         model.addAttribute("totals", totals);
         model.addAttribute("profileNames", profileNames);
         model.addAttribute("jobs", importJobRepository.findAllByOrderByStartedAtDesc());
@@ -144,6 +149,7 @@ public class BlockController {
         model.addAttribute("block", block);
         BlockService.Preview preview = blockService.preview(id);
         model.addAttribute("preview", preview);
+        model.addAttribute("openSession", sessionService.openBlocoSession(id).isPresent());
         model.addAttribute("passages", passageRepository.findAllById(preview.questions().stream()
                         .map(Question::getPassageId).filter(Objects::nonNull).distinct().toList())
                 .stream().collect(Collectors.toMap(Passage::getId, p -> p)));
@@ -151,6 +157,13 @@ public class BlockController {
                 : profileService.find(block.getScoringProfileId()).map(ScoringProfile::getName).orElse(null));
         model.addAttribute("exclusions", blockService.exclusionText(blockService.exclusions(id)));
         return "bloco-detalhe";
+    }
+
+    @GetMapping("/blocos/{id}/continuar")
+    public String resume(@PathVariable Long id) {
+        return sessionService.openBlocoSession(id)
+                .map(session -> "redirect:/resolver/" + session.getId() + "?index=" + sessionService.resumeIndex(session))
+                .orElse("redirect:/blocos/" + id);
     }
 
     @PostMapping("/blocos/{id}/iniciar")

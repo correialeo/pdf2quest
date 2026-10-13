@@ -37,6 +37,7 @@
         <p class="mb-1" th:if="${q.alternativeE != null}"><strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeE)}"></span></p>
     </div>
 
+    <a th:if="${openSession}" th:href="@{/blocos/{id}/continuar(id=${block.id})}" class="btn btn-primary">Continuar sessão</a>
     <form method="post" th:action="@{/blocos/{id}/iniciar(id=${block.id})}" class="d-inline">
         <button type="submit" class="btn btn-success" th:disabled="${preview.total == 0}">Iniciar sessão</button>
     </form>

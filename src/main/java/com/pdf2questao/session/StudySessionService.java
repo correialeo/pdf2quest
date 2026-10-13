@@ -54,6 +54,24 @@ public class StudySessionService {
         return sessionRepository.save(session);
     }
 
+    /** Sessao do bloco que foi iniciada e ainda nao terminou (a mais recente), se houver. */
+    public java.util.Optional<StudySession> openBlocoSession(Long blockId) {
+        return sessionRepository.findFirstByBlockIdAndFinishedAtIsNullOrderByStartedAtDesc(blockId);
+    }
+
+    /** Indice da primeira questao ainda sem resposta na sessao (a ultima, se todas ja foram respondidas). */
+    public int resumeIndex(StudySession session) {
+        List<Long> ids = session.questionIds();
+        java.util.Set<Long> answered = attemptRepository.findBySessionId(session.getId()).stream()
+                .map(Attempt::getQuestionId).collect(java.util.stream.Collectors.toSet());
+        for (int i = 0; i < ids.size(); i++) {
+            if (!answered.contains(ids.get(i))) {
+                return i;
+            }
+        }
+        return Math.max(0, ids.size() - 1);
+    }
+
     /** Resultado do perfil de pontuacao congelado no fim da sessao (null se a sessao nao usa perfil). */
     public ScoringCalculator.ScoreResult scoreResult(StudySession session) {
         if (session.getScoreReport() == null) {

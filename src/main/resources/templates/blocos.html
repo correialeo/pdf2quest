@@ -30,6 +30,7 @@
                       th:text="${profileNames[b.scoringProfileId]}"></span>
             </div>
             <div class="d-flex gap-2 align-items-start">
+                <a th:if="${openSessions[b.id]}" th:href="@{/blocos/{id}/continuar(id=${b.id})}" class="btn btn-primary">Continuar sessão</a>
                 <form method="post" th:action="@{/blocos/{id}/iniciar(id=${b.id})}">
                     <button type="submit" class="btn btn-success">Iniciar sessão</button>
                 </form>
