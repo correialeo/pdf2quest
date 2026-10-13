@@ -410,3 +410,20 @@ h1, h2, h3, h4, h5 {
 .alternative-correct {
     color: var(--bs-success-text-emphasis);
 }
+
+/* Grifo do texto base (marca-texto) */
+mark.user-highlight {
+    background-color: rgba(250, 204, 21, .55);
+    color: inherit;
+    padding: 0;
+    border-radius: 2px;
+}
+
+[data-bs-theme="dark"] mark.user-highlight {
+    background-color: rgba(250, 204, 21, .5);
+}
+
+.passage-panel ::selection {
+    background-color: rgba(250, 204, 21, .6);
+    color: inherit;
+}

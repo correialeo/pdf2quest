@@ -30,8 +30,17 @@
     <aside th:if="${passage != null}" id="passagePanel" class="passage-panel collapse d-md-block"
            th:attr="data-passage-id=${passage.id}" aria-label="Texto base">
         <div class="card p-4">
-            <h6 class="text-uppercase text-muted small mb-3">Texto base</h6>
-            <div class="rich-text" th:utext="${@richText.html(passage.content)}"></div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h6 class="text-uppercase text-muted small mb-0">Texto base</h6>
+                <span class="d-flex gap-1 passage-tools">
+                    <button type="button" class="btn btn-sm btn-outline-warning" id="highlightSelection"
+                            title="Grifa o trecho selecionado (no computador, basta selecionar)">Grifar seleção</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearHighlights"
+                            title="Remove todos os grifos deste texto">Limpar grifos</button>
+                </span>
+            </div>
+            <div class="form-text mb-2">Selecione um trecho para grifar. Selecione de novo dentro do grifo para tirá-lo.</div>
+            <div class="rich-text" id="passageText" th:utext="${@richText.html(passage.content)}"></div>
         </div>
     </aside>
 
@@ -95,6 +104,7 @@
 </main>
 
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<script src="/js/passage-highlight.js"></script>
 <script th:inline="javascript">
     const sessionId = /*[[${studySession.id}]]*/ 0;
     const questionId = /*[[${question.id}]]*/ 0;
@@ -135,6 +145,21 @@
             const hidden = !layout.classList.contains('passage-hidden');
             localStorage.setItem(hiddenKey, hidden ? '1' : '0');
             applyHidden(hidden);
+        });
+
+        // Grifo do texto base: um por sessao e texto, guardado no navegador.
+        const highlighter = PassageHighlight.init(document.getElementById('passageText'),
+            'passageHl:' + sessionId + ':' + panel.getAttribute('data-passage-id'));
+        const hlButton = document.getElementById('highlightSelection');
+        // mousedown: o clique no botao nao pode desfazer a selecao antes de grifar.
+        [hlButton, document.getElementById('clearHighlights')].forEach(function (b) {
+            b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        });
+        hlButton.addEventListener('click', function () { highlighter.apply(); });
+        document.getElementById('clearHighlights').addEventListener('click', function () {
+            if (highlighter.ranges().length === 0 || confirm('Remover todos os grifos deste texto?')) {
+                highlighter.clear();
+            }
         });
 
         panel.scrollTop = parseInt(sessionStorage.getItem(scrollKey) || '0', 10);

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/><title>RUNNING</title>
+<style>mark.user-highlight { background: yellow; }</style>
+<script src="%SCRIPT%"></script></head>
+<body>
+<div id="t"></div>
+<div id="outside">fora do texto base</div>
+<script>
+(function () {
+    var failures = [];
+    function check(name, cond) { if (!cond) { failures.push(name); } }
+    var HTML = 'Maquiavel mudou o <u>curso</u> do pensamento político.\nSegunda linha com trecho final.';
+    var root = document.getElementById('t');
+    function fakeStorage() {
+        var data = {};
+        return {getItem: function (k) { return k in data ? data[k] : null; },
+                setItem: function (k, v) { data[k] = String(v); },
+                removeItem: function (k) { delete data[k]; }, data: data};
+    }
+    function fresh() { root.innerHTML = HTML; var st = fakeStorage(); return {st: st, hl: PassageHighlight.init(root, 'k', {storage: st})}; }
+    function text() { return root.textContent; }
+    function selectChars(s, e) {
+        var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), pos = 0, r = document.createRange(), n;
+        var started = false;
+        while ((n = walker.nextNode())) {
+            var len = n.nodeValue.length;
+            if (!started && s <= pos + len) { r.setStart(n, s - pos); started = true; }
+            if (started && e <= pos + len) { r.setEnd(n, e - pos); break; }
+            pos += len;
+        }
+        var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    }
+    function marked() { return Array.prototype.map.call(root.querySelectorAll('mark.user-highlight'), function (m) { return m.textContent; }); }
+    var T = text.bind(null), base = HTML.replace(/<[^>]+>/g, '');
+    function at(sub) { return base.indexOf(sub); }
+
+    // 1. grifa uma palavra, sem mudar o texto
+    var a = fresh(); selectChars(at('mudou'), at('mudou') + 5);
+    check('1 apply retorna true', a.hl.apply() === true);
+    check('1 marca a palavra', marked().join('|') === 'mudou');
+    check('1 texto intacto', text() === base);
+    check('1 salvou', a.st.getItem('k') !== null);
+    check('1 limpou a selecao', getSelection().isCollapsed);
+
+    // 2. selecao atravessando o <u> e com espacos nas pontas
+    var b = fresh(); selectChars(at(' o curso do ') , at(' o curso do ') + 12);
+    b.hl.apply();
+    check('2 aparou espacos', marked().join('') === 'o curso do');
+    check('2 varias marcas (atravessa o u)', marked().length >= 3);
+    check('2 u preservado', root.querySelectorAll('u').length === 1 && root.querySelector('u').textContent === 'curso');
+    check('2 texto intacto', text() === base);
+    check('2 uma faixa so', b.hl.ranges().length === 1);
+
+    // 3. selecionar dentro do grifo tira so aquela parte
+    var c = fresh(); selectChars(at('mudou'), at('mudou') + 5); c.hl.apply();
+    selectChars(at('mudou'), at('mudou') + 2); c.hl.apply();
+    check('3 sobrou "dou"', marked().join('|') === 'dou');
+    check('3 texto intacto', text() === base);
+
+    // 4. recarregar a pagina (novo init, mesmo armazenamento) reaplica
+    var d = fresh(); selectChars(at('trecho'), at('trecho') + 6); d.hl.apply();
+    var before = JSON.stringify(d.hl.ranges());
+    root.innerHTML = HTML;
+    var d2 = PassageHighlight.init(root, 'k', {storage: d.st});
+    check('4 reaplicou', marked().join('|') === 'trecho' && JSON.stringify(d2.ranges()) === before);
+
+    // 5. texto diferente: descarta o grifo antigo
+    var e = fresh(); selectChars(at('trecho'), at('trecho') + 6); e.hl.apply();
+    root.innerHTML = HTML + ' extra';
+    var e2 = PassageHighlight.init(root, 'k', {storage: e.st});
+    check('5 descartou', marked().length === 0 && e2.ranges().length === 0);
+
+    // 6. nada a grifar: selecao vazia, so espacos, fora do texto
+    var f = fresh();
+    getSelection().removeAllRanges();
+    check('6 sem selecao', f.hl.apply() === false);
+    selectChars(at(' do'), at(' do') + 1);
+    check('6 so espaco', f.hl.apply() === false && marked().length === 0);
+    var out = document.getElementById('outside'), r = document.createRange();
+    r.selectNodeContents(out); getSelection().removeAllRanges(); getSelection().addRange(r);
+    check('6 fora da raiz', f.hl.apply() === false && marked().length === 0);
+
+    // 7. limpar
+    var g = fresh(); selectChars(at('mudou'), at('mudou') + 5); g.hl.apply(); g.hl.clear();
+    check('7 sem marcas', marked().length === 0 && g.hl.ranges().length === 0);
+    check('7 apagou do armazenamento', g.st.getItem('k') === null && text() === base);
+
+    // 8. trechos que se sobrepoem viram um so
+    var h = fresh(); selectChars(at('mudou o'), at('mudou o') + 7); h.hl.apply();
+    selectChars(at('o curso'), at('o curso') + 7); h.hl.apply();
+    check('8 unidos', h.hl.ranges().length === 1 && marked().join('') === 'mudou o curso');
+
+    // 9. grifo em linhas diferentes (quebra de linha no meio)
+    var i = fresh(); selectChars(at('final') - 8, at('final') + 5);
+    i.hl.apply();
+    check('9 texto intacto', text() === base);
+
+    // 10. funcoes puras
+    check('10 normalize une', JSON.stringify(PassageHighlight._normalize([{s: 5, e: 9}, {s: 1, e: 3}, {s: 3, e: 6}])) === '[{"s":1,"e":9}]');
+    check('10 subtract divide', JSON.stringify(PassageHighlight._subtract([{s: 0, e: 10}], 3, 5)) === '[{"s":0,"e":3},{"s":5,"e":10}]');
+
+    document.title = failures.length ? 'FAIL: ' + failures.join('; ') : 'PASS';
+})();
+</script>
+</body>
+</html>
