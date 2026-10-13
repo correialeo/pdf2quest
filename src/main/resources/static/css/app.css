@@ -105,7 +105,8 @@ h1, h2, h3, h4, h5 {
     background-color: var(--accent-soft);
 }
 
-.theme-toggle {
+.theme-toggle,
+.icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -120,7 +121,8 @@ h1, h2, h3, h4, h5 {
     transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.icon-btn:hover {
     color: var(--accent);
     border-color: var(--accent);
     background-color: var(--accent-soft);
