@@ -901,3 +901,103 @@ kbd {
     font-size: .72rem;
     padding: .05rem .35rem;
 }
+
+/* ---- Resultado ---- */
+.bg-ok { background-color: var(--ok) !important; }
+.bg-bad { background-color: var(--bad) !important; }
+.bg-guess { background-color: var(--guess) !important; }
+
+.subject-row + .subject-row {
+    margin-top: .8rem;
+}
+
+.score-group + .score-group {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.score-group > summary,
+.review-item > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.score-group > summary::-webkit-details-marker,
+.review-item > summary::-webkit-details-marker {
+    display: none;
+}
+
+.score-group > summary {
+    padding: .55rem 0;
+}
+
+.review-list {
+    overflow: hidden;
+}
+
+.review-item + .review-item {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.review-item > summary {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .65rem 1rem;
+    font-size: .875rem;
+}
+
+.review-item > summary:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.review-item[open] > summary {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.review-num {
+    width: 2rem;
+    color: var(--bs-secondary-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.review-subject {
+    flex: 1;
+    min-width: 0;
+}
+
+.review-guess {
+    color: var(--guess);
+}
+
+.review-answer {
+    display: flex;
+    gap: .4rem;
+    font-weight: 600;
+    min-width: 3.5rem;
+    justify-content: flex-end;
+}
+
+.review-body {
+    padding: 1rem 1rem 1.25rem 3.75rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.review-alt {
+    padding: .35rem .6rem;
+    border-radius: .375rem;
+    margin-bottom: .2rem;
+}
+
+.review-alt.is-correct {
+    background-color: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.review-alt.is-wrong {
+    background-color: color-mix(in srgb, var(--bad) 12%, transparent);
+}
+
+@media (max-width: 575.98px) {
+    .review-body {
+        padding-left: 1rem;
+    }
+}

@@ -172,8 +172,9 @@ class GuessDiagnosticIntegrationTest {
 
         sessionService.finish(session.getId());
         mvc.perform(get("/resultado/" + session.getId())).andExpect(status().isOk())
-                .andExpect(content().string(containsString("Foi no chute (estude)")))
-                .andExpect(content().string(containsString("1 acertos no chute")));
+                .andExpect(content().string(containsString("Acertou no chute: vale revisar o assunto.")))
+                .andExpect(content().string(containsString("Chutes (acerto / erro)")))
+                .andExpect(content().string(containsString("data-guess=\"true\"")));
 
         for (String url : new String[]{"/chutes", "/chutes?prova=" + job.getId(), "/dashboard",
                 "/dashboard/prova/" + job.getId()}) {

@@ -97,6 +97,24 @@ public class StudySessionController {
         return "redirect:/resultado/" + id;
     }
 
+    /** Acertos por disciplina das questoes corrigidas da sessao, piores primeiro (o que estudar). */
+    private static List<com.pdf2questao.dashboard.SubjectStat> bySubject(List<ReviewItem> review) {
+        java.util.Map<String, long[]> counts = new java.util.LinkedHashMap<>();
+        for (ReviewItem r : review) {
+            if (r.correct() == null) {
+                continue;
+            }
+            String subject = r.question().getSubject() == null ? "Sem disciplina" : r.question().getSubject();
+            long[] c = counts.computeIfAbsent(subject, k -> new long[2]);
+            c[0] += r.correct() ? 1 : 0;
+            c[1]++;
+        }
+        return counts.entrySet().stream()
+                .map(e -> new com.pdf2questao.dashboard.SubjectStat(e.getKey(), e.getValue()[0], e.getValue()[1]))
+                .sorted(java.util.Comparator.comparingDouble(com.pdf2questao.dashboard.SubjectStat::percent))
+                .toList();
+    }
+
     @PostMapping("/resolver/{id}/descartar")
     public String descartar(@PathVariable Long id) {
         sessionService.discard(id);
@@ -120,6 +138,8 @@ public class StudySessionController {
         model.addAttribute("guessedWrong", review.stream()
                 .filter(r -> Boolean.TRUE.equals(r.guessed()) && Boolean.FALSE.equals(r.correct())).count());
         model.addAttribute("score", sessionService.scoreResult(session));
+        model.addAttribute("bySubject", bySubject(review));
+        model.addAttribute("blank", review.stream().filter(r -> r.selectedAnswer() == null).count());
         return "resultado";
     }
 

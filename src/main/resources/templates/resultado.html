@@ -4,95 +4,166 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4">Resultado</h1>
-
-    <div class="card p-4 mb-4">
-        <p><strong>Modo:</strong> <span th:text="${studySession.mode}"></span></p>
-        <p><strong>Total de questões:</strong> <span th:text="${total}"></span></p>
-        <p><strong>Acertos:</strong> <span class="text-success" th:text="${studySession.correctCount}"></span></p>
-        <p><strong>Erros:</strong> <span class="text-danger" th:text="${studySession.wrongCount}"></span></p>
-        <p><strong>Percentual:</strong> <span th:text="${#numbers.formatDecimal(studySession.percent, 1, 1)} + '%'"></span></p>
-        <p th:if="${studySession.notaDataprev != null}">
-            <strong>Nota Dataprev:</strong> <span th:text="${#numbers.formatDecimal(studySession.notaDataprev, 1, 2)}"></span>
-        </p>
-        <p th:if="${guessedCorrect + guessedWrong > 0}">
-            <strong>Chutes:</strong>
-            <span class="badge bg-warning text-dark" th:text="${guessedCorrect} + ' acertos no chute'"></span>
-            <span class="badge bg-secondary" th:text="${guessedWrong} + ' erros no chute'"></span>
-            <a href="/chutes" class="ms-2">ver diagnóstico</a>
-        </p>
-        <p><strong>Tempo total:</strong> <span th:text="${#numbers.formatDecimal(studySession.totalElapsedMillis / 1000.0, 1, 1)} + 's'"></span></p>
-        <p><strong>Tempo médio por questão:</strong> <span th:text="${#numbers.formatDecimal(avgMillis / 1000.0, 1, 1)} + 's'"></span></p>
-    </div>
-
-    <div class="card p-4 mb-4" th:if="${score != null}">
-        <h4 th:text="'Pontuação — ' + ${score.profileName}"></h4>
-        <p th:if="${studySession.blockName != null}"><strong>Bloco:</strong> <span th:text="${studySession.blockName}"></span></p>
-        <p>
-            <strong>Total ponderado:</strong>
-            <span th:text="${#numbers.formatDecimal(score.total, 1, 1)} + ' de ' + ${#numbers.formatDecimal(score.maxTotal, 1, 1)}"></span>
-            <span th:if="${score.minTotal != null}" th:text="'(mínimo ' + ${#numbers.formatDecimal(score.minTotal, 1, 1)} + ')'"></span>
-            <span th:if="${score.minTotal != null}"
-                  th:classappend="${score.minTotalMet} ? 'badge bg-success' : 'badge bg-danger'"
-                  th:text="${score.minTotalMet} ? 'Bateu o mínimo total' : 'Abaixo do mínimo total'"></span>
-        </p>
-        <div th:each="g : ${score.groups}" class="mb-3">
-            <h6>
-                <span th:text="${g.name}"></span> —
-                <span th:text="${#numbers.formatDecimal(g.points, 1, 1)} + ' de ' + ${#numbers.formatDecimal(g.maxPoints, 1, 1)}"></span>
-                <span th:if="${g.minScore != null}" th:text="'(mínimo ' + ${#numbers.formatDecimal(g.minScore, 1, 1)} + ')'"></span>
-                <span th:if="${g.minScore != null}"
-                      th:classappend="${g.minMet} ? 'badge bg-success' : 'badge bg-danger'"
-                      th:text="${g.minMet} ? 'Bateu o mínimo' : 'Abaixo do mínimo'"></span>
-            </h6>
-            <table class="table table-sm mb-0">
-                <thead><tr><th>Disciplina</th><th class="text-end">Acertos</th><th class="text-end">Peso</th>
-                    <th class="text-end">Pontos</th></tr></thead>
-                <tbody>
-                <tr th:each="r : ${g.rules}" th:if="${r.questions > 0 or r.maxPoints > 0}">
-                    <td th:text="${r.subject}"></td>
-                    <td class="text-end" th:text="${r.correct} + ' / ' + ${r.questions}"></td>
-                    <td class="text-end" th:text="${r.weight}"></td>
-                    <td class="text-end" th:text="${#numbers.formatDecimal(r.points, 1, 1)} + ' / ' + ${#numbers.formatDecimal(r.maxPoints, 1, 1)}"></td>
-                </tr>
-                </tbody>
-            </table>
+    <div class="page-header">
+        <div>
+            <h1>Resultado</h1>
+            <p class="page-subtitle"
+               th:text="(${studySession.blockName} ?: ${studySession.mode}) + ' · ' + ${total} + ' questões'
+                        + (${studySession.finishedAt != null} ? ' · ' + ${#temporals.format(studySession.finishedAt, 'dd/MM/yyyy HH:mm')} : '')"></p>
         </div>
-        <p class="text-muted mb-0" th:if="${!score.unweightedSubjects.isEmpty()}">
-            Sem peso no perfil (não pontuaram):
-            <span th:each="e, st : ${score.unweightedSubjects}"
-                  th:text="${e.key} + ' (' + ${e.value} + ')' + (${st.last} ? '' : ', ')"></span>
-        </p>
+        <div class="d-flex gap-2">
+            <a href="/dashboard" class="btn btn-outline-secondary">Início</a>
+            <a href="/blocos" class="btn btn-primary"><i class="bi bi-play-fill me-1"></i>Nova sessão</a>
+        </div>
     </div>
 
-    <h2 class="mb-3">Revisão das questões</h2>
-    <div class="card p-3 mb-3" th:each="item : ${review}"
-         th:classappend="${item.correct == null} ? '' : (${item.correct} ? 'border-success' : 'border-danger')">
-        <p><strong th:text="'Questão ' + ${item.index}"></strong>
-            <span th:if="${item.question.subject != null}" class="text-muted" th:text="'— ' + ${item.question.subject}"></span>
-        </p>
-        <p class="rich-text" th:utext="${@richText.html(item.question.statement)}"></p>
-        <p class="text-muted rich-text" th:if="${item.question.note != null}"
-           th:text="'Observação: ' + ${item.question.note}"></p>
-        <p>
-            <strong>Sua resposta:</strong>
-            <span th:text="${item.selectedAnswer} ?: 'não respondida'"
-                  th:classappend="${item.correct == null} ? '' : (${item.correct} ? 'text-success' : 'text-danger')"></span>
-        </p>
-        <p>
-            <strong>Resposta correta:</strong>
-            <span class="text-success" th:text="${item.question.correctAnswer} ?: 'não informada'"></span>
-        </p>
-        <span th:if="${item.correct != null}"
-              th:classappend="${item.correct} ? 'badge bg-success' : 'badge bg-danger'"
-              th:text="${item.correct} ? 'Acertou' : 'Errou'"></span>
-        <span class="badge bg-warning text-dark ms-1" th:if="${item.guessed == true}"
-              th:text="${item.correct == true} ? 'Foi no chute (estude)' : 'Chute'"></span>
+    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3">
+        <div class="col"><div class="card stat">
+            <div class="stat-label">Aproveitamento</div>
+            <div class="stat-value" th:text="${#numbers.formatDecimal(studySession.percent, 1, 1)} + '%'"></div>
+        </div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Acertos', ${studySession.correctCount}, 'text-ok')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Erros', ${studySession.wrongCount}, 'text-bad')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Em branco', ${blank}, '')}"></div></div>
+        <div class="col"><div class="card stat">
+            <div class="stat-label">Chutes (acerto / erro)</div>
+            <div class="stat-value text-guess"><span th:text="${guessedCorrect}"></span>
+                <span class="text-muted fw-normal">/</span> <span th:text="${guessedWrong}"></span></div>
+        </div></div>
+        <div class="col"><div class="card stat" th:with="secs=${studySession.totalElapsedMillis == null ? 0 : studySession.totalElapsedMillis / 1000}">
+            <div class="stat-label">Tempo</div>
+            <div class="stat-value" th:text="${secs / 60} + 'min ' + ${secs % 60} + 's'"></div>
+            <div class="text-muted small" th:text="'≈ ' + ${#numbers.formatDecimal(avgMillis / 1000.0, 1, 0)} + 's por questão'"></div>
+        </div></div>
     </div>
 
-    <a href="/questoes" class="btn btn-primary">Nova sessão</a>
-    <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+    <div class="row g-3 mt-1">
+        <div class="col-lg" th:if="${score != null or studySession.notaDataprev != null}">
+            <div class="section-title">Pontuação</div>
+            <div class="card p-3" th:if="${score == null}">
+                <div class="stat-label">Nota Dataprev</div>
+                <div class="stat-value" th:text="${#numbers.formatDecimal(studySession.notaDataprev, 1, 2)}"></div>
+            </div>
+            <div class="card p-3" th:if="${score != null}">
+                <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-3">
+                    <div>
+                        <div class="stat-label" th:text="${score.profileName}"></div>
+                        <div class="stat-value">
+                            <span th:text="${#numbers.formatDecimal(score.total, 1, 1)}"></span>
+                            <span class="text-muted fw-normal fs-6" th:text="'de ' + ${#numbers.formatDecimal(score.maxTotal, 1, 1)}"></span>
+                        </div>
+                    </div>
+                    <span th:if="${score.minTotal != null}" class="badge"
+                          th:classappend="${score.minTotalMet} ? 'text-bg-success' : 'text-bg-danger'"
+                          th:text="(${score.minTotalMet} ? 'Bateu o mínimo total' : 'Abaixo do mínimo total') + ' (' + ${#numbers.formatDecimal(score.minTotal, 1, 1)} + ')'"></span>
+                </div>
+                <details th:each="g : ${score.groups}" class="score-group">
+                    <summary class="d-flex justify-content-between align-items-center gap-2">
+                        <span class="fw-medium" th:text="${g.name}"></span>
+                        <span class="d-flex align-items-center gap-2 small">
+                            <span th:text="${#numbers.formatDecimal(g.points, 1, 1)} + ' / ' + ${#numbers.formatDecimal(g.maxPoints, 1, 1)}"></span>
+                            <i th:if="${g.minScore != null}" class="bi"
+                               th:classappend="${g.minMet} ? 'bi-check-circle-fill text-ok' : 'bi-x-circle-fill text-bad'"
+                               th:title="'Mínimo ' + ${#numbers.formatDecimal(g.minScore, 1, 1)}"></i>
+                        </span>
+                    </summary>
+                    <table class="table table-sm mb-2 mt-1">
+                        <thead><tr><th>Disciplina</th><th class="text-end">Acertos</th><th class="text-end">Peso</th>
+                            <th class="text-end">Pontos</th></tr></thead>
+                        <tbody>
+                        <tr th:each="r : ${g.rules}" th:if="${r.questions > 0 or r.maxPoints > 0}">
+                            <td th:text="${r.subject}"></td>
+                            <td class="text-end" th:text="${r.correct} + ' / ' + ${r.questions}"></td>
+                            <td class="text-end" th:text="${r.weight}"></td>
+                            <td class="text-end" th:text="${#numbers.formatDecimal(r.points, 1, 1)} + ' / ' + ${#numbers.formatDecimal(r.maxPoints, 1, 1)}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </details>
+                <p class="text-muted small mb-0 mt-2" th:if="${!score.unweightedSubjects.isEmpty()}">
+                    Sem peso no perfil (não pontuaram):
+                    <span th:each="e, st : ${score.unweightedSubjects}"
+                          th:text="${e.key} + ' (' + ${e.value} + ')' + (${st.last} ? '' : ', ')"></span>
+                </p>
+            </div>
+        </div>
+
+        <div class="col-lg" th:if="${!bySubject.isEmpty()}">
+            <div class="section-title">Por disciplina <span class="fw-normal">(piores primeiro)</span></div>
+            <div class="card p-3">
+                <div th:each="s : ${bySubject}" class="subject-row">
+                    <div class="d-flex justify-content-between small mb-1 gap-2">
+                        <span class="text-truncate" th:text="${s.label}" th:title="${s.label}"></span>
+                        <span class="text-nowrap text-muted" th:text="${s.correct} + '/' + ${s.total} + ' · ' + ${#numbers.formatDecimal(s.percent(), 1, 0)} + '%'"></span>
+                    </div>
+                    <div class="progress"><div class="progress-bar"
+                         th:classappend="${s.percent() >= 70} ? 'bg-ok' : (${s.percent() >= 50} ? 'bg-guess' : 'bg-bad')"
+                         th:style="'width: ' + ${s.percent()} + '%'"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="section-title">Revisão das questões</div>
+        <div class="btn-group btn-group-sm review-filter" role="group" aria-label="Filtrar revisão">
+            <button type="button" class="btn btn-outline-secondary active" data-filter="all">Todas</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="wrong">Erradas</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="guess">Chutes</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="blank">Em branco</button>
+        </div>
+    </div>
+
+    <div class="card review-list">
+        <details class="review-item" th:each="item : ${review}"
+                 th:attr="data-status=${item.selectedAnswer == null} ? 'blank' : (${item.correct == false} ? 'wrong' : 'right'),
+                          data-guess=${item.guessed == true}">
+            <summary>
+                <span class="review-icon"><i class="bi"
+                     th:classappend="${item.selectedAnswer == null} ? 'bi-dash-circle text-muted'
+                                    : (${item.correct == null} ? 'bi-circle text-muted' : (${item.correct} ? 'bi-check-circle-fill text-ok' : 'bi-x-circle-fill text-bad'))"></i></span>
+                <span class="review-num" th:text="${item.index}"></span>
+                <span class="review-subject text-truncate" th:text="${item.question.subject} ?: 'Sem disciplina'"></span>
+                <span class="review-guess" th:if="${item.guessed == true}" title="Marcada como chute"><i class="bi bi-question-diamond"></i></span>
+                <span class="review-answer">
+                    <span th:text="${item.selectedAnswer} ?: '–'"
+                          th:classappend="${item.correct == false} ? 'text-bad text-decoration-line-through'"></span>
+                    <span th:if="${item.correct == false or item.selectedAnswer == null}" class="text-ok"
+                          th:text="'→ ' + (${item.question.correctAnswer} ?: '?')"></span>
+                </span>
+            </summary>
+            <div class="review-body">
+                <div class="rich-text mb-3" th:utext="${@richText.html(item.question.statement)}"></div>
+                <div th:each="alt : ${item.question.alternatives()}" class="review-alt"
+                     th:classappend="${alt.key == item.question.correctAnswer} ? 'is-correct' : (${alt.key == item.selectedAnswer} ? 'is-wrong' : '')">
+                    <strong th:text="${alt.key} + ')'"></strong> <span class="rich-text" th:utext="${@richText.html(alt.value)}"></span>
+                </div>
+                <p class="text-muted small mt-3 mb-0" th:if="${item.question.note != null}"
+                   th:text="'Observação: ' + ${item.question.note}"></p>
+                <p class="small mt-2 mb-0" th:if="${item.guessed == true and item.correct == true}">
+                    <i class="bi bi-question-diamond text-guess me-1"></i>Acertou no chute: vale revisar o assunto.</p>
+            </div>
+        </details>
+        <div class="empty-state m-3 d-none" id="reviewEmpty">Nenhuma questão neste filtro.</div>
+    </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    // Filtro da revisao: so esconde/mostra os itens ja carregados.
+    document.querySelectorAll('.review-filter button').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var filter = button.getAttribute('data-filter');
+            document.querySelectorAll('.review-filter button').forEach(function (b) { b.classList.toggle('active', b === button); });
+            var shown = 0;
+            document.querySelectorAll('.review-item').forEach(function (item) {
+                var show = filter === 'all'
+                    || (filter === 'guess' ? item.getAttribute('data-guess') === 'true' : item.getAttribute('data-status') === filter);
+                item.classList.toggle('d-none', !show);
+                shown += show ? 1 : 0;
+            });
+            document.getElementById('reviewEmpty').classList.toggle('d-none', shown > 0);
+        });
+    });
+</script>
 </body>
 </html>
