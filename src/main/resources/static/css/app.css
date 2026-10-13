@@ -659,7 +659,16 @@ mark.user-highlight {
     }
 }
 
-/* Resolver: questao numa coluna central de leitura confortavel (sem texto base). */
-.resolver-page.container {
-    max-width: 50rem;
+/* Resolver: questao curta fica no meio da tela; se for maior que a tela, rola normalmente a partir do topo. */
+.resolver-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+@media (max-width: 991.98px) {
+    .resolver-page {
+        min-height: calc(100vh - 3.3rem);   /* desconta a barra do topo do celular */
+    }
 }
