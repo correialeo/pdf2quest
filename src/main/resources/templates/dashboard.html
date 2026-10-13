@@ -4,77 +4,76 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="mb-0">Início</h1>
-        <a class="btn btn-primary" href="/blocos">Estudar</a>
+    <div class="page-header">
+        <div>
+            <h1>Início</h1>
+            <p class="page-subtitle" th:text="${data.answered} + ' de ' + ${data.totalQuestions} + ' questões já resolvidas em ' + ${data.provas} + (${data.provas == 1} ? ' prova' : ' provas')"></p>
+        </div>
+        <a class="btn btn-primary" href="/blocos"><i class="bi bi-play-fill me-1"></i>Estudar</a>
     </div>
 
-    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4 next-actions"
-         th:if="${!data.open.isEmpty() or data.errors > 0}">
+    <th:block th:if="${!data.open.isEmpty() or data.errors > 0}">
+    <div class="section-title mt-0">Continuar de onde parou</div>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 next-actions">
         <div class="col" th:each="o : ${data.open}">
             <div class="card h-100 p-3 d-flex flex-column">
-                <div class="text-muted small">Sessão em andamento</div>
                 <h6 class="mb-1 text-truncate" th:text="${o.label()}" th:title="${o.label()}"></h6>
-                <div class="text-muted small mb-3"
+                <div class="text-muted small mb-2"
                      th:text="'Questão ' + ${o.resumeIndex + 1} + ' de ' + ${o.total()} + ' · iniciada em '
                               + ${#temporals.format(o.session.startedAt, 'dd/MM HH:mm')}"></div>
+                <div class="progress mb-3"><div class="progress-bar"
+                     th:style="'width: ' + ${o.total() == 0 ? 0 : o.resumeIndex * 100 / o.total()} + '%'"></div></div>
                 <div class="d-flex gap-2 mt-auto">
                     <a class="btn btn-primary btn-sm"
                        th:href="@{/resolver/{id}(id=${o.session.id}, index=${o.resumeIndex})}">Continuar</a>
                     <form method="post" th:action="@{/resolver/{id}/descartar(id=${o.session.id})}"
                           onsubmit="return confirm('Descartar esta sessão? As respostas dela serão apagadas.')">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Descartar</button>
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Descartar</button>
                     </form>
                 </div>
             </div>
         </div>
         <div class="col" th:if="${data.errors > 0}">
             <div class="card h-100 p-3 d-flex flex-column">
-                <div class="text-muted small">Revisão</div>
-                <h6 class="mb-1" th:text="${data.errors} + (${data.errors == 1} ? ' questão errada' : ' questões erradas')"></h6>
-                <div class="text-muted small mb-3">no caderno de erros, esperando revisão</div>
-                <a class="btn btn-outline-primary btn-sm mt-auto align-self-start" href="/caderno-erros">Revisar erros</a>
+                <h6 class="mb-1"><i class="bi bi-journal-x text-bad me-1"></i><span
+                        th:text="${data.errors} + (${data.errors == 1} ? ' questão errada' : ' questões erradas')"></span></h6>
+                <div class="text-muted small mb-3">esperando revisão no caderno de erros</div>
+                <a class="btn btn-outline-secondary btn-sm mt-auto align-self-start" href="/caderno-erros">Revisar erros</a>
             </div>
         </div>
     </div>
+    </th:block>
 
-    <div class="row row-cols-2 row-cols-md-6 g-3 mb-4">
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Provas</div><div class="fs-4" th:text="${data.provas}"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Questões</div><div class="fs-4" th:text="${data.totalQuestions}"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Já resolvidas</div><div class="fs-4" th:text="${data.answered}"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Acertos / erros</div>
-            <div class="fs-4"><span class="text-success" th:text="${data.correct}"></span> /
-                <span class="text-danger" th:text="${data.wrong}"></span></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Aproveitamento</div>
-            <div class="fs-4" th:text="${#numbers.formatDecimal(data.percent(), 1, 1)} + '%'"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Acertos no chute</div>
-            <div class="fs-4"><a href="/chutes" class="text-warning" th:text="${data.guess.guessCorrect}"></a></div></div></div>
+    <div class="section-title">Desempenho geral</div>
+    <div class="row row-cols-2 row-cols-md-4 g-3">
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Resolvidas', ${data.answered}, '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Aproveitamento', ${#numbers.formatDecimal(data.percent(), 1, 1)} + '%', '')}"></div></div>
+        <div class="col"><div class="card stat">
+            <div class="stat-label">Acertos / erros</div>
+            <div class="stat-value"><span class="text-ok" th:text="${data.correct}"></span>
+                <span class="text-muted fw-normal">/</span> <span class="text-bad" th:text="${data.wrong}"></span></div>
+        </div></div>
+        <div class="col"><a href="/chutes" class="text-decoration-none text-reset">
+            <div th:replace="~{fragments/ui :: stat('Acertos no chute', ${data.guess.guessCorrect}, 'text-guess')}"></div></a></div>
     </div>
 
-    <h4 class="mb-3">Provas</h4>
-    <p class="text-muted" th:if="${data.groups.isEmpty()}">
-        Nenhuma prova importada ainda. <a href="/import">Importe um PDF</a>.
-    </p>
+    <div class="section-title">Provas</div>
+    <div th:if="${data.groups.isEmpty()}"
+         th:replace="~{fragments/ui :: empty('bi-file-earmark-pdf', 'Nenhuma prova importada ainda.', 'Importar um PDF', '/import')}"></div>
     <div th:each="g : ${data.groups}" class="mb-4">
-        <h6 class="text-uppercase text-muted mb-2" th:text="${g.banca}"></h6>
+        <div class="small text-muted fw-medium mb-2" th:text="${g.banca}"></div>
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
             <div class="col" th:each="c : ${g.provas}">
-                <div class="card h-100 p-3">
-                    <h6 class="mb-0"><a th:href="@{/dashboard/prova/{id}(id=${c.job.id})}" th:text="${c.job.displayName}"></a></h6>
+                <a class="card card-hover h-100 p-3 text-reset text-decoration-none d-flex flex-column" th:href="@{/dashboard/prova/{id}(id=${c.job.id})}">
+                    <h6 class="mb-0" th:text="${c.job.displayName}"></h6>
                     <div class="text-muted small mb-2"
                          th:text="${c.job.detectedYear != null ? c.job.detectedYear + ' · ' : ''} + ${c.totalQuestions} + ' questões'"></div>
                     <div class="d-flex justify-content-between small">
                         <span>Resolvidas</span>
                         <span th:text="${c.answered} + '/' + ${c.totalQuestions}"></span>
                     </div>
-                    <div class="progress mb-2" style="height: 6px">
-                        <div class="progress-bar bg-secondary" th:style="'width: ' + ${c.coverage()} + '%'"></div>
+                    <div class="progress mb-3">
+                        <div class="progress-bar" th:style="'width: ' + ${c.coverage()} + '%'"></div>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mt-auto">
                         <span th:if="${c.hasAttempts()}" class="badge"
@@ -83,16 +82,16 @@
                         <span th:unless="${c.hasAttempts()}" class="badge text-bg-secondary bg-opacity-25 text-body border">Sem respostas</span>
                         <span class="text-muted small" th:text="${c.sessions} + (${c.sessions == 1} ? ' sessão' : ' sessões')"></span>
                     </div>
-                </div>
+                </a>
             </div>
         </div>
     </div>
 
-    <h4 class="mb-3 mt-4" th:if="${!data.blocks.isEmpty()}">Blocos de estudo</h4>
+    <div class="section-title" th:if="${!data.blocks.isEmpty()}">Blocos de estudo</div>
     <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4" th:if="${!data.blocks.isEmpty()}">
         <div class="col" th:each="b : ${data.blocks}">
-            <div class="card h-100 p-3">
-                <h6 class="mb-0"><a th:href="@{/dashboard/bloco/{id}(id=${b.block.id})}" th:text="${b.block.name}"></a></h6>
+            <a class="card card-hover h-100 p-3 text-reset text-decoration-none d-flex flex-column" th:href="@{/dashboard/bloco/{id}(id=${b.block.id})}">
+                <h6 class="mb-0" th:text="${b.block.name}"></h6>
                 <div class="text-muted small mb-2"
                      th:text="${b.questions} + ' questões · ' + ${b.sessions} + (${b.sessions == 1} ? ' sessão' : ' sessões')"></div>
                 <div class="mt-auto" th:if="${b.lastScore != null}">
@@ -106,12 +105,12 @@
                 <div class="mt-auto text-muted small" th:if="${b.lastScore == null}">
                     <span th:text="${b.sessions == 0} ? 'Ainda não iniciado' : 'Sem nota (bloco sem perfil de pontuação)'"></span>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 
-    <h4 class="mb-3 mt-4">Sessões recentes</h4>
-    <div class="card p-3 mb-4">
+    <div class="section-title">Sessões recentes</div>
+    <div class="card px-3 py-2 mb-4">
         <p class="text-muted mb-0" th:if="${data.recent.isEmpty()}">Nenhuma sessão finalizada ainda.</p>
         <table class="table table-sm mb-0" th:if="${!data.recent.isEmpty()}">
             <thead><tr><th>Data</th><th>Sessão</th><th>Acertos</th><th>Aproveitamento</th><th>Nota</th><th></th></tr></thead>
@@ -130,14 +129,14 @@
     </div>
 
     <details class="mb-4" th:if="${!data.bySubject.isEmpty()}">
-        <summary class="text-muted">Desempenho por disciplina, todas as provas juntas</summary>
+        <summary class="section-title d-inline-block">Desempenho por disciplina (todas as provas)</summary>
         <div class="card p-3 mt-2">
             <div th:each="s : ${data.bySubject}" class="mb-2">
                 <div class="d-flex justify-content-between small">
                     <span th:text="${s.label}"></span>
                     <span th:text="${#numbers.formatDecimal(s.percent(), 1, 1)} + '% (' + ${s.correct} + '/' + ${s.total} + ')'"></span>
                 </div>
-                <div class="progress" style="height: 6px"><div class="progress-bar" th:style="'width: ' + ${s.percent()} + '%'"></div></div>
+                <div class="progress"><div class="progress-bar" th:style="'width: ' + ${s.percent()} + '%'"></div></div>
             </div>
         </div>
     </details>

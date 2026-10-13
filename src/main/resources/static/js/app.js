@@ -21,25 +21,19 @@
         });
     }
 
-    // Marca o item do menu da pagina atual (o de caminho mais longo: /import/gabarito nao acende /import);
-    // num submenu, marca tambem o grupo (Estudar, Revisar...).
+    // Marca o item do menu lateral da pagina atual (o de caminho mais longo: /import/gabarito nao acende /import).
     function highlightActiveNavLink() {
         var path = window.location.pathname;
         var best = null;
-        document.querySelectorAll('.app-navbar .nav-link, .app-navbar .dropdown-item').forEach(function (link) {
+        document.querySelectorAll('.sidebar .sidebar-link[href]').forEach(function (link) {
             var href = link.getAttribute('href');
-            if (href && href !== '#' && href !== '/' && path.indexOf(href) === 0
+            if (href !== '/' && path.indexOf(href) === 0
                     && (!best || href.length > best.getAttribute('href').length)) {
                 best = link;
             }
         });
-        if (!best) {
-            return;
-        }
-        best.classList.add('active');
-        var group = best.closest('.nav-item.dropdown');
-        if (group) {
-            group.querySelector('.nav-link').classList.add('active');
+        if (best) {
+            best.classList.add('active');
         }
     }
 

@@ -1,0 +1,22 @@
+<!-- Componentes de tela reaproveitados por todas as paginas. -->
+
+<!-- Cabecalho da pagina: use a marcacao direto (div.page-header > div > h1 + p.page-subtitle, acoes a direita). -->
+
+<!-- Mensagens de sucesso/erro vindas de redirect (flash attributes "message" e "error"). -->
+<th:block th:fragment="flash">
+    <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+</th:block>
+
+<!-- Cartao de metrica: rotulo pequeno em cima, numero grande embaixo. -->
+<div th:fragment="stat(label, value, cls)" class="card stat">
+    <div class="stat-label" th:text="${label}"></div>
+    <div class="stat-value" th:classappend="${cls}" th:text="${value}"></div>
+</div>
+
+<!-- Estado vazio: icone, texto e um link opcional para a proxima acao. -->
+<div th:fragment="empty(icon, text, linkText, linkHref)" class="empty-state">
+    <i class="bi" th:classappend="${icon}"></i>
+    <span th:text="${text}"></span>
+    <a th:if="${linkHref != null}" th:href="${linkHref}" th:text="${linkText}" class="ms-1"></a>
+</div>
