@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -75,7 +76,7 @@ public class ImportController {
         // O arquivo JSON, quando enviado, vale mais que o texto colado.
         String sectionMapJson = sectionMapFile != null && !sectionMapFile.isEmpty()
                 ? new String(sectionMapFile.getBytes(), StandardCharsets.UTF_8) : sectionMap;
-        ImportJob job = importService.importPdf(file, banca, exam, organizationOverride, yearOverride, sectionMapJson);
+        ImportJob job = importService.startImport(file, banca, exam, organizationOverride, yearOverride, sectionMapJson);
         return "redirect:/import/result/" + job.getId();
     }
 
@@ -85,6 +86,20 @@ public class ImportController {
         model.addAttribute("job", job);
         model.addAttribute("hasPdf", pdfStorage.exists(job));
         return "import-result";
+    }
+
+    /** Estado da importacao para a tela de progresso: terminou? quantas paginas o OCR ja leu? */
+    @GetMapping("/import/{id}/status")
+    @ResponseBody
+    public Map<String, Object> status(@PathVariable Long id) {
+        ImportJob job = importJobRepository.findById(id).orElseThrow();
+        Map<String, Object> status = new java.util.LinkedHashMap<>();
+        status.put("finished", job.getFinishedAt() != null);
+        importService.progress(id).ifPresent(p -> {
+            status.put("pagesDone", p.done());
+            status.put("pagesTotal", p.total());
+        });
+        return status;
     }
 
     @GetMapping("/import/{id}/questoes")

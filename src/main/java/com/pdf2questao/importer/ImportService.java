@@ -18,6 +18,9 @@ import com.pdf2questao.question.QuestionRepository;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import jakarta.annotation.PreDestroy;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +33,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -45,6 +52,13 @@ public class ImportService {
     private final PdfStorage pdfStorage;
     private final SpecificSubjectClassifier subjectClassifier;
     private final OcrService ocrService;
+    /** Uma importacao por vez: o OCR ja usa todos os nucleos, e o SQLite tem uma conexao so. */
+    private final ExecutorService importExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "import-pdf");
+        t.setDaemon(true);
+        return t;
+    });
+    private final Map<Long, OcrService.Progress> progress = new ConcurrentHashMap<>();
 
     public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
                           ExamParserRegistry examParserRegistry, GabaritoParserRegistry gabaritoParserRegistry,
@@ -73,44 +87,96 @@ public class ImportService {
      */
     public ImportJob importPdf(MultipartFile file, Banca banca, String examOverride, String organizationOverride,
                                 Integer yearOverride, String sectionMapJson) {
+        ImportJob job = newJob(file.getOriginalFilename(), banca);
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            return fail(job, "Falha ao ler o PDF: " + e.getMessage());
+        }
+        return process(job, bytes, banca, examOverride, organizationOverride, yearOverride, sectionMapJson);
+    }
+
+    /**
+     * Inicia a importacao em segundo plano e devolve na hora a importacao "em andamento" (sem finishedAt),
+     * para a tela acompanhar o progresso do OCR. Le os bytes ja aqui: o arquivo do upload some no fim da requisicao.
+     */
+    public ImportJob startImport(MultipartFile file, Banca banca, String examOverride, String organizationOverride,
+                                 Integer yearOverride, String sectionMapJson) throws IOException {
+        byte[] bytes = file.getBytes();
+        ImportJob job = importJobRepository.save(newJob(file.getOriginalFilename(), banca));
+        Long id = job.getId();
+        progress.put(id, new OcrService.Progress(0, 0, 0));
+        importExecutor.submit(() -> {
+            try {
+                process(job, bytes, banca, examOverride, organizationOverride, yearOverride, sectionMapJson);
+            } catch (RuntimeException e) {
+                fail(job, "Falha inesperada na importacao: " + e);
+            } finally {
+                progress.remove(id);
+            }
+        });
+        return job;
+    }
+
+    /** Paginas lidas pelo OCR da importacao em andamento (vazio se ja terminou ou nao usa OCR ainda). */
+    public Optional<OcrService.Progress> progress(Long jobId) {
+        return Optional.ofNullable(progress.get(jobId));
+    }
+
+    /**
+     * Importacoes que estavam em andamento quando o servidor caiu nunca vao terminar: fecha como falha
+     * ao subir, para nao ficarem "processando" para sempre.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void closeInterruptedImports() {
+        importJobRepository.findAll().stream().filter(j -> j.getFinishedAt() == null)
+                .forEach(j -> fail(j, "Importacao interrompida (o servidor foi reiniciado). Importe o PDF de novo."));
+    }
+
+    @PreDestroy
+    void shutdownExecutor() {
+        importExecutor.shutdownNow();
+    }
+
+    private ImportJob newJob(String fileName, Banca banca) {
         ImportJob job = new ImportJob();
-        job.setFileName(file.getOriginalFilename());
+        job.setFileName(fileName);
         job.setBanca(banca.name());
         job.setStartedAt(LocalDateTime.now());
+        return job;
+    }
 
+    private ImportJob fail(ImportJob job, String message) {
+        job.setImportedQuestions(0);
+        job.setFailedQuestions(0);
+        job.setErrorLog(message);
+        job.setFinishedAt(LocalDateTime.now());
+        return importJobRepository.save(job);
+    }
+
+    private ImportJob process(ImportJob job, byte[] bytes, Banca banca, String examOverride,
+                              String organizationOverride, Integer yearOverride, String sectionMapJson) {
+        String fileName = job.getFileName();
         ExamParser parser = examParserRegistry.find(banca).orElse(null);
         if (parser == null) {
-            job.setImportedQuestions(0);
-            job.setFailedQuestions(0);
-            job.setErrorLog("Banca ainda nao suportada: " + banca.getLabel());
-            job.setFinishedAt(LocalDateTime.now());
-            return importJobRepository.save(job);
+            return fail(job, "Banca ainda nao suportada: " + banca.getLabel());
         }
 
         SectionMap sectionMap;
         try {
             sectionMap = SectionMap.parse(sectionMapJson);
         } catch (IllegalArgumentException e) {
-            job.setImportedQuestions(0);
-            job.setFailedQuestions(0);
-            job.setErrorLog(e.getMessage());
-            job.setFinishedAt(LocalDateTime.now());
-            return importJobRepository.save(job);
+            return fail(job, e.getMessage());
         }
 
-        byte[] bytes;
         PdfRichTextExtractor.Extraction extraction;
         boolean usedOcr;
         try {
-            bytes = file.getBytes();
             usedOcr = ocrService.needsOcr(bytes);
-            extraction = usedOcr ? ocr(bytes) : extract(bytes);
+            extraction = usedOcr ? ocr(bytes, job.getId()) : extract(bytes);
         } catch (IOException e) {
-            job.setImportedQuestions(0);
-            job.setFailedQuestions(0);
-            job.setErrorLog("Falha ao ler o PDF: " + e.getMessage());
-            job.setFinishedAt(LocalDateTime.now());
-            return importJobRepository.save(job);
+            return fail(job, "Falha ao ler o PDF: " + e.getMessage());
         }
 
         ParseResult result = parser.parse(extraction.text());
@@ -124,8 +190,7 @@ public class ImportService {
         job.setDetectedOrganization(result.organization());
         job.setDetectedYear(result.year());
         job.setTitle(hasText(examOverride) ? examOverride.trim() : result.title());
-        job.setReport(ImportReport.forExam(file.getOriginalFilename(), result, sectionMap, usedOcr));
-        job.setFinishedAt(LocalDateTime.now());
+        job.setReport(ImportReport.forExam(fileName, result, sectionMap, usedOcr));
         ImportJob savedJob = importJobRepository.save(job);
         storePdf(savedJob, bytes);
 
@@ -139,7 +204,7 @@ public class ImportService {
                     q.setOrganization(organization);
                     q.setYear(year);
                     q.setExam(examOverride);
-                    q.setSource(file.getOriginalFilename());
+                    q.setSource(fileName);
                     q.setImportJobId(savedJob.getId());
                     applyParsedContent(q, pq, attachments);
                     var section = sectionMap.find(pq.number());
@@ -151,6 +216,8 @@ public class ImportService {
         questionRepository.saveAll(toSave);
 
         savedJob.setImportedQuestions(toSave.size());
+        // So agora a importacao conta como terminada: a tela de progresso espera as questoes estarem salvas.
+        savedJob.setFinishedAt(LocalDateTime.now());
         return importJobRepository.save(savedJob);
     }
 
@@ -252,11 +319,19 @@ public class ImportService {
 
     /** PDF sem camada de texto: o texto vem do OCR (com cache em disco), com recortes das questoes que o OCR nao le bem (formula, tabela). */
     private PdfRichTextExtractor.Extraction ocr(byte[] bytes) throws IOException {
+        return ocr(bytes, null);
+    }
+
+    private PdfRichTextExtractor.Extraction ocr(byte[] bytes, Long jobId) throws IOException {
         if (!ocrService.isAvailable()) {
             throw new IOException("o PDF nao tem camada de texto e o Tesseract com o idioma configurado "
                     + "(por) nao esta instalado - veja pdf2questao.ocr.* no application.properties");
         }
-        OcrService.Result result = ocrService.recognize(bytes, p -> { });
+        OcrService.Result result = ocrService.recognize(bytes, p -> {
+            if (jobId != null && progress.containsKey(jobId)) {
+                progress.put(jobId, p);
+            }
+        });
         return new PdfRichTextExtractor.Extraction(result.text(), result.images());
     }
 

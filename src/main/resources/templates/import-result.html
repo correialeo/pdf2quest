@@ -3,7 +3,24 @@
 <head th:replace="~{fragments/head :: head('Resultado da Importação')}"></head>
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
-<main class="container page">
+<main class="container page" th:if="${job.finishedAt == null}">
+    <!-- Importacao em andamento (roda em segundo plano): acompanha pelo /status e recarrega ao terminar. -->
+    <div class="page-header">
+        <div>
+            <h1 th:text="${job.displayName}"></h1>
+            <p class="page-subtitle">Importando… pode sair desta tela, a importação continua.</p>
+        </div>
+    </div>
+    <div class="card p-4 form-narrow" id="importProgress" th:attr="data-status-url=@{/import/{id}/status(id=${job.id})}">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="spinner-border spinner-border-sm text-muted"></span>
+            <span class="fw-medium" id="progressLabel">Lendo o PDF…</span>
+        </div>
+        <div class="progress"><div class="progress-bar" id="progressBar" style="width: 0%"></div></div>
+        <div class="form-text" id="progressHint">PDFs sem texto passam por OCR, página a página.</div>
+    </div>
+</main>
+<main class="container page" th:unless="${job.finishedAt == null}">
     <div class="page-header">
         <div>
             <h1 th:text="${job.displayName}"></h1>
@@ -84,5 +101,26 @@
     </details>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    (function () {
+        var box = document.getElementById('importProgress');
+        if (!box) { return; }
+        var url = box.getAttribute('data-status-url');
+        function poll() {
+            fetch(url).then(function (r) { return r.json(); }).then(function (s) {
+                if (s.finished) { window.location.reload(); return; }
+                if (s.pagesTotal) {
+                    document.getElementById('progressLabel').textContent =
+                        'OCR: página ' + s.pagesDone + ' de ' + s.pagesTotal;
+                    document.getElementById('progressBar').style.width = (s.pagesDone * 100 / s.pagesTotal) + '%';
+                } else if (s.pagesDone === 0 && s.pagesTotal === 0) {
+                    document.getElementById('progressLabel').textContent = 'Lendo o PDF…';
+                }
+                setTimeout(poll, 1500);
+            }).catch(function () { setTimeout(poll, 4000); });
+        }
+        poll();
+    })();
+</script>
 </body>
 </html>

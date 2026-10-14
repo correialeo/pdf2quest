@@ -73,7 +73,8 @@
         <div class="card block-list" th:unless="${jobs.isEmpty()}">
             <a class="block-row text-reset text-decoration-none" th:each="j : ${jobs}" th:href="@{/import/result/{id}(id=${j.id})}">
                 <span class="text-truncate" th:text="${j.displayName}" th:title="${j.displayName}"></span>
-                <span class="text-muted small text-nowrap" th:text="${j.importedQuestions} + ' questões'"></span>
+                <span class="text-muted small text-nowrap"
+                      th:text="${j.finishedAt == null} ? 'importando…' : ${j.importedQuestions} + ' questões'"></span>
             </a>
         </div>
     </div>
@@ -81,7 +82,7 @@
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script>
-    // Mostra o nome do PDF escolhido, aceita arrastar e trava o botao durante o envio (OCR pode demorar).
+    // Mostra o nome do PDF escolhido, aceita arrastar e trava o botao durante o envio do arquivo.
     (function () {
         var input = document.getElementById('pdfFile');
         var zone = input.closest('.drop-zone');
@@ -103,7 +104,7 @@
         document.getElementById('importForm').addEventListener('submit', function () {
             var button = document.getElementById('importSubmit');
             button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importando… (OCR pode levar alguns minutos)';
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando…';
         });
     })();
 </script>
