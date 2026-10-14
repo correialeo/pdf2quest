@@ -3,12 +3,12 @@
 <head th:replace="~{fragments/head :: head('Resultado da Importação')}"></head>
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
-<main class="container page" th:if="${job.finishedAt == null}">
+<main class="container page" th:if="${processing}">
     <!-- Importacao em andamento (roda em segundo plano): acompanha pelo /status e recarrega ao terminar. -->
     <div class="page-header">
         <div>
             <h1 th:text="${job.displayName}"></h1>
-            <p class="page-subtitle">Importando… pode sair desta tela, a importação continua.</p>
+            <p class="page-subtitle" th:text="(${job.finishedAt == null} ? 'Importando' : 'Reprocessando') + '… pode sair desta tela, o processamento continua.'"></p>
         </div>
     </div>
     <div class="card p-4 form-narrow" id="importProgress" th:attr="data-status-url=@{/import/{id}/status(id=${job.id})}">
@@ -20,7 +20,7 @@
         <div class="form-text" id="progressHint">PDFs sem texto passam por OCR, página a página.</div>
     </div>
 </main>
-<main class="container page" th:unless="${job.finishedAt == null}">
+<main class="container page" th:unless="${processing}">
     <div class="page-header">
         <div>
             <h1 th:text="${job.displayName}"></h1>

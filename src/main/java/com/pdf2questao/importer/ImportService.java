@@ -22,7 +22,9 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -59,12 +61,15 @@ public class ImportService {
         return t;
     });
     private final Map<Long, OcrService.Progress> progress = new ConcurrentHashMap<>();
+    private final Map<Long, ReprocessResult> reprocessResults = new ConcurrentHashMap<>();
+    private final TransactionTemplate transactions;
 
     public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
                           ExamParserRegistry examParserRegistry, GabaritoParserRegistry gabaritoParserRegistry,
                           PassageRepository passageRepository, QuestionImageRepository questionImageRepository,
                           PdfStorage pdfStorage, SpecificSubjectClassifier subjectClassifier,
-                          OcrService ocrService) {
+                          OcrService ocrService, PlatformTransactionManager transactionManager) {
+        this.transactions = new TransactionTemplate(transactionManager);
         this.questionRepository = questionRepository;
         this.importJobRepository = importJobRepository;
         this.examParserRegistry = examParserRegistry;
@@ -226,8 +231,68 @@ public class ImportService {
      * mexer em ids, gabarito ou disciplina ja preenchida - simulados e tentativas
      * continuam apontando para as mesmas questoes.
      */
-    @Transactional
     public ReprocessResult reprocess(Long importJobId, MultipartFile file) {
+        byte[] bytes;
+        try {
+            bytes = reprocessBytes(importJobId, file);
+        } catch (IOException e) {
+            return ReprocessResult.error(e.getMessage());
+        }
+        return transactions.execute(status -> reprocess(importJobId, bytes));
+    }
+
+    /**
+     * Reprocessa em segundo plano, na mesma fila das importacoes. Enquanto roda, {@link #isReprocessing} e
+     * verdadeiro; o resultado fica guardado ate a tela busca-lo com {@link #takeReprocessResult}.
+     */
+    public void startReprocess(Long importJobId, MultipartFile file) {
+        byte[] bytes;
+        try {
+            bytes = reprocessBytes(importJobId, file);
+        } catch (IOException e) {
+            reprocessResults.put(importJobId, ReprocessResult.error(e.getMessage()));
+            return;
+        }
+        progress.put(importJobId, new OcrService.Progress(0, 0, 0));
+        importExecutor.submit(() -> {
+            ReprocessResult result;
+            try {
+                result = transactions.execute(status -> reprocess(importJobId, bytes));
+            } catch (RuntimeException e) {
+                result = ReprocessResult.error("Falha inesperada ao reprocessar: " + e);
+            }
+            reprocessResults.put(importJobId, result);
+            progress.remove(importJobId);
+        });
+    }
+
+    /** A importacao esta na fila ou sendo lida agora (importacao nova ou reprocessamento). */
+    public boolean isProcessing(Long importJobId) {
+        return progress.containsKey(importJobId);
+    }
+
+    /** Resultado do ultimo reprocessamento terminado desta importacao; so e devolvido uma vez. */
+    public Optional<ReprocessResult> takeReprocessResult(Long importJobId) {
+        return Optional.ofNullable(reprocessResults.remove(importJobId));
+    }
+
+    /** O arquivo enviado agora ou, sem ele, o PDF guardado na importacao. */
+    private byte[] reprocessBytes(Long importJobId, MultipartFile file) throws IOException {
+        ImportJob job = importJobRepository.findById(importJobId).orElseThrow();
+        try {
+            if (file != null && !file.isEmpty()) {
+                return file.getBytes();
+            }
+            if (pdfStorage.exists(job)) {
+                return pdfStorage.read(job);
+            }
+        } catch (IOException e) {
+            throw new IOException("Falha ao ler o PDF: " + e.getMessage(), e);
+        }
+        throw new IOException("Esta importacao nao tem PDF guardado - envie o arquivo da prova.");
+    }
+
+    private ReprocessResult reprocess(Long importJobId, byte[] bytes) {
         ImportJob job = importJobRepository.findById(importJobId).orElseThrow();
         Banca banca = Banca.valueOf(job.getBanca());
         ExamParser parser = examParserRegistry.find(banca).orElse(null);
@@ -235,17 +300,9 @@ public class ImportService {
             return ReprocessResult.error("Banca ainda nao suportada: " + banca.getLabel());
         }
 
-        byte[] bytes;
         PdfRichTextExtractor.Extraction extraction;
         try {
-            if (file != null && !file.isEmpty()) {
-                bytes = file.getBytes();
-            } else if (pdfStorage.exists(job)) {
-                bytes = pdfStorage.read(job);
-            } else {
-                return ReprocessResult.error("Esta importacao nao tem PDF guardado - envie o arquivo da prova.");
-            }
-            extraction = ocrService.needsOcr(bytes) ? ocr(bytes) : extract(bytes);
+            extraction = ocrService.needsOcr(bytes) ? ocr(bytes, importJobId) : extract(bytes);
         } catch (IOException e) {
             return ReprocessResult.error("Falha ao ler o PDF: " + e.getMessage());
         }
@@ -318,17 +375,13 @@ public class ImportService {
     }
 
     /** PDF sem camada de texto: o texto vem do OCR (com cache em disco), com recortes das questoes que o OCR nao le bem (formula, tabela). */
-    private PdfRichTextExtractor.Extraction ocr(byte[] bytes) throws IOException {
-        return ocr(bytes, null);
-    }
-
     private PdfRichTextExtractor.Extraction ocr(byte[] bytes, Long jobId) throws IOException {
         if (!ocrService.isAvailable()) {
             throw new IOException("o PDF nao tem camada de texto e o Tesseract com o idioma configurado "
                     + "(por) nao esta instalado - veja pdf2questao.ocr.* no application.properties");
         }
         OcrService.Result result = ocrService.recognize(bytes, p -> {
-            if (jobId != null && progress.containsKey(jobId)) {
+            if (progress.containsKey(jobId)) {
                 progress.put(jobId, p);
             }
         });

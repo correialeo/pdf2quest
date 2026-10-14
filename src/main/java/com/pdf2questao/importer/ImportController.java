@@ -85,6 +85,8 @@ public class ImportController {
         ImportJob job = importJobRepository.findById(id).orElseThrow();
         model.addAttribute("job", job);
         model.addAttribute("hasPdf", pdfStorage.exists(job));
+        model.addAttribute("processing", job.getFinishedAt() == null || importService.isProcessing(id));
+        importService.takeReprocessResult(id).ifPresent(r -> model.addAttribute("reprocess", r));
         return "import-result";
     }
 
@@ -94,7 +96,7 @@ public class ImportController {
     public Map<String, Object> status(@PathVariable Long id) {
         ImportJob job = importJobRepository.findById(id).orElseThrow();
         Map<String, Object> status = new java.util.LinkedHashMap<>();
-        status.put("finished", job.getFinishedAt() != null);
+        status.put("finished", job.getFinishedAt() != null && !importService.isProcessing(id));
         importService.progress(id).ifPresent(p -> {
             status.put("pagesDone", p.done());
             status.put("pagesTotal", p.total());
@@ -123,7 +125,7 @@ public class ImportController {
     public String reprocess(@PathVariable Long id,
                             @RequestParam(value = "file", required = false) MultipartFile file,
                             RedirectAttributes redirectAttributes) {
-        redirectAttributes.addFlashAttribute("reprocess", importService.reprocess(id, file));
+        importService.startReprocess(id, file);
         return "redirect:/import/result/" + id;
     }
 
