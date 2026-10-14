@@ -4,78 +4,133 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3-6DB33F)
 ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)
 
-Ferramenta web local (single-user, sem login, sem nuvem) para importar
-provas de concurso em PDF, resolver questões, montar simulados com nota
-calculada pelo edital e acompanhar a evolução nos estudos ao longo do
-tempo.
+Transforma o PDF de uma prova de concurso em questões para resolver no computador: você importa a prova,
+resolve as questões, vê a nota calculada pelo edital e acompanha onde está errando.
 
-Feita inicialmente com foco no edital da Dataprev, mas serve pra qualquer
-concurso cujas provas venham em PDF — a leitura de cada PDF é feita por um
-parser específico da banca organizadora, então dá pra estender pra novas
-bancas sem tocar no resto do sistema. Veja a arquitetura de parsers e como
-adicionar uma banca nova em [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Tudo roda **no seu computador**: não precisa de conta, de internet (depois de instalado) nem de servidor.
+As suas provas e respostas ficam num arquivo só, dentro da pasta do projeto.
 
-## Stack
+## Como instalar e usar (passo a passo)
 
-| Camada       | Tecnologia                          |
-| ------------ | ------------------------------------ |
-| Back-end     | Java 21 + Spring Boot 3 (MVC)        |
-| Views        | Thymeleaf + Bootstrap 5              |
-| Banco        | SQLite (arquivo único, sem servidor) |
-| Extração PDF | Apache PDFBox                        |
-| Build        | Maven                                |
+Funciona no **macOS** e no **Linux** (Ubuntu, Debian, Fedora). No Windows, veja a seção
+[Windows](#windows) abaixo.
 
-## Rodando localmente
+### 1. Baixe o projeto
 
-Pré-requisito: Java 21 (`java -version`; ajuste `JAVA_HOME` se necessário).
+Escolha uma das opções:
+
+- **Sem saber Git:** na página do projeto no GitHub, clique no botão verde **Code** → **Download ZIP**.
+  Descompacte o arquivo onde quiser (por exemplo, na pasta Documentos).
+- **Com Git:** `git clone https://github.com/correialeo/pdf2quest.git`
+
+### 2. Abra o Terminal na pasta do projeto
+
+- **Mac:** abra o app **Terminal**, digite `cd ` (com um espaço no fim), arraste a pasta do projeto para
+  dentro da janela e aperte Enter.
+- **Linux:** clique com o botão direito dentro da pasta e escolha **Abrir no terminal**.
+
+### 3. Instale o que é necessário (só na primeira vez)
 
 ```bash
-mvn spring-boot:run
+./instalar.sh
 ```
 
-Acesse **http://localhost:8080** — abre direto no dashboard.
+O script instala o **Java 21**, o **Maven** (que compila e roda o projeto) e o **Tesseract** (que lê provas
+escaneadas, em imagem). Ele vai pedir a senha do computador. No Mac, se ainda não tiver o
+[Homebrew](https://brew.sh), ele instala também. Pode levar alguns minutos.
 
-## Funcionalidades
+### 4. Abra o sistema
 
-1. **Importar prova (PDF)** — sobe o PDF de uma prova; banca, ano,
-   disciplina e categoria (Gerais/Específicas) são detectados
-   automaticamente a partir do próprio documento.
-2. **Importar gabarito separado (PDF)** — vincula um PDF de gabarito
-   publicado à parte a uma prova já importada.
-3. **Banco de questões / prática livre** — filtra por disciplina, assunto,
-   ano e banca para resolver questões avulsas.
-4. **Simulado** — monta um simulado por quantidade de questões de
-   Gerais/Específicas e calcula a nota conforme o peso do edital.
-5. **Caderno de erros** — lista questões erradas na última tentativa e
-   permite refazê-las de uma vez.
-6. **Dashboard** — totais, desempenho por disciplina/assunto, histórico de
-   simulados e exportação do banco (`.sql`) para backup.
+```bash
+./iniciar.sh
+```
 
-Descrição completa de cada funcionalidade e da arquitetura de parsers por
-banca em [`sobre.md`](sobre.md).
+Na primeira vez demora alguns minutos (o Maven baixa o que precisa); nas próximas, uns segundos. Quando
+estiver pronto, o navegador abre sozinho em **http://localhost:8080**.
 
-## Arquitetura
+Para **fechar**, volte ao Terminal e aperte `Ctrl + C`. Para usar de novo outro dia, repita só o passo 4.
 
-A importação de PDF segue um padrão de plugin por banca organizadora
-(`ExamParser` / `GabaritoTableParser`, descobertos automaticamente pelo
-Spring e indexados por `Banca`), pensado para escalar sem acoplar bancas
-novas ao resto do sistema. Hoje só a **FGV** tem parser implementado; as
-demais (Cesgranrio, Cebraspe, FCC, Vunesp) já existem no enum `Banca` e
-aparecem nas telas de importação como placeholders para o roadmap.
+> **Deu "permissão negada"?** Rode uma vez `chmod +x instalar.sh iniciar.sh` e tente de novo.
+>
+> **A porta 8080 já está em uso?** Rode `PORTA=8090 ./iniciar.sh` e acesse http://localhost:8090.
 
-Detalhes da estrutura de pacotes e o passo a passo para adicionar uma
-banca nova estão em [`CONTRIBUTING.md`](CONTRIBUTING.md).
+### Windows
 
-## Limitações conhecidas
+Os scripts não rodam direto no Windows. Duas opções:
 
-- Parsing de PDF é heurístico (regex); provas com formatação incomum podem
-  gerar falhas de importação — registradas no relatório final, sem travar
-  o processo.
-- Não há tela de edição para corrigir disciplina/categoria/assunto
-  detectados incorretamente; hoje o ajuste é direto no banco SQLite
-  (`pdf2questao.db`).
-- Sem autenticação/multiusuário de propósito — é uma ferramenta pessoal,
-  para rodar local.
+- **Recomendado: WSL.** Instale o [WSL com Ubuntu](https://learn.microsoft.com/pt-br/windows/wsl/install)
+  (um Linux dentro do Windows), abra o Ubuntu e siga os passos acima normalmente.
+- **Manual:** instale o [Java 21 (Temurin)](https://adoptium.net/), o [Maven](https://maven.apache.org/download.cgi)
+  e, se for importar provas escaneadas, o [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) com o
+  idioma português. Depois, no Prompt de Comando, dentro da pasta do projeto: `mvn spring-boot:run`.
+
+## Primeiros passos no sistema
+
+1. **Importe uma prova:** menu **Provas → Importar PDF**. Escolha o arquivo e a banca. Provas escaneadas
+   (só imagem, comum na FCC) passam por leitura automática (OCR) e levam alguns minutos; a tela mostra o
+   progresso página a página e você pode continuar usando o sistema enquanto isso.
+2. **Importe o gabarito**, se ele vier num PDF separado: **Provas → Importar gabarito**.
+3. **Estude:** em **Estudar → Blocos de estudo**, crie um bloco com a prova inteira ou só as faixas de
+   questões que quiser (ex.: `1-30`), ou use **Sessão rápida** para sortear questões.
+4. **Resolva:** clique na alternativa ou use o teclado (`A`–`E` responde, `X` marca chute, `←` `→` navega,
+   `M` abre o mapa de questões). Pode sair no meio: a sessão fica salva e aparece em **Início → Continuar**.
+5. **Revise:** ao finalizar, veja a nota, o desempenho por disciplina e as questões erradas. Depois, o
+   **Caderno de erros** e a tela de **Chutes** juntam o que você precisa estudar.
+
+## O que o sistema faz
+
+- **Importar provas em PDF** das bancas **FGV, FCC, Cebraspe e Cesgranrio**, detectando ano, disciplina,
+  textos base e imagens. Provas escaneadas são lidas por OCR.
+- **Importar gabarito** de um PDF separado e ligar as respostas às questões.
+- **Blocos de estudo:** recortes reutilizáveis de uma ou várias provas, com tempo limite opcional.
+- **Perfis de pontuação:** peso por disciplina e nota mínima por grupo, como no edital.
+- **Resolver no modo foco**, com riscar alternativas, grifar o texto base e marcar "é chute?".
+- **Resultado** com nota, desempenho por disciplina e revisão filtrável (erradas, chutes, em branco).
+- **Caderno de erros** e **diagnóstico de chutes** (o que você acertou sem saber).
+- **Exportar o banco** (`.sql`) para backup, no menu lateral.
+
+Descrição detalhada em [`sobre.md`](sobre.md).
+
+## Onde ficam os meus dados?
+
+Tudo fica dentro da pasta do projeto:
+
+| O quê                         | Onde                |
+| ----------------------------- | ------------------- |
+| Questões, sessões e respostas | `pdf2questao.db`    |
+| PDFs das provas importadas    | `data/pdfs/`        |
+| Cache da leitura por OCR      | `data/ocr-cache/`   |
+
+**Para fazer backup**, copie o `pdf2questao.db` e a pasta `data/` (ou use **Exportar banco** no menu).
+Se for baixar uma versão nova do projeto, leve esses arquivos para a pasta nova.
+
+## Problemas comuns
+
+- **"Falta o Java 21 ou o Maven"** ao rodar `./iniciar.sh`: rode `./instalar.sh` antes.
+- **A importação de uma prova escaneada falha falando do Tesseract:** rode `./instalar.sh` de novo; ele
+  confere se o Tesseract e o idioma português estão instalados.
+- **Algumas questões vieram erradas ou faltando:** a leitura de PDF é automática e pode errar em provas
+  com formatação incomum. Veja o **relatório** na tela da prova importada. Depois de uma atualização do
+  projeto, o botão **Reprocessar** lê o PDF de novo sem perder as suas respostas.
+
+## Para desenvolvedores
+
+| Camada       | Tecnologia                              |
+| ------------ | --------------------------------------- |
+| Back-end     | Java 21 + Spring Boot 3 (MVC)           |
+| Views        | Thymeleaf + Bootstrap 5                 |
+| Banco        | SQLite (arquivo único) + Flyway         |
+| Extração PDF | Apache PDFBox + Tesseract (OCR)         |
+| Build        | Maven                                   |
+
+```bash
+mvn spring-boot:run   # sobe em http://localhost:8080
+mvn test              # roda os testes
+```
+
+A importação segue um padrão de plugin por banca (`ExamParser` / `GabaritoTableParser`, descobertos pelo
+Spring e indexados por `Banca`): adicionar uma banca nova não mexe no resto do sistema. Estrutura de pacotes
+e passo a passo em [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Licença
 
