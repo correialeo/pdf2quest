@@ -20,3 +20,27 @@
     <span th:text="${text}"></span>
     <a th:if="${linkHref != null}" th:href="${linkHref}" th:text="${linkText}" class="ms-1"></a>
 </div>
+
+<!-- Questao para leitura (listas de prova, bloco, erros e chutes): cabecalho, texto base opcional, enunciado e
+     alternativas. "correct"/"wrong" sao letras a destacar (null = nao destacar); "tools" mostra a observacao editavel. -->
+<article th:fragment="question(q, heading, passage, passageOpen, correct, wrong, tools)" class="card question-card">
+    <header class="question-card-head">
+        <span class="fw-medium" th:text="${heading}"></span>
+        <span class="text-muted small" th:if="${q.subject != null}" th:text="${q.subject}"></span>
+        <span class="text-muted small ms-auto" th:if="${q.organization != null or q.year != null}"
+              th:text="${#strings.defaultString(q.organization, '')} + (${q.organization != null and q.year != null} ? ' · ' : '') + ${q.year != null ? q.year : ''}"></span>
+    </header>
+    <details class="mb-3" th:if="${passage != null}" th:open="${passageOpen}">
+        <summary class="small text-muted">Texto base</summary>
+        <div class="rich-text mt-2 passage-inline" th:utext="${@richText.html(passage.content)}"></div>
+    </details>
+    <div class="rich-text mb-3" th:utext="${@richText.html(q.statement)}"></div>
+    <div th:each="alt : ${q.alternatives()}" class="review-alt"
+         th:classappend="${alt.key == correct} ? 'is-correct' : (${alt.key == wrong} ? 'is-wrong' : '')">
+        <strong th:text="${alt.key} + ')'"></strong> <span class="rich-text" th:utext="${@richText.html(alt.value)}"></span>
+        <span class="alt-tag text-ok" th:if="${alt.key == correct}">Resposta certa</span>
+        <span class="alt-tag text-bad" th:if="${alt.key == wrong}">Sua resposta</span>
+    </div>
+    <p class="text-muted small mt-3 mb-0" th:if="${!tools and q.note != null}" th:text="'Observação: ' + ${q.note}"></p>
+    <div th:if="${tools}" th:replace="~{fragments/question-tools :: tools(${q})}"></div>
+</article>

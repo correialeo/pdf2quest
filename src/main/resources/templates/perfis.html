@@ -4,31 +4,48 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-3">Perfis de pontuação</h1>
+    <div class="page-header">
+        <div>
+            <h1>Perfis de pontuação</h1>
+            <p class="page-subtitle">Peso de cada disciplina, mínimo por grupo e mínimo total. Anuladas contam como acerto; erros não descontam.</p>
+        </div>
+    </div>
     <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
-    <p class="text-muted">
-        Um perfil define o peso de cada disciplina, a nota mínima de cada grupo (ex.: P1, P2) e a nota mínima
-        total. Questões anuladas contam como acerto; erros não descontam.
-    </p>
 
-    <div class="card p-4 mb-3" th:each="p : ${profiles}">
-        <h5 th:text="${p.profile.name}"></h5>
-        <p class="text-muted" th:if="${p.profile.description != null}" th:text="${p.profile.description}"></p>
-        <p th:if="${p.spec.minTotal() != null}">Mínimo total: <strong th:text="${p.spec.minTotal()}"></strong></p>
-        <div th:each="g : ${p.spec.groups()}" class="mb-2">
-            <strong th:text="${g.name()}"></strong>
-            <span th:if="${g.minScore() != null}" th:text="'— mínimo ' + ${g.minScore()}"></span>
-            <ul class="mb-0">
-                <li th:each="r : ${g.rules()}"
-                    th:text="${r.subject()} + ': ' + ${r.questionCount()} + ' q × ' + ${r.weight()}"></li>
-            </ul>
+    <div th:if="${profiles.isEmpty()}"
+         th:replace="~{fragments/ui :: empty('bi-sliders', 'Nenhum perfil ainda. Crie um com o JSON abaixo.', null, null)}"></div>
+    <div class="row row-cols-1 row-cols-lg-2 g-3">
+        <div class="col" th:each="p : ${profiles}">
+            <div class="card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-baseline gap-2">
+                    <h5 class="mb-1" th:text="${p.profile.name}"></h5>
+                    <span class="text-muted small text-nowrap" th:if="${p.spec.minTotal() != null}"
+                          th:text="'mínimo total ' + ${p.spec.minTotal()}"></span>
+                </div>
+                <p class="text-muted small" th:if="${p.profile.description != null}" th:text="${p.profile.description}"></p>
+                <details th:each="g : ${p.spec.groups()}" class="score-group">
+                    <summary class="d-flex justify-content-between gap-2">
+                        <span class="fw-medium" th:text="${g.name()}"></span>
+                        <span class="text-muted small" th:if="${g.minScore() != null}" th:text="'mínimo ' + ${g.minScore()}"></span>
+                    </summary>
+                    <table class="table table-sm mb-2">
+                        <tbody>
+                        <tr th:each="r : ${g.rules()}">
+                            <td th:text="${r.subject()}"></td>
+                            <td class="text-end text-muted text-nowrap" th:text="${r.questionCount()} + ' q × ' + ${r.weight()}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </details>
+            </div>
         </div>
     </div>
 
-    <form method="post" action="/perfis" class="card p-4">
-        <h5>Criar ou atualizar perfil (JSON)</h5>
-        <textarea name="json" rows="14" class="form-control font-monospace"
+    <details class="mt-4" th:open="${json != null}">
+        <summary class="section-title d-inline-block m-0">Criar ou atualizar perfil (JSON)</summary>
+    <form method="post" action="/perfis" class="card p-3 mt-2">
+        <textarea name="json" rows="14" class="form-control font-monospace small"
                   th:text="${json != null} ? ${json} : ${exampleJson}"></textarea>
         <div class="form-text">
             Se já existir um perfil com o mesmo <code>name</code>, as regras dele são substituídas (sessões já
@@ -37,7 +54,7 @@
         </div>
         <button type="submit" class="btn btn-primary mt-3 align-self-start">Salvar perfil</button>
     </form>
-    <a href="/blocos" class="btn btn-secondary mt-3">Voltar aos blocos</a>
+    </details>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

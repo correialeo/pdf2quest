@@ -4,77 +4,76 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <a href="/dashboard" class="small">&larr; Dashboard</a>
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3 mt-1">
+    <a href="/dashboard" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Início</a>
+    <div class="page-header mt-2">
         <div>
-            <h1 class="mb-0" th:text="${p.job.displayName}"></h1>
-            <div class="text-muted small"
-                 th:text="${p.job.banca} + (${p.job.detectedYear != null} ? ' · ' + ${p.job.detectedYear} : '') + ' · ' + ${p.job.fileName}"></div>
+            <h1 th:text="${p.job.displayName}"></h1>
+            <p class="page-subtitle"
+               th:text="${p.job.banca} + (${p.job.detectedYear != null} ? ' · ' + ${p.job.detectedYear} : '') + ' · ' + ${p.job.fileName}"></p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a th:href="@{/import/{id}/questoes(id=${p.job.id})}" class="btn btn-outline-secondary btn-sm">Ver questões</a>
-            <a th:href="@{/import/result/{id}(id=${p.job.id})}" class="btn btn-outline-secondary btn-sm">Dados e relatório</a>
-            <form method="post" th:action="@{/import/{id}/bloco(id=${p.job.id})}">
-                <button class="btn btn-outline-primary btn-sm">Criar bloco desta prova</button></form>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-three-dots"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" th:href="@{/import/{id}/questoes(id=${p.job.id})}"><i class="bi bi-list-ol me-2"></i>Ver questões</a></li>
+                    <li><a class="dropdown-item" th:href="@{/import/result/{id}(id=${p.job.id})}"><i class="bi bi-info-circle me-2"></i>Dados e relatório</a></li>
+                    <li><form method="post" th:action="@{/import/{id}/bloco(id=${p.job.id})}">
+                        <button class="dropdown-item"><i class="bi bi-collection me-2"></i>Criar bloco desta prova</button></form></li>
+                </ul>
+            </div>
             <form method="post" th:action="@{/import/{id}/simulado(id=${p.job.id})}">
-                <button class="btn btn-success btn-sm">Iniciar simulado</button></form>
+                <button class="btn btn-primary"><i class="bi bi-play-fill me-1"></i>Resolver a prova</button></form>
         </div>
     </div>
 
-    <div class="row row-cols-2 row-cols-md-6 g-3 mb-4">
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Questões</div><div class="fs-4" th:text="${p.totalQuestions}"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Resolvidas</div>
-            <div class="fs-4" th:text="${p.answered} + ' (' + ${#numbers.formatDecimal(p.coverage(), 1, 0)} + '%)'"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Acertos / erros</div>
-            <div class="fs-4"><span class="text-success" th:text="${p.correct}"></span> /
-                <span class="text-danger" th:text="${p.wrong}"></span></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Aproveitamento</div>
-            <div class="fs-4" th:text="${#numbers.formatDecimal(p.percent(), 1, 1)} + '%'"></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Caderno de erros</div>
-            <div class="fs-4"><a th:href="@{/caderno-erros(prova=${p.job.id})}" th:text="${p.errors}"></a></div></div></div>
-        <div class="col"><div class="card p-3 text-center">
-            <div class="text-muted small">Acertos no chute</div>
-            <div class="fs-4"><a class="text-warning" th:href="@{/chutes(prova=${p.job.id})}" th:text="${p.guess.guessCorrect}"></a></div></div></div>
+    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-3">
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Questões', ${p.totalQuestions}, '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Resolvidas', ${p.answered} + ' · ' + ${#numbers.formatDecimal(p.coverage(), 1, 0)} + '%', '')}"></div></div>
+        <div class="col"><div class="card stat">
+            <div class="stat-label">Acertos / erros</div>
+            <div class="stat-value"><span class="text-ok" th:text="${p.correct}"></span>
+                <span class="text-muted fw-normal">/</span> <span class="text-bad" th:text="${p.wrong}"></span></div>
+        </div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Aproveitamento', ${#numbers.formatDecimal(p.percent(), 1, 1)} + '%', '')}"></div></div>
+        <div class="col"><a class="text-reset text-decoration-none" th:href="@{/caderno-erros(prova=${p.job.id})}">
+            <div th:replace="~{fragments/ui :: stat('No caderno de erros', ${p.errors}, 'text-bad')}"></div></a></div>
+        <div class="col"><a class="text-reset text-decoration-none" th:href="@{/chutes(prova=${p.job.id})}">
+            <div th:replace="~{fragments/ui :: stat('Acertos no chute', ${p.guess.guessCorrect}, 'text-guess')}"></div></a></div>
     </div>
-
     <div class="alert alert-warning" th:if="${p.needsReview > 0}"
          th:text="${p.needsReview} + ' questões desta prova estão marcadas para revisão (leitura incerta do PDF). Veja o relatório em Dados e relatório.'"></div>
 
-    <h5>Por disciplina</h5>
-    <div class="card p-3 mb-4">
-        <div th:each="s : ${p.subjects}" class="mb-3">
-            <div class="d-flex justify-content-between">
-                <span th:text="${s.label}"></span>
+    <div class="section-title">Por disciplina</div>
+    <div class="card p-3">
+        <div th:each="s : ${p.subjects}" class="subject-row">
+            <div class="d-flex justify-content-between small mb-1 gap-2">
+                <span class="text-truncate" th:text="${s.label}"></span>
                 <span class="text-muted small"
                       th:text="${s.answered} + '/' + ${s.questions} + ' resolvidas'
                                + (${s.correct + s.wrong > 0} ? ' · ' + ${#numbers.formatDecimal(s.percent(), 1, 0)} + '% de acerto (' + ${s.correct} + '/' + ${s.correct + s.wrong} + ')' : '')"></span>
             </div>
-            <div class="progress" style="height: 10px">
-                <div class="progress-bar" th:classappend="${s.percent() >= 70} ? 'bg-success' : (${s.percent() >= 50} ? 'bg-warning' : 'bg-danger')"
+            <div class="progress">
+                <div class="progress-bar" th:classappend="${s.percent() >= 70} ? 'bg-ok' : (${s.percent() >= 50} ? 'bg-guess' : 'bg-bad')"
                      th:style="'width: ' + ${s.percent()} + '%'"></div>
             </div>
         </div>
     </div>
 
-    <h5 th:if="${!p.topics.isEmpty()}">Por assunto</h5>
-    <div class="card p-3 mb-4" th:if="${!p.topics.isEmpty()}">
-        <div th:each="s : ${p.topics}" class="mb-2">
+    <div class="section-title" th:if="${!p.topics.isEmpty()}">Por assunto</div>
+    <div class="card p-3" th:if="${!p.topics.isEmpty()}">
+        <div th:each="s : ${p.topics}" class="subject-row">
             <div class="d-flex justify-content-between small">
                 <span th:text="${s.label}"></span>
                 <span th:text="${#numbers.formatDecimal(s.percent(), 1, 1)} + '% (' + ${s.correct} + '/' + ${s.total} + ')'"></span>
             </div>
-            <div class="progress" style="height: 6px"><div class="progress-bar bg-info" th:style="'width: ' + ${s.percent()} + '%'"></div></div>
+            <div class="progress"><div class="progress-bar" th:style="'width: ' + ${s.percent()} + '%'"></div></div>
         </div>
     </div>
 
-    <h5>Sessões que usaram questões desta prova</h5>
-    <div class="card p-3">
-        <p class="text-muted mb-0" th:if="${p.sessions.isEmpty()}">Nenhuma ainda.</p>
+    <div class="section-title">Sessões com questões desta prova</div>
+    <div class="card px-3 py-2">
+        <p class="text-muted mb-0 py-2" th:if="${p.sessions.isEmpty()}">Nenhuma ainda.</p>
         <table class="table table-sm mb-0" th:if="${!p.sessions.isEmpty()}">
             <thead><tr><th>Data</th><th>Sessão</th><th>Acertos nesta prova</th><th>Aproveitamento</th><th></th></tr></thead>
             <tbody>

@@ -4,74 +4,108 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4">Importar Prova (PDF)</h1>
+    <div class="page-header">
+        <div>
+            <h1>Importar prova</h1>
+            <p class="page-subtitle">Envie o PDF da prova. Ano, disciplina e categoria são detectados pelo próprio texto.</p>
+        </div>
+        <a href="/import/gabarito" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i>Importar gabarito</a>
+    </div>
 
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
 
-    <form method="post" action="/import" enctype="multipart/form-data" class="card p-4">
-        <div class="mb-3">
-            <label class="form-label">Arquivo PDF</label>
-            <input type="file" name="file" accept="application/pdf" class="form-control" required/>
-        </div>
+    <div class="row g-4">
+    <div class="col-lg-7">
+    <form method="post" action="/import" enctype="multipart/form-data" class="card p-4" id="importForm">
+        <label class="drop-zone mb-3" for="pdfFile">
+            <i class="bi bi-file-earmark-pdf"></i>
+            <span class="fw-medium" id="pdfName">Escolha o PDF da prova</span>
+            <span class="text-muted small">ou arraste o arquivo aqui · até 25 MB</span>
+            <input type="file" name="file" id="pdfFile" accept="application/pdf" class="visually-hidden" required/>
+        </label>
         <div class="mb-3">
             <label class="form-label">Banca</label>
             <select name="banca" class="form-select" required>
                 <option value="" disabled selected>Selecione a banca</option>
                 <option th:each="b : ${bancas}"
                         th:value="${b}"
-                        th:text="${b.label}"
+                        th:text="${b.label} + (${supportedBancas.contains(b)} ? '' : ' (em breve)')"
                         th:disabled="${!supportedBancas.contains(b)}"></option>
             </select>
-            <div class="form-text">
-                Define qual heurística de leitura será usada para interpretar o PDF. Bancas
-                desabilitadas na lista ainda não têm um parser implementado.
-            </div>
+            <div class="form-text">Define como o PDF é lido. PDFs sem texto (imagem, comum na FCC) passam por OCR: leva alguns segundos por página.</div>
         </div>
         <div class="mb-3">
-            <label class="form-label">Cargo/Prova (opcional)</label>
-            <input type="text" name="exam" class="form-control" placeholder="Ex: Analista Técnico"/>
+            <label class="form-label">Cargo/prova <span class="text-muted fw-normal">(opcional)</span></label>
+            <input type="text" name="exam" class="form-control" placeholder="Ex.: Analista Técnico"/>
         </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Nome da banca para exibição (opcional — sobrepõe o rótulo padrão)</label>
-                <input type="text" name="organizationOverride" class="form-control"/>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Ano (opcional — sobrepõe detecção automática)</label>
-                <input type="number" name="yearOverride" class="form-control"/>
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Mapa de seções por faixa de questões (opcional, JSON)</label>
-            <textarea name="sectionMap" rows="5" class="form-control font-monospace"
-                      placeholder='[{"from": 1, "to": 31, "subject": "Língua Portuguesa"}, {"from": 32, "to": 46, "subject": "Matemática Financeira/Estatística"}]'></textarea>
-            <input type="file" name="sectionMapFile" accept="application/json,.json" class="form-control mt-2"/>
-            <div class="form-text">
-                Preenche a disciplina (<code>subject</code>) de cada questão pelo número. Cada faixa aceita
-                também <code>"topic"</code>. Tem prioridade sobre os títulos de seção detectados no PDF; se
-                enviar o arquivo, ele vale mais que o texto colado. PDFs sem camada de texto (imagem) são
-                lidos por OCR (Tesseract, idioma <code>por</code>) — leva alguns segundos por página.
-            </div>
-        </div>
-        <p class="text-muted">
-            Ano, disciplina e categoria (Conhecimentos Gerais/Específicos) são detectados
-            automaticamente a partir do próprio texto da prova. Quando a prova não traz o título
-            da disciplina nos Conhecimentos Específicos, ela é sugerida pelo conteúdo da questão.
-            "Assunto" não é detectado e pode ser preenchido depois na tela de Questões.
-        </p>
-        <button type="submit" class="btn btn-primary">Importar</button>
-    </form>
 
-    <div class="card p-4 mt-4" th:if="${!jobs.isEmpty()}">
-        <h5>Provas importadas</h5>
-        <ul class="list-unstyled mb-0">
-            <li th:each="j : ${jobs}" class="mb-1">
-                <a th:href="@{/import/result/{id}(id=${j.id})}" th:text="${j.displayName}"></a>
-                <span class="text-muted" th:text="'— ' + ${j.importedQuestions} + ' questões'"></span>
-            </li>
-        </ul>
+        <details class="mb-3">
+            <summary class="section-title d-inline-block m-0">Opções avançadas</summary>
+            <div class="row g-3 mt-1">
+                <div class="col-md-8">
+                    <label class="form-label">Nome da banca para exibição</label>
+                    <input type="text" name="organizationOverride" class="form-control" placeholder="Rótulo padrão da banca"/>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ano</label>
+                    <input type="number" name="yearOverride" class="form-control" placeholder="Detectar"/>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Mapa de seções por faixa de questões (JSON)</label>
+                    <textarea name="sectionMap" rows="4" class="form-control font-monospace small"
+                              placeholder='[{"from": 1, "to": 31, "subject": "Língua Portuguesa"}, {"from": 32, "to": 46, "subject": "Matemática"}]'></textarea>
+                    <input type="file" name="sectionMapFile" accept="application/json,.json" class="form-control form-control-sm mt-2"/>
+                    <div class="form-text">
+                        Define a disciplina (e opcionalmente <code>"topic"</code>) de cada questão pelo número. Vale mais que os
+                        títulos detectados no PDF; o arquivo vale mais que o texto colado.
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <button type="submit" class="btn btn-primary align-self-start" id="importSubmit">Importar</button>
+    </form>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="section-title mt-0">Provas importadas</div>
+        <div th:if="${jobs.isEmpty()}" th:replace="~{fragments/ui :: empty('bi-inbox', 'Nenhuma prova ainda.', null, null)}"></div>
+        <div class="card block-list" th:unless="${jobs.isEmpty()}">
+            <a class="block-row text-reset text-decoration-none" th:each="j : ${jobs}" th:href="@{/import/result/{id}(id=${j.id})}">
+                <span class="text-truncate" th:text="${j.displayName}" th:title="${j.displayName}"></span>
+                <span class="text-muted small text-nowrap" th:text="${j.importedQuestions} + ' questões'"></span>
+            </a>
+        </div>
+    </div>
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    // Mostra o nome do PDF escolhido, aceita arrastar e trava o botao durante o envio (OCR pode demorar).
+    (function () {
+        var input = document.getElementById('pdfFile');
+        var zone = input.closest('.drop-zone');
+        function show() {
+            document.getElementById('pdfName').textContent = input.files.length ? input.files[0].name : 'Escolha o PDF da prova';
+            zone.classList.toggle('has-file', input.files.length > 0);
+        }
+        input.addEventListener('change', show);
+        ['dragenter', 'dragover'].forEach(function (ev) {
+            zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add('dragging'); });
+        });
+        ['dragleave', 'drop'].forEach(function (ev) {
+            zone.addEventListener(ev, function () { zone.classList.remove('dragging'); });
+        });
+        zone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; show(); }
+        });
+        document.getElementById('importForm').addEventListener('submit', function () {
+            var button = document.getElementById('importSubmit');
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importando… (OCR pode levar alguns minutos)';
+        });
+    })();
+</script>
 </body>
 </html>

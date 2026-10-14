@@ -4,10 +4,15 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4">Questões</h1>
-    <p class="text-muted"><span th:text="${total}"></span> questões cadastradas no banco.</p>
+    <div class="page-header">
+        <div>
+            <h1>Sessão rápida</h1>
+            <p class="page-subtitle">Sorteie questões do banco (<span th:text="${total}"></span> no total) com os filtros que quiser,
+                sem montar um bloco.</p>
+        </div>
+    </div>
 
-    <form method="post" action="/questoes/iniciar" class="card p-4">
+    <form method="post" action="/questoes/iniciar" class="card p-4 form-narrow">
         <div class="row">
             <div class="col-12 mb-3">
                 <label class="form-label">Prova</label>
@@ -47,7 +52,7 @@
         </div>
         <div class="mb-3">
             <label class="form-label">Quantidade de questões</label>
-            <input type="number" name="quantity" class="form-control" value="10" min="1" required/>
+            <input type="number" name="quantity" class="form-control w-auto" value="10" min="1" required/>
         </div>
         <div class="form-check mb-3">
             <input type="checkbox" class="form-check-input" name="keepExamOrder" value="true" id="keepExamOrder"/>
@@ -55,7 +60,7 @@
                 Manter ordem original da prova (também agrupa por disciplina)
             </label>
         </div>
-        <button type="submit" class="btn btn-primary">Iniciar</button>
+        <button type="submit" class="btn btn-primary align-self-start"><i class="bi bi-play-fill me-1"></i>Iniciar</button>
     </form>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

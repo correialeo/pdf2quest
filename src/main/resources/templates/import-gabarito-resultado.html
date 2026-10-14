@@ -4,31 +4,38 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4">Resultado da Importação de Gabarito</h1>
-
-    <div class="alert alert-danger" th:if="${result.errorMessage != null}" th:text="${result.errorMessage}"></div>
-
-    <div class="card p-4 mb-4" th:if="${result.errorMessage == null}">
-        <p th:if="${titulo != null and !titulo.isBlank()}"><strong>Título buscado:</strong> <span th:text="${titulo}"></span></p>
-        <p><strong>Respostas encontradas no gabarito:</strong>
-            <span class="badge bg-secondary" th:text="${result.totalGabarito}"></span></p>
-        <p><strong>Questões da importação:</strong>
-            <span class="badge bg-secondary" th:text="${result.totalQuestions}"></span></p>
-        <p><strong>Questões vinculadas com sucesso:</strong>
-            <span class="badge bg-success" th:text="${result.matched}"></span></p>
-        <p th:if="${!result.unmatchedQuestionNumbers.isEmpty()}">
-            <strong>Questões sem correspondência no gabarito:</strong>
-            <span class="badge bg-warning text-dark" th:text="${result.unmatchedQuestionNumbers}"></span>
-        </p>
-        <p th:if="${!result.annulledQuestionNumbers.isEmpty()}">
-            <strong>Questões anuladas (contam ponto para todos):</strong>
-            <span class="badge bg-info text-dark" th:text="${result.annulledQuestionNumbers}"></span>
-        </p>
-        <pre class="mb-0" th:if="${!result.report.isEmpty()}" th:text="${#strings.listJoin(result.report, '\n')}"></pre>
+    <div class="page-header">
+        <div>
+            <h1>Gabarito importado</h1>
+            <p class="page-subtitle" th:if="${titulo != null and !titulo.isBlank()}" th:text="'Perfil buscado: ' + ${titulo}"></p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/import/gabarito" class="btn btn-outline-secondary">Importar outro</a>
+            <a href="/blocos" class="btn btn-primary">Estudar</a>
+        </div>
     </div>
-
-    <a href="/import/gabarito" class="btn btn-secondary mt-3">Importar outro gabarito</a>
-    <a href="/questoes" class="btn btn-primary mt-3">Ver questões</a>
+    <div class="alert alert-danger" th:if="${result.errorMessage != null}" th:text="${result.errorMessage}"></div>
+    <th:block th:if="${result.errorMessage == null}">
+        <div class="row row-cols-2 row-cols-md-3 g-3">
+            <div class="col"><div th:replace="~{fragments/ui :: stat('Vinculadas', ${result.matched}, 'text-ok')}"></div></div>
+            <div class="col"><div th:replace="~{fragments/ui :: stat('Respostas no gabarito', ${result.totalGabarito}, '')}"></div></div>
+            <div class="col"><div th:replace="~{fragments/ui :: stat('Questões da prova', ${result.totalQuestions}, '')}"></div></div>
+        </div>
+        <div class="card p-3 mt-3" th:if="${!result.unmatchedQuestionNumbers.isEmpty() or !result.annulledQuestionNumbers.isEmpty()}">
+            <dl class="kv">
+                <th:block th:if="${!result.unmatchedQuestionNumbers.isEmpty()}">
+                    <dt>Sem correspondência no gabarito</dt><dd class="text-guess" th:text="${result.unmatchedQuestionNumbers}"></dd>
+                </th:block>
+                <th:block th:if="${!result.annulledQuestionNumbers.isEmpty()}">
+                    <dt>Anuladas (ponto para todos)</dt><dd th:text="${result.annulledQuestionNumbers}"></dd>
+                </th:block>
+            </dl>
+        </div>
+        <details class="mt-4" th:if="${!result.report.isEmpty()}">
+            <summary class="section-title d-inline-block m-0">Relatório</summary>
+            <pre class="mt-2 mb-0" th:text="${#strings.listJoin(result.report, '\n')}"></pre>
+        </details>
+    </th:block>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

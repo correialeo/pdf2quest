@@ -4,45 +4,35 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-2" th:text="${block.name}"></h1>
-    <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
-    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
-    <p class="text-muted" th:if="${block.description != null}" th:text="${block.description}"></p>
-    <p>
-        <span class="badge bg-secondary" th:if="${block.timeLimitMinutes != null}"
-              th:text="${block.timeLimitMinutes} + ' min'"></span>
-        <span class="badge bg-info text-dark" th:if="${profile != null}" th:text="'Perfil: ' + ${profile}"></span>
-        <span class="text-muted" th:if="${!exclusions.isBlank()}" th:text="'Exclusões: ' + ${exclusions}"></span>
-    </p>
+    <div class="page-header">
+        <div>
+            <h1 th:text="${block.name}"></h1>
+            <p class="page-subtitle" th:if="${block.description != null}" th:text="${block.description}"></p>
+            <div class="block-meta mt-1">
+                <span th:if="${block.timeLimitMinutes != null}"><i class="bi bi-stopwatch"></i> <span th:text="${block.timeLimitMinutes} + ' min'"></span></span>
+                <span th:if="${profile != null}"><i class="bi bi-sliders"></i> <span th:text="${profile}"></span></span>
+                <span th:if="${!exclusions.isBlank()}" th:text="'Exclusões: ' + ${exclusions}"></span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a th:href="@{/blocos/{id}/editar(id=${block.id})}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
+            <a th:if="${openSession}" th:href="@{/blocos/{id}/continuar(id=${block.id})}" class="btn btn-primary">Continuar sessão</a>
+            <form method="post" th:action="@{/blocos/{id}/iniciar(id=${block.id})}">
+                <button type="submit" class="btn" th:classappend="${openSession} ? 'btn-outline-secondary' : 'btn-primary'"
+                        th:disabled="${preview.total == 0}"><i class="bi bi-play-fill me-1"></i><span th:text="${openSession} ? 'Nova sessão' : 'Iniciar sessão'"></span></button>
+            </form>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
     <div th:replace="~{fragments/block-preview :: preview(${preview})}"></div>
 
-    <h4 class="mt-4 mb-3" th:if="${preview.total > 0}">Questões do bloco</h4>
-    <div class="card p-4 mb-3" th:each="q, it : ${preview.questions}"
-         th:with="passage=${q.passageId != null} ? ${passages[q.passageId]} : null,
-                  firstOfPassage=${passage != null and (it.first or preview.questions[it.index - 1].passageId != q.passageId)}">
-        <p class="mb-2">
-            <strong th:text="${it.count} + '. Questão ' + ${q.questionNumber}"></strong>
-            <span class="text-muted" th:if="${q.subject != null}" th:text="'— ' + ${q.subject}"></span>
-        </p>
-        <details class="mb-3" th:if="${passage != null}" th:open="${firstOfPassage}">
-            <summary>Texto base</summary>
-            <div class="rich-text mt-2" th:utext="${@richText.html(passage.content)}"></div>
-        </details>
-        <p class="mb-3 rich-text" th:utext="${@richText.html(q.statement)}"></p>
-        <p class="mb-1" th:if="${q.alternativeA != null}"><strong>A)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeA)}"></span></p>
-        <p class="mb-1" th:if="${q.alternativeB != null}"><strong>B)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeB)}"></span></p>
-        <p class="mb-1" th:if="${q.alternativeC != null}"><strong>C)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeC)}"></span></p>
-        <p class="mb-1" th:if="${q.alternativeD != null}"><strong>D)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeD)}"></span></p>
-        <p class="mb-1" th:if="${q.alternativeE != null}"><strong>E)</strong> <span class="rich-text" th:utext="${@richText.html(q.alternativeE)}"></span></p>
-    </div>
-
-    <a th:if="${openSession}" th:href="@{/blocos/{id}/continuar(id=${block.id})}" class="btn btn-primary">Continuar sessão</a>
-    <form method="post" th:action="@{/blocos/{id}/iniciar(id=${block.id})}" class="d-inline">
-        <button type="submit" class="btn btn-success" th:disabled="${preview.total == 0}">Iniciar sessão</button>
-    </form>
-    <a th:href="@{/blocos/{id}/editar(id=${block.id})}" class="btn btn-outline-secondary">Editar</a>
-    <a href="/blocos" class="btn btn-secondary">Voltar</a>
+    <div class="section-title" th:if="${preview.total > 0}">Questões do bloco</div>
+    <th:block th:each="q, it : ${preview.questions}"
+              th:with="passage=${q.passageId != null} ? ${passages[q.passageId]} : null,
+                       firstOfPassage=${passage != null and (it.first or preview.questions[it.index - 1].passageId != q.passageId)}">
+        <div th:replace="~{fragments/ui :: question(${q}, ${it.count} + '. Questão ' + ${q.questionNumber}, ${passage}, ${firstOfPassage}, null, null, false)}"></div>
+    </th:block>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

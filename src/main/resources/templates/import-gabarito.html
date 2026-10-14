@@ -4,18 +4,17 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4">Importar Gabarito (PDF)</h1>
+    <div class="page-header">
+        <div>
+            <h1>Importar gabarito</h1>
+            <p class="page-subtitle">Para quando o gabarito vem num PDF separado da prova. As respostas são ligadas às questões já importadas.</p>
+        </div>
+    </div>
 
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
 
-    <p class="text-muted">
-        Use esta tela quando o gabarito estiver em um PDF separado da prova, contendo (possivelmente)
-        vários perfis/tipos de prova. Informe o título exato do perfil desejado (ex.:
-        "ATI - DESENVOLVIMENTO DE SOFTWARE – PROVA TIPO 1") e selecione a importação de prova
-        correspondente para vincular as respostas às questões já cadastradas.
-    </p>
 
-    <form method="post" action="/import/gabarito" enctype="multipart/form-data" class="card p-4">
+    <form method="post" action="/import/gabarito" enctype="multipart/form-data" class="card p-4 form-narrow">
         <div class="mb-3">
             <label class="form-label">Arquivo PDF do Gabarito</label>
             <input type="file" name="file" accept="application/pdf" class="form-control" required/>
@@ -48,11 +47,11 @@
             <select name="importJobId" class="form-select" required>
                 <option value="" disabled selected>Selecione a importação</option>
                 <option th:each="job : ${jobs}" th:value="${job.id}"
-                        th:text="${job.id + ' — ' + job.displayName + ' — ' + job.importedQuestions + ' questões'}">
+                        th:text="${'#' + job.id + ' · ' + job.displayName + ' (' + job.importedQuestions + ' questões)'}">
                 </option>
             </select>
         </div>
-        <button type="submit" class="btn btn-primary">Importar Gabarito</button>
+        <button type="submit" class="btn btn-primary">Importar gabarito</button>
     </form>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

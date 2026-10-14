@@ -1038,3 +1038,137 @@ kbd {
 .block-row:first-child { border-radius: var(--bs-border-radius-lg) var(--bs-border-radius-lg) 0 0; }
 .block-row:last-child { border-radius: 0 0 var(--bs-border-radius-lg) var(--bs-border-radius-lg); }
 .block-row:only-child { border-radius: var(--bs-border-radius-lg); }
+
+/* ---- Importacao ---- */
+.drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+    padding: 1.75rem 1rem;
+    border: 1.5px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color .12s ease, background-color .12s ease;
+}
+
+.drop-zone .bi {
+    font-size: 1.75rem;
+    color: var(--bs-secondary-color);
+}
+
+.drop-zone:hover,
+.drop-zone.dragging {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.drop-zone.has-file {
+    border-style: solid;
+    border-color: var(--accent);
+}
+
+.drop-zone.has-file .bi {
+    color: var(--accent);
+}
+
+.drop-zone:has(input:focus-visible) {
+    box-shadow: 0 0 0 .2rem var(--accent-soft);
+}
+
+pre {
+    font-size: .8rem;
+    background-color: var(--bs-tertiary-bg);
+    border-radius: var(--bs-border-radius);
+    padding: .75rem 1rem;
+    max-height: 24rem;
+    overflow: auto;
+}
+
+/* Lista de definicao compacta (rotulo: valor) */
+.kv {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .4rem 1.25rem;
+    margin: 0;
+    font-size: .875rem;
+}
+
+.kv dt {
+    font-weight: 400;
+    color: var(--bs-secondary-color);
+}
+
+.kv dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.form-narrow {
+    max-width: 44rem;
+}
+
+/* ---- Questao para leitura (fragments/ui :: question) ---- */
+.question-card {
+    padding: 1.1rem 1.25rem;
+    margin-bottom: .75rem;
+}
+
+.question-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .25rem .75rem;
+    margin-bottom: .75rem;
+}
+
+.passage-inline {
+    max-height: 22rem;
+    overflow-y: auto;
+    padding: .75rem 1rem;
+    background-color: var(--bs-tertiary-bg);
+    border-radius: var(--bs-border-radius);
+    font-size: .9rem;
+}
+
+.alt-tag {
+    margin-left: .5rem;
+    font-size: .75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Filtros em chips (por prova) */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-bottom: 1.25rem;
+}
+
+.chip {
+    display: inline-block;
+    max-width: 100%;
+    padding: .25rem .7rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+    font-size: .8rem;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chip:hover {
+    color: var(--bs-body-color);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.chip.active {
+    color: var(--accent);
+    border-color: transparent;
+    background-color: var(--accent-soft);
+}

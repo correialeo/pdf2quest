@@ -4,19 +4,22 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
-    <h1 class="mb-4">Simulado (Edital Dataprev)</h1>
-    <p class="text-muted">
-        Conhecimentos Gerais valem peso 1 e Conhecimentos Específicos valem peso 2,5 no cálculo da nota final.
-    </p>
+    <div class="page-header">
+        <div>
+            <h1>Simulado</h1>
+            <p class="page-subtitle">Modelo do edital Dataprev: Conhecimentos Gerais valem peso 1 e Específicos, peso 2,5 na nota final.
+                Para outras provas, use um bloco com perfil de pontuação.</p>
+        </div>
+    </div>
 
-    <form method="post" action="/simulado/iniciar" class="card p-4">
+    <form method="post" action="/simulado/iniciar" class="card p-4 form-narrow">
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Quantidade — Conhecimentos Gerais</label>
+                <label class="form-label">Conhecimentos Gerais</label>
                 <input type="number" name="qtyGerais" class="form-control" value="10" min="0" required/>
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label">Quantidade — Conhecimentos Específicos</label>
+                <label class="form-label">Conhecimentos Específicos</label>
                 <input type="number" name="qtyEspecificas" class="form-control" value="10" min="0" required/>
             </div>
         </div>
@@ -26,7 +29,7 @@
                 Manter ordem original da prova (também agrupa por disciplina)
             </label>
         </div>
-        <button type="submit" class="btn btn-primary">Iniciar Simulado</button>
+        <button type="submit" class="btn btn-primary align-self-start"><i class="bi bi-play-fill me-1"></i>Iniciar simulado</button>
     </form>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
