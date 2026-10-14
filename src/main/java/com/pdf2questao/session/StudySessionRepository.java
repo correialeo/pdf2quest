@@ -10,5 +10,7 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
 
     List<StudySession> findTop3ByFinishedAtIsNullOrderByStartedAtDesc();
 
+    List<StudySession> findByBlockIdIsNotNullAndFinishedAtIsNull();
+
     Optional<StudySession> findFirstByBlockIdAndFinishedAtIsNullOrderByStartedAtDesc(Long blockId);
 }

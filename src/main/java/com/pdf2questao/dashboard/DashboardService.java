@@ -103,7 +103,10 @@ public class DashboardService {
                 .forEach(c -> byBanca.computeIfAbsent(bancaLabel(c.job()), k -> new ArrayList<>()).add(c));
         List<ProvaGroup> groups = byBanca.entrySet().stream().map(e -> new ProvaGroup(e.getKey(), e.getValue())).toList();
 
-        List<BlockCard> blocks = blockService.findAll().stream().map(b -> blockCard(b, sessions.values())).toList();
+        List<StudyBlock> allBlocks = blockService.findAll();
+        Map<Long, Integer> blockCounts = blockService.questionCounts(allBlocks);
+        List<BlockCard> blocks = allBlocks.stream()
+                .map(b -> blockCard(b, blockCounts.getOrDefault(b.getId(), 0), sessions.values())).toList();
 
         List<SessionRow> recent = sessionRepository.findByFinishedAtIsNotNullOrderByStartedAtDesc().stream()
                 .limit(RECENT_SESSIONS)
@@ -119,7 +122,7 @@ public class DashboardService {
                 guessService.counts(null), open, questionRepository.findErrorNotebook().size());
     }
 
-    private BlockCard blockCard(StudyBlock block, java.util.Collection<StudySession> allSessions) {
+    private BlockCard blockCard(StudyBlock block, int questions, java.util.Collection<StudySession> allSessions) {
         List<StudySession> finished = allSessions.stream()
                 .filter(s -> block.getId().equals(s.getBlockId()) && s.getFinishedAt() != null)
                 .sorted(Comparator.comparing(StudySession::getStartedAt).reversed()).toList();
@@ -131,7 +134,7 @@ public class DashboardService {
             ScoreResult result = sessionService.scoreResult(last);
             passed = result == null ? null : result.passed();
         }
-        return new BlockCard(block, blockService.resolve(block.getId()).questions().size(), finished.size(),
+        return new BlockCard(block, questions, finished.size(),
                 last == null ? null : last.getScoreTotal(), passed, best, last == null ? null : last.getStartedAt());
     }
 

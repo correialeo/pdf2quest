@@ -47,16 +47,12 @@ public class BlockController {
     @GetMapping("/blocos")
     public String list(Model model) {
         List<StudyBlock> blocks = blockService.findAll();
-        Map<Long, Integer> totals = new LinkedHashMap<>();
-        for (StudyBlock b : blocks) {
-            totals.put(b.getId(), blockService.resolve(b.getId()).questions().size());
-        }
+        Map<Long, Integer> totals = blockService.questionCounts(blocks);
         Map<Long, String> profileNames = new LinkedHashMap<>();
         profileService.findAll().forEach(p -> profileNames.put(p.getId(), p.getName()));
+        java.util.Set<Long> open = sessionService.blocksWithOpenSession();
         Map<Long, Boolean> openSessions = new LinkedHashMap<>();
-        for (StudyBlock b : blocks) {
-            openSessions.put(b.getId(), sessionService.openBlocoSession(b.getId()).isPresent());
-        }
+        blocks.forEach(b -> openSessions.put(b.getId(), open.contains(b.getId())));
         model.addAttribute("blocks", blocks);
         model.addAttribute("openSessions", openSessions);
         model.addAttribute("totals", totals);

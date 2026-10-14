@@ -66,6 +66,12 @@ public class StudySessionService {
                 .map(Attempt::getQuestionId).collect(java.util.stream.Collectors.toSet());
     }
 
+    /** Ids dos blocos que tem sessao aberta (uma consulta para a lista toda de blocos). */
+    public java.util.Set<Long> blocksWithOpenSession() {
+        return sessionRepository.findByBlockIdIsNotNullAndFinishedAtIsNull().stream()
+                .map(StudySession::getBlockId).collect(java.util.stream.Collectors.toSet());
+    }
+
     /** Indice da primeira questao ainda sem resposta na sessao (a ultima, se todas ja foram respondidas). */
     public int resumeIndex(StudySession session) {
         List<Long> ids = session.questionIds();

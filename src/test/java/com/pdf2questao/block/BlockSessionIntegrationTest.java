@@ -100,6 +100,12 @@ class BlockSessionIntegrationTest {
         StudyBlock s2 = blocks.stream().filter(b -> b.getName().equals(BlockService.DIAG_2)).findFirst().orElseThrow();
         assertNotNull(s1.getScoringProfileId());
 
+        // A contagem em lote das listas (uma leitura so do banco) bate com a resolucao bloco a bloco.
+        java.util.Map<Long, Integer> counts = blockService.questionCounts(blocks);
+        for (StudyBlock b : blocks) {
+            assertEquals(blockService.resolve(b.getId()).questions().size(), counts.get(b.getId()), b.getName());
+        }
+
         // Sessao 1: P1 1-10, 31-45, 71-85, 86-100 = 10 + 15 + 15 + 15 (Q89 e Direito Financeiro e Financas Publicas).
         BlockService.Preview preview1 = blockService.preview(s1.getId());
         assertEquals(55, preview1.total());

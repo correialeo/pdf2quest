@@ -11,12 +11,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class BlockService {
@@ -250,6 +254,28 @@ public class BlockService {
 
     public BlockSelector.Selection resolve(Long blockId) {
         return resolve(new Draft(blockRepository.findById(blockId).orElseThrow(), sources(blockId), exclusions(blockId)));
+    }
+
+    /**
+     * Quantas questoes cada bloco tem, para as listas (blocos e inicio). Le as questoes, origens e exclusoes
+     * uma vez so para todos os blocos, em vez de uma leitura do banco inteiro por bloco.
+     */
+    public Map<Long, Integer> questionCounts(Collection<StudyBlock> blocks) {
+        Map<Long, Integer> counts = new HashMap<>();
+        if (blocks.isEmpty()) {
+            return counts;
+        }
+        List<Question> all = questionRepository.findAll();
+        Map<Long, List<StudyBlockSource>> sources = sourceRepository.findAll().stream()
+                .sorted(Comparator.comparingInt(StudyBlockSource::getPosition))
+                .collect(Collectors.groupingBy(StudyBlockSource::getBlockId));
+        Map<Long, List<StudyBlockExclusion>> exclusions = exclusionRepository.findAll().stream()
+                .collect(Collectors.groupingBy(StudyBlockExclusion::getBlockId));
+        for (StudyBlock b : blocks) {
+            counts.put(b.getId(), BlockSelector.select(all, sources.getOrDefault(b.getId(), List.of()),
+                    exclusions.getOrDefault(b.getId(), List.of()), new Random()).questions().size());
+        }
+        return counts;
     }
 
     public List<Long> questionIds(Long blockId) {
