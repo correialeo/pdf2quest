@@ -19,3 +19,14 @@
               placeholder="Anote rápido: uma dúvida, um artigo para revisar, uma ideia… (Ctrl+Enter guarda)"></textarea>
     <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-inbox me-1"></i>Guardar</button>
 </form>
+
+<!-- Botao do resumo de um dia: abre o que ja existe ou cria na primeira vez. "label" vazio = so o icone. -->
+<th:block th:fragment="dayButton(date, pageId, label, cls)">
+    <a th:if="${pageId != null}" th:href="@{/estudos/paginas/{id}(id=${pageId})}" class="day-summary-btn has-summary" th:classappend="${cls}"
+       title="Abrir o resumo deste dia" onclick="event.stopPropagation()">
+        <i class="bi bi-journal-text"></i><span th:if="${label != ''}" th:text="${label}"></span></a>
+    <form th:unless="${pageId != null}" method="post" th:action="@{/estudos/cronograma/dia/{d}/resumo(d=${date})}" class="d-inline">
+        <button type="submit" class="day-summary-btn" th:classappend="${cls}" title="Escrever o resumo deste dia" onclick="event.stopPropagation()">
+            <i class="bi bi-journal-plus"></i><span th:if="${label != ''}" th:text="${label}"></span></button>
+    </form>
+</th:block>

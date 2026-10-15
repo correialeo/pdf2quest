@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Importar arquivo')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Importar questões de arquivo</h1>
+            <p class="page-subtitle">Sem PDF: traga questões de uma planilha ou de um arquivo JSON. Antes de gravar, você vê uma prévia e os problemas encontrados.</p>
+        </div>
+        <a href="/import/gabarito/arquivo" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i>Importar só o gabarito</a>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <form method="post" action="/import/csv" enctype="multipart/form-data" class="card p-4 h-100">
+                <h2 class="h5 mb-1"><i class="bi bi-table me-2"></i>Planilha (CSV)</h2>
+                <p class="text-muted small">Do Excel, LibreOffice ou Google Planilhas: use <em>Arquivo › Salvar como / Baixar › CSV</em>.
+                    No passo seguinte você diz qual coluna é o enunciado, as alternativas, a resposta etc.</p>
+                <label class="drop-zone mb-3" for="csvFile">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                    <span class="fw-medium" data-file-name>Escolha a planilha</span>
+                    <span class="text-muted small">arquivo .csv ou .txt</span>
+                    <input type="file" name="file" id="csvFile" accept=".csv,.txt,text/csv,text/plain" class="visually-hidden" required/>
+                </label>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-auto">
+                    <button type="submit" class="btn btn-primary">Continuar</button>
+                    <a href="/exemplos/questoes-exemplo.csv" class="small" download>Baixar planilha de exemplo</a>
+                </div>
+            </form>
+        </div>
+        <div class="col-lg-6">
+            <form method="post" action="/import/json" enctype="multipart/form-data" class="card p-4 h-100">
+                <h2 class="h5 mb-1"><i class="bi bi-braces me-2"></i>Arquivo JSON</h2>
+                <p class="text-muted small">Formato próprio do PDF2Questão, para bancos de questões gerados por outros programas ou
+                    compartilhados entre pessoas. Guarda tudo: explicação, assuntos, tags, texto base e referências.</p>
+                <label class="drop-zone mb-3" for="jsonFile">
+                    <i class="bi bi-filetype-json"></i>
+                    <span class="fw-medium" data-file-name>Escolha o arquivo JSON</span>
+                    <span class="text-muted small">arquivo .json</span>
+                    <input type="file" name="file" id="jsonFile" accept=".json,application/json" class="visually-hidden" required/>
+                </label>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-auto">
+                    <button type="submit" class="btn btn-primary">Ver prévia</button>
+                    <a href="/exemplos/questoes-exemplo.json" class="small" download>Baixar exemplo</a>
+                    <a href="https://github.com/correialeo/pdf2quest/blob/master/docs/importacao/formato-json.md" class="small" target="_blank" rel="noopener">Como o formato funciona</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card p-3 mt-4 small text-muted">
+        <div><i class="bi bi-shield-check me-1"></i>Nada é gravado sem a sua confirmação. Questões com erro nunca entram, e questões que parecem
+            já existir são mostradas para você decidir.</div>
+        <div class="mt-1"><i class="bi bi-file-earmark-pdf me-1"></i>Tem a prova em PDF? Use <a href="/import">Importar PDF</a>.</div>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    document.querySelectorAll('.drop-zone input[type=file]').forEach(function (input) {
+        input.addEventListener('change', function () {
+            var label = input.closest('.drop-zone').querySelector('[data-file-name]');
+            if (input.files.length) { label.textContent = input.files[0].name; }
+        });
+    });
+</script>
+</body>
+</html>

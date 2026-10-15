@@ -11,6 +11,8 @@ public interface StudyTaskRepository extends JpaRepository<StudyTask, Long> {
 
     List<StudyTask> findByPageId(Long pageId);
 
+    List<StudyTask> findByPlannedDate(java.time.LocalDate date);
+
     @Modifying
     @Query("UPDATE StudyTask t SET t.pageId = NULL WHERE t.pageId IN :pageIds")
     int unlinkPages(Collection<Long> pageIds);

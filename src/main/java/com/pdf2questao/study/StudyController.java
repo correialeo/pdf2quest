@@ -19,13 +19,15 @@ public class StudyController {
     private final StudyTaskService taskService;
     private final InboxService inboxService;
     private final StudySubjects subjects;
+    private final DaySummaryService daySummaryService;
 
     public StudyController(StudyPageService pageService, StudyTaskService taskService, InboxService inboxService,
-                           StudySubjects subjects) {
+                           StudySubjects subjects, DaySummaryService daySummaryService) {
         this.pageService = pageService;
         this.taskService = taskService;
         this.inboxService = inboxService;
         this.subjects = subjects;
+        this.daySummaryService = daySummaryService;
     }
 
     @GetMapping("/estudos")
@@ -33,6 +35,7 @@ public class StudyController {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
         model.addAttribute("dueTasks", taskService.dueBy(today));
+        model.addAttribute("todaySummary", daySummaryService.existing(today, today).get(today));
         model.addAttribute("week", taskService.week(today));
         model.addAttribute("recentPages", pageService.recent());
         model.addAttribute("inboxCount", inboxService.count());

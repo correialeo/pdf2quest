@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Editar tarefa')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Editar tarefa</h1>
+            <p class="page-subtitle" th:text="${task.done} ? 'Concluída em ' + ${#temporals.format(task.doneAt, 'dd/MM/yyyy HH:mm')} : 'Pendente'"></p>
+        </div>
+        <a href="/estudos/cronograma" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Cronograma</a>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="post" th:action="@{/estudos/cronograma/{id}/editar(id=${task.id})}" class="card p-4 form-narrow">
+        <div class="mb-3">
+            <label class="form-label">Título</label>
+            <input type="text" name="title" class="form-control" th:value="${task.title}" required maxlength="255"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descrição</label>
+            <textarea name="description" class="form-control" rows="3" th:text="${task.description}"></textarea>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Dia planejado</label>
+                <input type="date" name="plannedDate" class="form-control" th:value="${task.plannedDate}"/>
+                <div class="form-text">Em branco: tarefa sem data.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Disciplina</label>
+                <input type="text" name="subject" class="form-control" list="subjectOptions" th:value="${task.subject}"/>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Tempo estimado (min)</label>
+                <input type="number" name="estimatedMinutes" class="form-control" min="0" step="5" th:value="${task.estimatedMinutes}"/>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Tempo dedicado (min)</label>
+                <input type="number" name="spentMinutes" class="form-control" min="0" step="5" th:value="${task.spentMinutes}"/>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Página de resumo</label>
+            <select name="pageId" class="form-select">
+                <option value="">Nenhuma</option>
+                <option th:each="n : ${pages}" th:value="${n.page.id}" th:selected="${n.page.id == task.pageId}"
+                        th:text="${#strings.repeat('— ', n.depth)} + ${n.page.displayTitle}"></option>
+            </select>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary">Salvar</button>
+            <button type="submit" class="btn btn-outline-secondary" formnovalidate
+                    th:formaction="@{/estudos/cronograma/{id}/concluir(id=${task.id})}" name="done" th:value="${!task.done}"
+                    th:text="${task.done} ? 'Reabrir' : 'Marcar como concluída'"></button>
+            <button type="submit" class="btn btn-link text-bad ms-auto" formnovalidate
+                    th:formaction="@{/estudos/cronograma/{id}/excluir(id=${task.id})}"
+                    onclick="return confirm('Apagar esta tarefa?')"><i class="bi bi-trash me-1"></i>Apagar</button>
+        </div>
+    </form>
+    <datalist th:replace="~{fragments/estudos :: subjects}"></datalist>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Prévia do gabarito')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Prévia do gabarito</h1>
+            <p class="page-subtitle" th:text="${preview.fileName} + (${job != null} ? ' · prova ' + ${job.displayName} : '') + ' · nada foi gravado ainda.'"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <div class="alert alert-danger" th:unless="${preview.fileErrors.isEmpty()}">
+        <ul class="mb-0"><li th:each="e : ${preview.fileErrors}" th:text="${e}"></li></ul>
+    </div>
+
+    <th:block th:if="${preview.fileErrors.isEmpty()}">
+    <div class="row row-cols-2 row-cols-md-5 g-3 mb-3">
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Respostas novas', ${preview.toApply.size()}, 'text-ok')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Iguais às atuais', ${preview.unchanged.size()}, '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Conflitos', ${preview.conflicts.size()}, ${preview.conflicts.size() > 0} ? 'text-guess' : '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Sem questão', ${preview.unmatched.size()}, ${preview.unmatched.size() > 0} ? 'text-bad' : '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Inválidas', ${preview.invalid.size()}, ${preview.invalid.size() > 0} ? 'text-bad' : '')}"></div></div>
+    </div>
+
+    <form method="post" th:action="@{/import/gabarito/previa/{t}/confirmar(t=${preview.token})}" class="card p-3 mb-4" th:if="${preview.applicable}">
+        <div class="form-check" th:if="${preview.mode.name() == 'NUMERO'}">
+            <input class="form-check-input" type="checkbox" name="confirmedNumbering" value="true" id="confirmedNumbering" required/>
+            <label class="form-check-label" for="confirmedNumbering">Conferi: a numeração deste gabarito é a mesma das questões da prova escolhida.</label>
+        </div>
+        <div class="form-check" th:if="${preview.conflicts.size() > 0}">
+            <input class="form-check-input" type="checkbox" name="replaceConflicts" value="true" id="replaceConflicts"/>
+            <label class="form-check-label" for="replaceConflicts">Trocar a resposta das <strong th:text="${preview.conflicts.size()}"></strong> questões em conflito pela do arquivo
+                <span class="text-muted small">(desmarcado: ficam como estão; respostas já dadas em sessões não mudam)</span></label>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Gravar gabarito</button>
+            <a href="/import/gabarito/arquivo" class="btn btn-outline-secondary">Desistir</a>
+        </div>
+    </form>
+    <div class="alert alert-info" th:unless="${preview.applicable}">Não há nenhuma resposta nova para gravar.</div>
+
+    <th:block th:each="group : ${ {
+            {'Conflitos', preview.conflicts},
+            {'Respostas sem questão correspondente', preview.unmatched},
+            {'Respostas inválidas (não serão aplicadas)', preview.invalid},
+            {'Respostas novas', preview.toApply}} }">
+        <details class="mb-3" th:unless="${group[1].isEmpty()}" th:open="${group[0] != 'Respostas novas'}">
+            <summary class="section-title d-inline-block m-0" th:text="${group[0]} + ' (' + ${group[1].size()} + ')'"></summary>
+            <div class="card mt-2 table-responsive">
+                <table class="table table-sm mb-0 small">
+                    <thead><tr><th>No arquivo</th><th>Chave</th><th>Resposta</th><th>Questão</th><th>Atual</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="l : ${group[1]}">
+                        <td th:text="${l.label}"></td>
+                        <td><code th:text="${l.key}"></code></td>
+                        <td th:text="${l.rawAnswer}"></td>
+                        <td th:text="${l.questionLabel} ?: '—'"></td>
+                        <td th:text="${l.currentAnswer} ?: '—'"></td>
+                        <td class="text-muted" th:text="${l.message}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </th:block>
+
+    <details class="mb-3" th:unless="${preview.questionsWithoutAnswer.isEmpty()}">
+        <summary class="section-title d-inline-block m-0" th:text="'Questões que continuam sem resposta (' + ${preview.questionsWithoutAnswer.size()} + ')'"></summary>
+        <div class="card p-3 mt-2 small"><span th:each="q, s : ${preview.questionsWithoutAnswer}" th:text="${q} + (${s.last} ? '' : '; ')"></span></div>
+    </details>
+    </th:block>
+    <a href="/import/gabarito/arquivo" class="btn btn-outline-secondary" th:unless="${preview.fileErrors.isEmpty()}">Enviar outro gabarito</a>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

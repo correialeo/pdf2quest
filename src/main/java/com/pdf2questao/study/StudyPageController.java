@@ -26,13 +26,15 @@ public class StudyPageController {
     private final StudyTaskService taskService;
     private final StudySubjects subjects;
     private final DocxImportService docxImportService;
+    private final DaySummaryService daySummaryService;
 
     public StudyPageController(StudyPageService pageService, StudyTaskService taskService, StudySubjects subjects,
-                               DocxImportService docxImportService) {
+                               DocxImportService docxImportService, DaySummaryService daySummaryService) {
         this.pageService = pageService;
         this.taskService = taskService;
         this.subjects = subjects;
         this.docxImportService = docxImportService;
+        this.daySummaryService = daySummaryService;
     }
 
     @PostMapping("/estudos/importar")
@@ -113,6 +115,13 @@ public class StudyPageController {
         model.addAttribute("tree", pageService.flatTree());
         model.addAttribute("descendants", pageService.descendantIds(id));
         model.addAttribute("tasks", taskService.forPage(id));
+        if (page.get().getSummaryDate() != null) {
+            var date = page.get().getSummaryDate();
+            model.addAttribute("dayTasks", daySummaryService.tasks(date));
+            model.addAttribute("dayLabel", StudyTaskService.dayLabel(date, java.time.LocalDate.now()));
+            model.addAttribute("previousDay", date.minusDays(1));
+            model.addAttribute("nextDay", date.plusDays(1));
+        }
         model.addAttribute("subjects", subjects.all());
         return "estudos-pagina";
     }

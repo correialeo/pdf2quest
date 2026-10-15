@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Estudos')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Estudos</h1>
+            <p class="page-subtitle">Seus resumos, o cronograma e as anotações rápidas, num lugar só.</p>
+        </div>
+        <form method="post" action="/estudos/paginas">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nova página</button>
+        </form>
+    </div>
+    <nav th:replace="~{fragments/estudos :: tabs('overview')}"></nav>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="section-title d-flex align-items-center mt-0">
+                <span>Para hoje</span>
+                <span class="ms-auto d-flex align-items-center gap-3">
+                    <th:block th:replace="~{fragments/estudos :: dayButton(${today}, ${todaySummary}, 'Resumo de hoje', '')}"></th:block>
+                    <a href="/estudos/cronograma" class="small fw-normal">Ver cronograma</a>
+                </span>
+            </div>
+            <th:block th:if="${dueTasks.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-calendar-check', 'Nada planejado para hoje.', 'Planejar uma tarefa', '/estudos/cronograma')}"></div></th:block>
+            <div class="card task-list" th:unless="${dueTasks.isEmpty()}">
+                <div class="task-row" th:each="t : ${dueTasks}" th:classappend="${t.overdue} ? 'is-overdue'">
+                    <form method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}">
+                        <input type="hidden" name="done" value="true"/>
+                        <button type="submit" class="task-check" title="Concluir" aria-label="Concluir tarefa"><i class="bi bi-circle"></i></button>
+                    </form>
+                    <div class="task-info">
+                        <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
+                        <div class="task-meta">
+                            <span th:if="${t.overdue}" class="text-bad">Atrasada · <span th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span></span>
+                            <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
+                            <span th:if="${t.estimatedMinutes != null}"><i class="bi bi-clock"></i> <span th:text="${t.estimatedMinutes} + ' min'"></span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row-cols-3 g-3 mt-1">
+                <div class="col"><div th:replace="~{fragments/ui :: stat('Tarefas da semana', ${week.done} + ' de ' + ${week.planned}, '')}"></div></div>
+                <div class="col"><div th:replace="~{fragments/ui :: stat('Planejado na semana', ${week.estimatedMinutes} + ' min', '')}"></div></div>
+                <div class="col"><div th:replace="~{fragments/ui :: stat('Estudado na semana', ${week.spentMinutes} + ' min', 'text-ok')}"></div></div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="section-title d-flex align-items-center mt-0">
+                <span>Anotação rápida</span>
+                <a href="/estudos/caixa-de-entrada" class="ms-auto small fw-normal"
+                   th:text="${inboxCount > 0} ? 'Caixa de entrada (' + ${inboxCount} + ')' : 'Caixa de entrada'"></a>
+            </div>
+            <form th:replace="~{fragments/estudos :: quickNote}"></form>
+
+            <div class="section-title mt-4">Páginas recentes</div>
+            <div th:if="${recentPages.isEmpty()}" class="empty-state">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Crie sua primeira página de resumo: use títulos, listas, tabelas e checklists.</span>
+            </div>
+            <div class="card page-list" th:unless="${recentPages.isEmpty()}">
+                <a class="page-list-row" th:each="p : ${recentPages}" th:href="@{/estudos/paginas/{id}(id=${p.id})}">
+                    <i class="bi bi-file-earmark-text text-muted"></i>
+                    <span class="text-truncate" th:text="${p.displayTitle}"></span>
+                    <span class="text-muted small ms-auto text-nowrap" th:text="${#temporals.format(p.updatedAt, 'dd/MM HH:mm')}"></span>
+                </a>
+            </div>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

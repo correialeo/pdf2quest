@@ -19,18 +19,31 @@ public class StudyTaskController {
     private final StudyTaskService taskService;
     private final StudyPageService pageService;
     private final StudySubjects subjects;
+    private final DaySummaryService daySummaryService;
 
-    public StudyTaskController(StudyTaskService taskService, StudyPageService pageService, StudySubjects subjects) {
+    public StudyTaskController(StudyTaskService taskService, StudyPageService pageService, StudySubjects subjects,
+                               DaySummaryService daySummaryService) {
         this.taskService = taskService;
         this.pageService = pageService;
         this.subjects = subjects;
+        this.daySummaryService = daySummaryService;
+    }
+
+    /** Abre (ou cria, na primeira vez) o resumo do dia. */
+    @PostMapping("/estudos/cronograma/dia/{date}/resumo")
+    public String daySummary(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return "redirect:/estudos/paginas/" + daySummaryService.open(date).getId();
     }
 
     @GetMapping("/estudos/cronograma")
     public String list(Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
-        model.addAttribute("groups", taskService.groups(today));
+        var groups = taskService.groups(today);
+        model.addAttribute("groups", groups);
+        var dates = groups.stream().map(StudyTaskService.TaskGroup::date).filter(java.util.Objects::nonNull).toList();
+        model.addAttribute("summaries", dates.isEmpty() ? java.util.Map.of()
+                : daySummaryService.existing(java.util.Collections.min(dates), java.util.Collections.max(dates)));
         model.addAttribute("week", taskService.week(today));
         model.addAttribute("pages", pageService.flatTree());
         model.addAttribute("subjects", subjects.all());

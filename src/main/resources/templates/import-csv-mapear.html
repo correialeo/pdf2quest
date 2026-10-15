@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Mapear colunas')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Como ler a planilha</h1>
+            <p class="page-subtitle" th:text="${upload.fileName} + ' · diga o que há em cada coluna. Deixe em branco o que a planilha não tem.'"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="get" th:action="@{/import/csv/{t}(t=${upload.token})}" class="card p-3 mb-3 d-flex flex-row flex-wrap align-items-end gap-3">
+        <div>
+            <label class="form-label small">Separador das colunas</label>
+            <select name="delimitador" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option th:each="d : ${delimiters}" th:value="${d.key}" th:text="${d.value}"
+                        th:selected="${d.key == delimiterValue}"></option>
+            </select>
+        </div>
+        <div class="form-text m-0">Reconhecido automaticamente. Se as colunas abaixo parecerem misturadas, troque o separador.</div>
+    </form>
+
+    <div class="section-title">Primeiras linhas</div>
+    <div class="card mb-4 table-responsive">
+        <table class="table table-sm mb-0 small csv-sample">
+            <thead><tr><th th:each="name : ${upload.columnNames()}" th:text="${name}"></th></tr></thead>
+            <tbody>
+            <tr th:each="row, s : ${upload.sample()}" th:classappend="${s.first and mapping.header} ? 'text-muted'">
+                <td th:each="cell : ${row}" th:text="${#strings.abbreviate(cell, 60)}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <form method="post" th:action="@{/import/csv/{t}(t=${upload.token})}" class="card p-4">
+        <input type="hidden" name="delimitador" th:value="${delimiterValue}"/>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="cabecalho" id="cabecalho" th:checked="${mapping.header}"/>
+            <label class="form-check-label" for="cabecalho">A primeira linha é o cabeçalho (nomes das colunas), não uma questão</label>
+        </div>
+
+        <div class="section-title">Alternativas</div>
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="modoAlternativas" id="modoColunas" value="COLUNAS"
+                       th:checked="${mapping.alternativesMode.name() == 'COLUNAS'}"/>
+                <label class="form-check-label" for="modoColunas">Uma coluna para cada alternativa (A, B, C, D, E)</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="modoAlternativas" id="modoUma" value="UMA_COLUNA"
+                       th:checked="${mapping.alternativesMode.name() == 'UMA_COLUNA'}"/>
+                <label class="form-check-label" for="modoUma">Todas as alternativas numa coluna só, separadas por</label>
+                <input type="text" name="separadorAlternativas" class="form-control form-control-sm d-inline-block ms-1"
+                       style="width: 4rem" th:value="${mapping.alternativesSeparator}" maxlength="3"/>
+                <div class="form-text">Ex.: <code>A) Brasília | B) Rio | C) Salvador</code>. Use <code>\n</code> se cada alternativa estiver numa linha da célula.</div>
+            </div>
+            <div class="form-text">Itens de Certo/Errado (Cebraspe) não têm alternativas: deixe as colunas de alternativas em branco e a resposta como C/E ou Certo/Errado.</div>
+        </div>
+
+        <div class="section-title">O que há em cada coluna</div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-6 col-xl-4" th:each="f : ${fields}">
+                <label class="form-label small mb-0" th:for="${'col_' + f.name()}">
+                    <span th:text="${f.label}"></span><span th:if="${f.name() == 'ENUNCIADO'}" class="text-bad"> *</span>
+                </label>
+                <select class="form-select form-select-sm" th:name="${'col_' + f.name()}" th:id="${'col_' + f.name()}">
+                    <option value="">— não tem —</option>
+                    <option th:each="name, s : ${upload.columnNames()}" th:value="${s.index}" th:text="${name}"
+                            th:selected="${mapping.column(f) != null and mapping.column(f) == s.index}"></option>
+                </select>
+            </div>
+        </div>
+
+        <details class="mb-3">
+            <summary class="section-title d-inline-block m-0">Valores para todas as questões (opcional)</summary>
+            <div class="row g-2 mt-1">
+                <div class="col-md-3"><label class="form-label small">Banca</label><input type="text" name="banca" class="form-control form-control-sm" placeholder="Ex.: FGV"/></div>
+                <div class="col-md-4"><label class="form-label small">Concurso / prova</label><input type="text" name="concurso" class="form-control form-control-sm" placeholder="Ex.: TJ-SP 2024 Escrevente"/></div>
+                <div class="col-md-2"><label class="form-label small">Ano</label><input type="number" name="ano" class="form-control form-control-sm" min="1900" max="2100"/></div>
+                <div class="col-md-3"><label class="form-label small">Disciplina</label><input type="text" name="disciplina" class="form-control form-control-sm"/></div>
+                <div class="form-text">Usados quando a linha não tiver o valor na planilha.</div>
+            </div>
+        </details>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Ver prévia</button>
+            <a href="/import/arquivo" class="btn btn-outline-secondary">Voltar</a>
+        </div>
+    </form>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head(${page.displayTitle})}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page study-page-layout">
+    <aside class="study-tree d-none d-lg-block" aria-label="Páginas">
+        <div class="d-flex align-items-center mb-2">
+            <a href="/estudos/paginas" class="section-title m-0 text-reset text-decoration-none">Páginas</a>
+            <form method="post" action="/estudos/paginas" class="ms-auto">
+                <button type="submit" class="icon-btn border-0" title="Nova página" aria-label="Nova página"><i class="bi bi-plus-lg"></i></button>
+            </form>
+        </div>
+        <a th:each="n : ${tree}" th:href="@{/estudos/paginas/{id}(id=${n.page.id})}" class="study-tree-link text-truncate"
+           th:classappend="${n.page.id == page.id} ? 'active'" th:style="'padding-left: ' + ${0.5 + n.depth} + 'rem'"
+           th:text="${n.page.displayTitle}"></a>
+    </aside>
+
+    <div class="study-main">
+        <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+        <div class="d-flex align-items-center gap-2 mb-2 small">
+            <nav class="study-breadcrumbs text-truncate" aria-label="Caminho">
+                <a href="/estudos/paginas">Páginas</a>
+                <th:block th:each="b : ${breadcrumbs}">
+                    <i class="bi bi-chevron-right"></i>
+                    <a th:href="@{/estudos/paginas/{id}(id=${b.id})}" th:text="${b.displayTitle}"
+                       th:classappend="${b.id == page.id} ? 'text-reset'"></a>
+                </th:block>
+            </nav>
+            <span id="saveStatus" class="save-status ms-auto text-nowrap" aria-live="polite">Salvo</span>
+        </div>
+
+        <div id="draftBanner" class="alert alert-warning d-flex flex-wrap align-items-center gap-2" hidden>
+            <span>Encontramos alterações desta página que não chegaram a ser salvas.</span>
+            <button type="button" class="btn btn-sm btn-primary" id="restoreDraft">Recuperar</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="discardDraft">Descartar</button>
+        </div>
+        <div id="conflictBanner" class="alert alert-danger d-flex flex-wrap align-items-center gap-2" hidden>
+            <span>Esta página foi alterada em outra aba ou janela. Suas alterações daqui ficaram guardadas neste navegador.</span>
+            <button type="button" class="btn btn-sm btn-primary" onclick="window.location.reload()">Recarregar a página</button>
+        </div>
+
+        <section class="day-panel card" th:if="${page.summaryDate != null}" aria-label="Tarefas do dia">
+            <div class="day-panel-head">
+                <form method="post" th:action="@{/estudos/cronograma/dia/{d}/resumo(d=${previousDay})}">
+                    <button type="submit" class="icon-btn border-0" title="Resumo do dia anterior" aria-label="Dia anterior"><i class="bi bi-chevron-left"></i></button>
+                </form>
+                <div class="text-center flex-grow-1">
+                    <div class="fw-medium" th:text="${dayLabel}"></div>
+                    <div class="small text-muted" th:text="${dayTasks.isEmpty()} ? 'Nenhuma tarefa no cronograma' : (${#lists.size(dayTasks.?[done])} + ' de ' + ${dayTasks.size()} + ' tarefas concluídas')"></div>
+                </div>
+                <form method="post" th:action="@{/estudos/cronograma/dia/{d}/resumo(d=${nextDay})}">
+                    <button type="submit" class="icon-btn border-0" title="Resumo do dia seguinte" aria-label="Dia seguinte"><i class="bi bi-chevron-right"></i></button>
+                </form>
+            </div>
+            <div class="task-list" th:unless="${dayTasks.isEmpty()}">
+                <div class="task-row" th:each="t : ${dayTasks}" th:classappend="${t.done} ? 'is-done'">
+                    <form method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}">
+                        <input type="hidden" name="done" th:value="${!t.done}"/>
+                        <button type="submit" class="task-check" th:title="${t.done} ? 'Reabrir' : 'Concluir'"
+                                th:attr="aria-label=${t.done} ? 'Reabrir tarefa' : 'Concluir tarefa'">
+                            <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
+                    </form>
+                    <div class="task-info">
+                        <a class="text-reset text-decoration-none" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
+                        <div class="task-meta">
+                            <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
+                            <span th:if="${t.estimatedMinutes != null}"><i class="bi bi-clock"></i> <span th:text="${t.estimatedMinutes} + ' min'"></span></span>
+                            <a th:if="${t.pageId != null and t.pageId != page.id}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <form method="post" action="/estudos/cronograma" class="day-panel-add">
+                <input type="hidden" name="plannedDate" th:value="${page.summaryDate}"/>
+                <input type="text" name="title" class="form-control form-control-sm" placeholder="Adicionar tarefa neste dia" required maxlength="255"/>
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-lg"></i></button>
+            </form>
+        </section>
+
+        <div id="pageEditor" th:attr="data-page-id=${page.id},data-version=${page.version},data-updated=${page.updatedAtMillis}">
+            <input type="text" id="pageTitle" class="page-title-input" th:value="${page.title}" placeholder="Sem título"
+                   maxlength="255" aria-label="Título da página"/>
+
+            <div class="editor-toolbar" role="toolbar" aria-label="Formatação">
+                <button type="button" data-cmd="h1" title="Título">T1</button>
+                <button type="button" data-cmd="h2" title="Subtítulo">T2</button>
+                <button type="button" data-cmd="h3" title="Subtítulo menor">T3</button>
+                <button type="button" data-cmd="p" title="Texto comum"><i class="bi bi-text-paragraph"></i></button>
+                <span class="sep"></span>
+                <button type="button" data-cmd="bold" title="Negrito (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
+                <button type="button" data-cmd="italic" title="Itálico (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
+                <button type="button" data-cmd="underline" title="Sublinhado (Ctrl+U)"><i class="bi bi-type-underline"></i></button>
+                <button type="button" data-cmd="strikeThrough" title="Riscado"><i class="bi bi-type-strikethrough"></i></button>
+                <span class="sep"></span>
+                <button type="button" data-cmd="ul" title="Lista com marcadores"><i class="bi bi-list-ul"></i></button>
+                <button type="button" data-cmd="ol" title="Lista numerada"><i class="bi bi-list-ol"></i></button>
+                <button type="button" data-cmd="checklist" title="Checklist"><i class="bi bi-check2-square"></i></button>
+                <span class="sep"></span>
+                <button type="button" data-cmd="link" title="Link"><i class="bi bi-link-45deg"></i></button>
+                <button type="button" data-cmd="table" title="Tabela"><i class="bi bi-table"></i></button>
+                <button type="button" data-cmd="quote" title="Citação / destaque"><i class="bi bi-quote"></i></button>
+                <button type="button" data-cmd="code" title="Bloco de código"><i class="bi bi-code-slash"></i></button>
+                <button type="button" data-cmd="hr" title="Separador"><i class="bi bi-hr"></i></button>
+                <span class="sep"></span>
+                <button type="button" data-cmd="undo" title="Desfazer (Ctrl+Z)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                <button type="button" data-cmd="redo" title="Refazer (Ctrl+Shift+Z)"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+            <div id="editor" class="rich-content" contenteditable="true" spellcheck="true" aria-label="Conteúdo da página"
+                 data-placeholder="Comece a escrever… Dica: digite # e espaço para um título, - e espaço para uma lista, [] e espaço para um checklist."
+                 th:utext="${page.content}"></div>
+        </div>
+
+        <div class="row g-4 mt-4">
+            <div class="col-md-6">
+                <div class="section-title">Subpáginas</div>
+                <div class="card page-list mb-2" th:unless="${children.isEmpty()}">
+                    <a class="page-list-row" th:each="c : ${children}" th:href="@{/estudos/paginas/{id}(id=${c.id})}">
+                        <i class="bi bi-file-earmark-text text-muted"></i><span class="text-truncate" th:text="${c.displayTitle}"></span></a>
+                </div>
+                <form method="post" action="/estudos/paginas" class="d-flex gap-2">
+                    <input type="hidden" name="parentId" th:value="${page.id}"/>
+                    <input type="hidden" name="subject" th:value="${page.subject}"/>
+                    <input type="text" name="title" class="form-control form-control-sm" placeholder="Título da subpágina" maxlength="255"/>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap"><i class="bi bi-plus-lg me-1"></i>Subpágina</button>
+                </form>
+
+                <div class="section-title mt-4">Tarefas ligadas</div>
+                <p class="small text-muted" th:if="${tasks.isEmpty()}">Nenhuma tarefa do cronograma aponta para esta página.</p>
+                <div class="card task-list" th:unless="${tasks.isEmpty()}">
+                    <a class="task-row text-reset text-decoration-none" th:each="t : ${tasks}" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}">
+                        <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill text-ok' : 'bi-circle text-muted'"></i>
+                        <span th:text="${t.title}"></span>
+                        <span class="ms-auto small text-muted" th:if="${t.plannedDate != null}" th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="section-title">Organizar</div>
+                <form method="post" th:action="@{/estudos/paginas/{id}/detalhes(id=${page.id})}" class="card p-3">
+                    <label class="form-label small">Disciplina</label>
+                    <input type="text" name="subject" class="form-control form-control-sm mb-2" list="subjectOptions" th:value="${page.subject}"/>
+                    <label class="form-label small">Dentro de</label>
+                    <select name="parentId" class="form-select form-select-sm mb-3">
+                        <option value="">(nenhuma: página principal)</option>
+                        <option th:each="n : ${tree}" th:unless="${n.page.id == page.id or descendants.contains(n.page.id)}"
+                                th:value="${n.page.id}" th:selected="${n.page.id == page.parentId}"
+                                th:text="${#strings.repeat('— ', n.depth)} + ${n.page.displayTitle}"></option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary align-self-start">Salvar</button>
+                </form>
+                <form method="post" th:action="@{/estudos/paginas/{id}/excluir(id=${page.id})}" class="mt-3"
+                      th:attr="data-confirm=${descendants.isEmpty()} ? 'Apagar esta página? Não dá para desfazer.' : 'Apagar esta página e as ' + ${descendants.size()} + ' subpáginas dentro dela? Não dá para desfazer.'"
+                      onsubmit="return confirm(this.getAttribute('data-confirm'))">
+                    <button type="submit" class="btn btn-sm btn-link text-bad p-0"><i class="bi bi-trash me-1"></i>Apagar página</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <datalist th:replace="~{fragments/estudos :: subjects}"></datalist>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script src="/js/editor.js"></script>
+</body>
+</html>

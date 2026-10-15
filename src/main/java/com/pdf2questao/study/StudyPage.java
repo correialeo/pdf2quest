@@ -35,6 +35,9 @@ public class StudyPage {
 
     private String subject;
 
+    /** Dia do cronograma que esta pagina resume; nulo = pagina comum. */
+    private java.time.LocalDate summaryDate;
+
     /** Ordem entre as irmas. */
     private int position;
 

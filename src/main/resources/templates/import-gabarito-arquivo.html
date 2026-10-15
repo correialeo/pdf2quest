@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Gabarito em arquivo')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Importar gabarito de arquivo</h1>
+            <p class="page-subtitle">Uma resposta por linha, de planilha, texto ou JSON. Você confere a prévia antes de gravar.</p>
+        </div>
+        <a href="/import/gabarito" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>Gabarito em PDF</a>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="post" action="/import/gabarito/arquivo" enctype="multipart/form-data" class="card p-4 form-narrow">
+        <div class="mb-3">
+            <label class="form-label">Como as respostas encontram as questões</label>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="modo" value="ID" id="modoId" checked/>
+                <label class="form-check-label" for="modoId">Pelo ID da questão <span class="text-muted small">(recomendado; questões importadas por JSON/CSV com ID)</span></label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="modo" value="NUMERO" id="modoNumero"/>
+                <label class="form-check-label" for="modoNumero">Pelo número da questão numa prova</label>
+            </div>
+        </div>
+        <div class="mb-3" id="provaBox" hidden>
+            <label class="form-label">Prova</label>
+            <select name="importJobId" class="form-select">
+                <option value="">Selecione a prova</option>
+                <option th:each="job : ${jobs}" th:value="${job.id}"
+                        th:text="${'#' + job.id + ' · ' + job.displayName + ' (' + job.importedQuestions + ' questões)'}"></option>
+            </select>
+            <div class="form-text">Só use se a numeração do gabarito for exatamente a da prova. Você vai precisar confirmar.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Arquivo</label>
+            <input type="file" name="file" accept=".csv,.txt,.json,text/csv,text/plain,application/json" class="form-control"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">…ou cole as respostas</label>
+            <textarea name="texto" class="form-control font-monospace" rows="6" placeholder="trt-2024-q1;B&#10;trt-2024-q2;Certo&#10;trt-2024-q3;anulada"></textarea>
+            <div class="form-text">Formatos aceitos por linha: <code>ID;resposta</code>, <code>12,C</code>, <code>12 - E</code>. Questão anulada: <code>anulada</code> ou <code>X</code>.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Ver prévia</button>
+    </form>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    (function () {
+        var box = document.getElementById('provaBox');
+        function sync() { box.hidden = !document.getElementById('modoNumero').checked; }
+        document.querySelectorAll('input[name=modo]').forEach(function (r) { r.addEventListener('change', sync); });
+        sync();
+    })();
+</script>
+</body>
+</html>

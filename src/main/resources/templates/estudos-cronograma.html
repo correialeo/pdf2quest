@@ -67,6 +67,9 @@
         <summary class="day-header">
             <span class="section-title m-0" th:classappend="${g.kind == 'overdue'} ? 'text-bad' : ''" th:text="${g.label}"></span>
             <span class="text-muted small" th:text="${g.tasks.size()} + (${g.tasks.size() == 1} ? ' tarefa' : ' tarefas') + (${g.estimatedMinutes() > 0} ? ' · ' + ${g.estimatedMinutes()} + ' min' : '')"></span>
+            <span class="ms-auto" th:if="${g.date != null}">
+                <th:block th:replace="~{fragments/estudos :: dayButton(${g.date}, ${summaries[g.date]}, ${summaries[g.date] != null} ? 'Abrir resumo' : 'Resumo do dia', '')}"></th:block>
+            </span>
         </summary>
         <div class="card task-list mt-2">
             <div class="task-row" th:each="t : ${g.tasks}" th:classappend="${t.done} ? 'is-done'">
@@ -85,6 +88,9 @@
                         <span th:if="${t.estimatedMinutes != null or t.spentMinutes != null}"><i class="bi bi-clock"></i>
                             <span th:text="(${t.spentMinutes != null} ? ${t.spentMinutes} + ' de ' : '') + (${t.estimatedMinutes != null} ? ${t.estimatedMinutes} : '?') + ' min'"></span></span>
                         <a th:if="${t.pageId != null}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
+                        <th:block th:if="${g.kind == 'done' and t.plannedDate != null}">
+                            <th:block th:replace="~{fragments/estudos :: dayButton(${t.plannedDate}, ${summaries[t.plannedDate]}, 'resumo do dia', 'is-link')}"></th:block>
+                        </th:block>
                     </div>
                     <div class="small text-muted text-truncate" th:if="${t.listDescription != null}" th:text="${t.listDescription}"></div>
                 </div>

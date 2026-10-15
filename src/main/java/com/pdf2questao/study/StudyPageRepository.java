@@ -11,6 +11,14 @@ public interface StudyPageRepository extends JpaRepository<StudyPage, Long> {
 
     List<StudyPage> findTop6ByOrderByUpdatedAtDesc();
 
+    java.util.Optional<StudyPage> findBySummaryDate(java.time.LocalDate date);
+
+    List<StudyPage> findBySummaryDateBetween(java.time.LocalDate from, java.time.LocalDate to);
+
+    /** Pagina-mae dos resumos do dia: a raiz que ja tem algum resumo do dia dentro. */
+    @Query("SELECT DISTINCT p.parentId FROM StudyPage p WHERE p.summaryDate IS NOT NULL AND p.parentId IS NOT NULL")
+    List<Long> findSummaryParents();
+
     @Query("SELECT COALESCE(MAX(p.position), 0) FROM StudyPage p WHERE "
             + "(:parentId IS NULL AND p.parentId IS NULL) OR p.parentId = :parentId")
     int maxPosition(Long parentId);

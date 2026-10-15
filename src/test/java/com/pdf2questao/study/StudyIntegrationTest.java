@@ -161,6 +161,39 @@ class StudyIntegrationTest {
         assertTrue(inboxService.all().stream().noneMatch(n -> n.getId().equals(note.getId())));
     }
 
+    @Autowired
+    DaySummaryService daySummaryService;
+
+    @Test
+    void resumoDoDiaECriadoUmaVezComAsTarefasDoDia() {
+        LocalDate day = LocalDate.of(2027, 3, 10);
+        taskService.create(new StudyTaskService.TaskForm("AFO: <princípios>", null, "AFO", day, 60, null, null));
+        taskService.create(new StudyTaskService.TaskForm("Scrum", null, null, day, 90, null, null));
+        taskService.create(new StudyTaskService.TaskForm("Outro dia", null, null, day.plusDays(1), 30, null, null));
+
+        StudyPage summary = daySummaryService.open(day);
+        assertEquals("Resumo – Qua, 10/03/2027", summary.getTitle());
+        assertEquals(day, summary.getSummaryDate());
+        assertTrue(summary.getContent().startsWith("<h2>AFO: &lt;princípios&gt;</h2><p><br></p><h2>Scrum</h2>"),
+                summary.getContent());
+        assertFalse(summary.getContent().contains("Outro dia"));
+        StudyPage parent = pageRepository.findById(summary.getParentId()).orElseThrow();
+        assertEquals(DaySummaryService.PARENT_TITLE, parent.getTitle());
+
+        // Abrir de novo devolve a mesma pagina; outro dia fica na mesma pasta, em ordem de data.
+        assertEquals(summary.getId(), daySummaryService.open(day).getId());
+        StudyPage before = daySummaryService.open(day.minusDays(1));
+        assertEquals(parent.getId(), before.getParentId());
+        assertEquals(List.of(before.getId(), summary.getId()),
+                pageService.children(parent.getId()).stream().map(StudyPage::getId).toList());
+        assertEquals(java.util.Map.of(day, summary.getId(), day.minusDays(1), before.getId()),
+                daySummaryService.existing(day.minusDays(5), day));
+
+        // Apagar o resumo libera o dia: abrir de novo cria outro.
+        pageService.delete(summary.getId());
+        assertFalse(daySummaryService.open(day).getId().equals(summary.getId()));
+    }
+
     @Test
     void descricaoQueSoRepeteOBlocoNaoApareceNaLista() {
         StudyTask task = new StudyTask();

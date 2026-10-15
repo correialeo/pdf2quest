@@ -148,6 +148,16 @@ class NewScreensWebTest {
         mvc.perform(get("/estudos")).andExpect(status().isOk()).andExpect(content().string(containsString("Novo")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Nada planejado para hoje"))));
 
+        // Resumo do dia pelo cronograma: cria na primeira vez, abre o mesmo depois, e a tela mostra o painel do dia.
+        String summary = mvc.perform(post("/estudos/cronograma/dia/" + java.time.LocalDate.now() + "/resumo"))
+                .andExpect(redirectedUrlPattern("/estudos/paginas/*")).andReturn().getResponse().getRedirectedUrl();
+        mvc.perform(post("/estudos/cronograma/dia/" + java.time.LocalDate.now() + "/resumo"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl(summary));
+        mvc.perform(get(summary)).andExpect(status().isOk())
+                .andExpect(content().string(containsString("Tarefa web")))
+                .andExpect(content().string(containsString("Adicionar tarefa neste dia")));
+        mvc.perform(get("/estudos/cronograma")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("Abrir resumo")));
 
         mvc.perform(post(pageUrl + "/excluir")).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/estudos/paginas"));
         mvc.perform(put(pageUrl + "/conteudo").contentType(MediaType.APPLICATION_JSON)
