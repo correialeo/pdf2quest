@@ -48,8 +48,11 @@ class PassageHighlightScriptTest {
         Files.writeString(page, harness, StandardCharsets.UTF_8);
 
         Path out = tempDir.resolve("dom.html");
+        // Perfil do Chrome fora do @TempDir: processos auxiliares do Chrome ainda escrevem nele por alguns instantes
+        // depois de encerrado, e o JUnit falharia ao apagar a pasta. Removido no fim, sem exigir sucesso.
+        Path profile = Files.createTempDirectory("chrome-profile");
         Process process = new ProcessBuilder(chrome, "--headless=new", "--disable-gpu", "--no-sandbox",
-                "--allow-file-access-from-files", "--user-data-dir=" + tempDir.resolve("profile"),
+                "--allow-file-access-from-files", "--user-data-dir=" + profile,
                 "--virtual-time-budget=3000", "--dump-dom", page.toUri().toString())
                 .redirectOutput(out.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD).start();
         // O Chrome demora a encerrar depois de imprimir a pagina: le o resultado assim que ele aparece.
@@ -62,6 +65,7 @@ class PassageHighlightScriptTest {
         } finally {
             process.destroyForcibly();
             process.waitFor(10, TimeUnit.SECONDS);
+            org.springframework.util.FileSystemUtils.deleteRecursively(profile.toFile());
         }
 
         Matcher title = Pattern.compile("<title>(.*?)</title>", Pattern.DOTALL).matcher(dom);
