@@ -125,6 +125,10 @@ public class ImportController {
     public String reprocess(@PathVariable Long id,
                             @RequestParam(value = "file", required = false) MultipartFile file,
                             RedirectAttributes redirectAttributes) {
+        if (!importJobRepository.findById(id).orElseThrow().isFromPdf()) {
+            redirectAttributes.addFlashAttribute("info", "Esta prova veio de um arquivo JSON/CSV: não há PDF para reprocessar.");
+            return "redirect:/import/result/" + id;
+        }
         importService.startReprocess(id, file);
         return "redirect:/import/result/" + id;
     }

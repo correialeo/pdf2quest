@@ -36,12 +36,19 @@ public class ImportJob {
 
     private String pdfPath;
 
+    /** PDF, JSON ou CSV; nulo nas importacoes anteriores ao JSON/CSV (todas de PDF). */
+    private String sourceFormat;
+
     /** Nome amigavel da prova, editavel; ver {@link #getDisplayName()}. */
     private String title;
 
     /** Relatorio da importacao (totais, questoes para revisar, divergencias com o gabarito). */
     @Lob
     private String report;
+
+    public boolean isFromPdf() {
+        return sourceFormat == null || "PDF".equals(sourceFormat);
+    }
 
     /** Titulo da prova, ou o nome do arquivo (sem ".pdf") enquanto ninguem deu um titulo. */
     public String getDisplayName() {
@@ -51,6 +58,6 @@ public class ImportJob {
         if (fileName == null) {
             return "Prova " + id;
         }
-        return fileName.replaceAll("(?i)\\.pdf$", "");
+        return fileName.replaceAll("(?i)\\.(pdf|json|csv|txt)$", "");
     }
 }

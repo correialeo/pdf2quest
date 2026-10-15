@@ -78,6 +78,25 @@ public class Question {
     @Enumerated(EnumType.STRING)
     private QuestionCategory category;
 
+    /** Identificador estavel vindo de um arquivo JSON/CSV; nulo nas questoes lidas de PDF. */
+    private String externalId;
+
+    /** Tipo informado na importacao estruturada; nulo nas questoes de PDF (o tipo sai das alternativas). */
+    @Enumerated(EnumType.STRING)
+    private QuestionType questionType;
+
+    /** Subtopicos do assunto, um por linha. */
+    @Lob
+    private String subtopics;
+
+    /** Tags separadas por virgula. */
+    @Lob
+    private String tags;
+
+    /** Referencias e metadados livres do arquivo importado (JSON). */
+    @Lob
+    private String extraMetadata;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     /** Alternativas preenchidas, na ordem A-E (letra -> texto), para as telas montarem a lista num laco so. */

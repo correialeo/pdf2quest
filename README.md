@@ -70,6 +70,10 @@ Os scripts não rodam direto no Windows. Duas opções:
    (só imagem, comum na FCC) passam por leitura automática (OCR) e levam alguns minutos; a tela mostra o
    progresso página a página e você pode continuar usando o sistema enquanto isso.
 2. **Importe o gabarito**, se ele vier num PDF separado: **Provas → Importar gabarito**.
+   Sem PDF? Em **Provas → Importar planilha/JSON** você traz questões de uma planilha (Excel, LibreOffice,
+   Google Planilhas salvos como CSV) ou de um arquivo JSON. Antes de gravar, o sistema mostra uma prévia com
+   as questões com erro e as que parecem repetidas. O gabarito também pode vir de uma planilha ou ser colado
+   como texto (**Importar gabarito → Gabarito em planilha/texto**).
 3. **Estude:** em **Estudar → Blocos de estudo**, crie um bloco com a prova inteira ou só as faixas de
    questões que quiser (ex.: `1-30`), ou use **Sessão rápida** para sortear questões.
 4. **Resolva:** clique na alternativa ou use o teclado (`A`–`E` responde, `X` marca chute, `←` `→` navega,
@@ -82,6 +86,8 @@ Os scripts não rodam direto no Windows. Duas opções:
 - **Importar provas em PDF** das bancas **FGV, FCC, Cebraspe e Cesgranrio**, detectando ano, disciplina,
   textos base e imagens. Provas escaneadas são lidas por OCR.
 - **Importar gabarito** de um PDF separado e ligar as respostas às questões.
+- **Importar questões sem PDF**, por planilha CSV (qualquer layout: você escolhe as colunas) ou JSON
+  ([formato documentado](docs/importacao/formato-json.md)), com prévia, validação e detecção de duplicatas.
 - **Blocos de estudo:** recortes reutilizáveis de uma ou várias provas, com tempo limite opcional.
 - **Perfis de pontuação:** peso por disciplina e nota mínima por grupo, como no edital.
 - **Resolver no modo foco**, com riscar alternativas, grifar o texto base e marcar "é chute?".

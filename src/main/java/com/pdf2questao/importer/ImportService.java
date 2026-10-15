@@ -148,6 +148,7 @@ public class ImportService {
         ImportJob job = new ImportJob();
         job.setFileName(fileName);
         job.setBanca(banca.name());
+        job.setSourceFormat("PDF");
         job.setStartedAt(LocalDateTime.now());
         return job;
     }

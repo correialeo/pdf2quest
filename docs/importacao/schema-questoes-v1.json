@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/correialeo/pdf2quest/docs/importacao/schema-questoes-v1.json",
+  "title": "PDF2Questão – questões (versão 1)",
+  "type": "object",
+  "required": ["versao", "questoes"],
+  "properties": {
+    "formato": { "const": "pdf2questao-questoes" },
+    "versao": { "const": 1 },
+    "prova": {
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "banca": { "type": "string" },
+        "concurso": { "type": "string" },
+        "ano": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+        "disciplina": { "type": "string" }
+      }
+    },
+    "questoes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/questao" }
+    }
+  },
+  "$defs": {
+    "textos": { "type": "array", "items": { "type": "string" } },
+    "questao": {
+      "type": "object",
+      "required": ["enunciado"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 255 },
+        "numero": { "type": "integer", "minimum": 0 },
+        "tipo": { "enum": ["multipla_escolha", "certo_errado"] },
+        "enunciado": { "type": "string", "minLength": 1 },
+        "textoBase": { "type": "string" },
+        "alternativas": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "oneOf": [
+              { "type": "string", "minLength": 1 },
+              {
+                "type": "object",
+                "required": ["texto"],
+                "properties": {
+                  "letra": { "enum": ["A", "B", "C", "D", "E", "a", "b", "c", "d", "e"] },
+                  "texto": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          }
+        },
+        "resposta": { "type": "string" },
+        "anulada": { "type": "boolean" },
+        "explicacao": { "type": "string" },
+        "banca": { "type": "string" },
+        "concurso": { "type": "string" },
+        "ano": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+        "disciplina": { "type": "string" },
+        "assunto": { "type": "string" },
+        "subtopicos": { "$ref": "#/$defs/textos" },
+        "tags": { "$ref": "#/$defs/textos" },
+        "dificuldade": { "type": "string" },
+        "categoria": { "enum": ["geral", "especifico"] },
+        "fonte": { "type": "string" },
+        "referencias": { "$ref": "#/$defs/textos" },
+        "metadados": { "type": "object" }
+      }
+    }
+  }
+}

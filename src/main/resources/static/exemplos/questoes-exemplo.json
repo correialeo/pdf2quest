@@ -1,0 +1,63 @@
+{
+  "formato": "pdf2questao-questoes",
+  "versao": 1,
+  "prova": {
+    "titulo": "Exemplo – Direito Constitucional e Português",
+    "banca": "Exemplo",
+    "concurso": "Concurso de Exemplo – Analista",
+    "ano": 2024
+  },
+  "questoes": [
+    {
+      "id": "exemplo-2024-q1",
+      "numero": 1,
+      "tipo": "multipla_escolha",
+      "enunciado": "Segundo a Constituição Federal de 1988, a capital federal é:",
+      "alternativas": [
+        { "letra": "A", "texto": "Rio de Janeiro" },
+        { "letra": "B", "texto": "Brasília" },
+        { "letra": "C", "texto": "São Paulo" },
+        { "letra": "D", "texto": "Salvador" },
+        { "letra": "E", "texto": "Belo Horizonte" }
+      ],
+      "resposta": "B",
+      "explicacao": "Art. 18, § 1º: Brasília é a Capital Federal.",
+      "disciplina": "Direito Constitucional",
+      "assunto": "Organização do Estado",
+      "subtopicos": ["União", "Distrito Federal"],
+      "tags": ["literalidade", "art. 18"],
+      "dificuldade": "fácil",
+      "referencias": ["CF/88, art. 18, § 1º"]
+    },
+    {
+      "id": "exemplo-2024-q2",
+      "numero": 2,
+      "tipo": "certo_errado",
+      "textoBase": "O servidor público, no exercício de suas funções, deve observar os princípios da administração pública.",
+      "enunciado": "A eficiência foi incluída entre os princípios expressos da administração pública pela Emenda Constitucional nº 19/1998.",
+      "resposta": "Certo",
+      "disciplina": "Direito Administrativo",
+      "assunto": "Princípios da administração pública",
+      "tags": ["LIMPE"]
+    },
+    {
+      "id": "exemplo-2024-q3",
+      "numero": 3,
+      "enunciado": "Assinale a alternativa em que a palavra está grafada corretamente.",
+      "alternativas": ["Excessão", "Exceção", "Esceção", "Exseção"],
+      "resposta": "B",
+      "disciplina": "Língua Portuguesa",
+      "assunto": "Ortografia",
+      "metadados": { "origem": "elaborada para o exemplo" }
+    },
+    {
+      "id": "exemplo-2024-q4",
+      "numero": 4,
+      "tipo": "multipla_escolha",
+      "enunciado": "Questão anulada pela banca (todos ganham o ponto).",
+      "alternativas": ["Primeira", "Segunda", "Terceira"],
+      "anulada": true,
+      "disciplina": "Língua Portuguesa"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+id;numero;enunciado;A;B;C;D;E;resposta;disciplina;assunto;banca;ano;explicacao
+exemplo-csv-q1;1;"Qual é o plural de ""cidadão""?";Cidadões;Cidadãos;Cidadães;Cidadãoes;;B;Língua Portuguesa;Plural;Exemplo;2024;Cidadão faz o plural em -ãos.
+exemplo-csv-q2;2;Quanto é 15% de 200?;20;25;30;35;40;C;Matemática;Porcentagem;Exemplo;2024;0,15 x 200 = 30.
+exemplo-csv-q3;3;"O habeas corpus protege a liberdade de locomoção.";;;;;;Certo;Direito Constitucional;Remédios constitucionais;Exemplo;2024;CF/88, art. 5º, LXVIII.

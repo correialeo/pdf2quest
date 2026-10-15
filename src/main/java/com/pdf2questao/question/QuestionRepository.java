@@ -78,4 +78,14 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     long countBySubject(String subject);
 
     List<Question> findByImportJobId(Long importJobId);
+
+    /** [id, external_id] das questoes que vieram de JSON/CSV com identificador. */
+    @Query("SELECT q.id, q.externalId FROM Question q WHERE q.externalId IS NOT NULL")
+    List<Object[]> findExternalIds();
+
+    /** [id, enunciado] de todas as questoes, para apontar possiveis duplicatas na importacao. */
+    @Query("SELECT q.id, q.statement FROM Question q")
+    List<Object[]> findStatements();
+
+    List<Question> findByExternalIdIn(java.util.Collection<String> externalIds);
 }

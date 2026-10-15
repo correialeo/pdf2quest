@@ -70,7 +70,15 @@
                 </div>
             </form>
         </div>
-        <div class="col-lg-5">
+        <div class="col-lg-5" th:unless="${job.fromPdf}">
+            <div class="section-title">Origem</div>
+            <div class="card p-3 small">
+                <div>Importada de arquivo <strong th:text="${job.sourceFormat}"></strong>: <span th:text="${job.fileName}"></span>.</div>
+                <div class="text-muted mt-1">Para corrigir questões, ajuste o arquivo e importe de novo marcando "atualizar as já cadastradas".
+                    Gabarito separado: <a href="/import/gabarito/arquivo">importar gabarito de arquivo</a>.</div>
+            </div>
+        </div>
+        <div class="col-lg-5" th:if="${job.fromPdf}">
             <div class="section-title">PDF da prova</div>
             <div class="card p-3">
                 <form method="post" th:action="@{/import/{id}/reprocessar(id=${job.id})}" enctype="multipart/form-data">
