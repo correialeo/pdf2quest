@@ -66,8 +66,7 @@
     </div>
 
     <div class="section-title">Para estudar</div>
-    <div th:if="${report.lucky.isEmpty()}"
-         th:replace="~{fragments/ui :: empty('bi-question-diamond', 'Nenhum acerto no chute. Quando acertar uma questão marcada como chute, ela aparece aqui.', null, null)}"></div>
+    <th:block th:if="${report.lucky.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-question-diamond', 'Nenhum acerto no chute. Quando acertar uma questão marcada como chute, ela aparece aqui.', null, null)}"></div></th:block>
     <th:block th:each="l : ${report.lucky}">
         <div th:replace="~{fragments/ui :: question(${l.question},
              (${l.job != null} ? ${l.job.displayName} : 'Questão') + (${l.question.questionNumber != null} ? ' · questão ' + ${l.question.questionNumber} : ''),

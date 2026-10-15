@@ -20,8 +20,7 @@
     </div>
 
     <div class="section-title mt-0">Sessões finalizadas</div>
-    <div th:if="${b.sessions.isEmpty()}"
-         th:replace="~{fragments/ui :: empty('bi-clock-history', 'Nenhuma sessão finalizada deste bloco ainda.', null, null)}"></div>
+    <th:block th:if="${b.sessions.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-clock-history', 'Nenhuma sessão finalizada deste bloco ainda.', null, null)}"></div></th:block>
     <div class="card px-3 py-2" th:unless="${b.sessions.isEmpty()}">
         <table class="table table-sm mb-0 align-middle" th:if="${!b.sessions.isEmpty()}">
             <thead><tr><th>Data</th><th>Acertos</th><th>Nota</th><th>Por grupo</th><th>Mínimos</th><th></th></tr></thead>

@@ -13,8 +13,7 @@
     <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
 
-    <div th:if="${profiles.isEmpty()}"
-         th:replace="~{fragments/ui :: empty('bi-sliders', 'Nenhum perfil ainda. Crie um com o JSON abaixo.', null, null)}"></div>
+    <th:block th:if="${profiles.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-sliders', 'Nenhum perfil ainda. Crie um com o JSON abaixo.', null, null)}"></div></th:block>
     <div class="row row-cols-1 row-cols-lg-2 g-3">
         <div class="col" th:each="p : ${profiles}">
             <div class="card p-3 h-100">

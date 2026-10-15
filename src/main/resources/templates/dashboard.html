@@ -58,8 +58,7 @@
     </div>
 
     <div class="section-title">Provas</div>
-    <div th:if="${data.groups.isEmpty()}"
-         th:replace="~{fragments/ui :: empty('bi-file-earmark-pdf', 'Nenhuma prova importada ainda.', 'Importar um PDF', '/import')}"></div>
+    <th:block th:if="${data.groups.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-file-earmark-pdf', 'Nenhuma prova importada ainda.', 'Importar um PDF', '/import')}"></div></th:block>
     <div th:each="g : ${data.groups}" class="mb-4">
         <div class="small text-muted fw-medium mb-2" th:text="${g.banca}"></div>
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">

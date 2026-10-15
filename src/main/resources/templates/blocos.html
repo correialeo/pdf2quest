@@ -13,8 +13,7 @@
     </div>
     <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
-    <div th:if="${blocks.isEmpty()}"
-         th:replace="~{fragments/ui :: empty('bi-collection', 'Nenhum bloco ainda.', 'Criar o primeiro', '/blocos/novo')}"></div>
+    <th:block th:if="${blocks.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-collection', 'Nenhum bloco ainda.', 'Criar o primeiro', '/blocos/novo')}"></div></th:block>
 
     <div class="card block-list" th:unless="${blocks.isEmpty()}">
         <div class="block-row" th:each="b : ${blocks}">

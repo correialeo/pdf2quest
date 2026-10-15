@@ -42,5 +42,5 @@
         <span class="alt-tag text-bad" th:if="${alt.key == wrong}">Sua resposta</span>
     </div>
     <p class="text-muted small mt-3 mb-0" th:if="${!tools and q.note != null}" th:text="'Observação: ' + ${q.note}"></p>
-    <div th:if="${tools}" th:replace="~{fragments/question-tools :: tools(${q})}"></div>
+    <th:block th:if="${tools}"><div th:replace="~{fragments/question-tools :: tools(${q})}"></div></th:block>
 </article>

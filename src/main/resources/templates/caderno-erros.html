@@ -22,8 +22,7 @@
            th:classappend="${selectedProva != null and selectedProva == j.id} ? 'active'" th:title="${j.displayName}"
            th:text="${j.displayName} + ' · ' + ${perProva[j.id]}"></a>
     </div>
-    <div th:if="${questions.isEmpty()}"
-         th:replace="~{fragments/ui :: empty('bi-emoji-smile', 'Nenhuma questão pendente de revisão. Bom trabalho!', null, null)}"></div>
+    <th:block th:if="${questions.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-emoji-smile', 'Nenhuma questão pendente de revisão. Bom trabalho!', null, null)}"></div></th:block>
     <th:block th:each="q : ${questions}">
         <div th:replace="~{fragments/ui :: question(${q}, ${q.questionNumber != null} ? 'Questão ' + ${q.questionNumber} : 'Questão', null, false, null, ${wrongAnswers[q.id]}, false)}"></div>
     </th:block>

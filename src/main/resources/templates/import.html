@@ -69,7 +69,7 @@
 
     <div class="col-lg-5">
         <div class="section-title mt-0">Provas importadas</div>
-        <div th:if="${jobs.isEmpty()}" th:replace="~{fragments/ui :: empty('bi-inbox', 'Nenhuma prova ainda.', null, null)}"></div>
+        <th:block th:if="${jobs.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-inbox', 'Nenhuma prova ainda.', null, null)}"></div></th:block>
         <div class="card block-list" th:unless="${jobs.isEmpty()}">
             <a class="block-row text-reset text-decoration-none" th:each="j : ${jobs}" th:href="@{/import/result/{id}(id=${j.id})}">
                 <span class="text-truncate" th:text="${j.displayName}" th:title="${j.displayName}"></span>
