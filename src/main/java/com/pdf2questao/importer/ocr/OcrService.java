@@ -213,6 +213,12 @@ public class OcrService {
             if (Files.isRegularFile(tsv)) {
                 String tsvText = Files.readString(tsv, StandardCharsets.UTF_8);
                 try {
+                    text = RomanLineRereader.reread(text, UnderlineDetector.parseLines(tsvText), image, this::readLine);
+                } catch (IOException | RuntimeException e) {
+                    // Sem a releitura a pagina continua valida: as alternativas ficam como o OCR leu.
+                    log.warn("Alternativas com romanos nao relidas na pagina {}: {}", pageNumber, e.toString());
+                }
+                try {
                     text = UnderlineDetector.annotate(text, tsvText, image, dpi);
                 } catch (RuntimeException e) {
                     // Sem sublinhado a pagina continua valida: so perde a marcacao.
@@ -231,6 +237,33 @@ public class OcrService {
             Files.deleteIfExists(png);
             Files.deleteIfExists(txt);
             Files.deleteIfExists(tsv);
+        }
+    }
+
+    /** OCR de uma imagem com uma linha so de texto (psm 7). */
+    private String readLine(BufferedImage line) throws IOException {
+        Path png = Files.createTempFile("pdf2questao-ocr-line-", ".png");
+        try {
+            ImageIO.write(line, "png", png.toFile());
+            ProcessBuilder builder = new ProcessBuilder(tesseractPath, png.toString(), "stdout",
+                    "-l", language, "--psm", "7", "--dpi", String.valueOf(dpi));
+            builder.environment().put("OMP_THREAD_LIMIT", "1");
+            builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+            Process process = builder.start();
+            String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            try {
+                if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    throw new IOException("Tesseract excedeu o tempo relendo uma linha");
+                }
+            } catch (InterruptedException e) {
+                process.destroyForcibly();
+                Thread.currentThread().interrupt();
+                throw new IOException("OCR interrompido", e);
+            }
+            return out.strip();
+        } finally {
+            Files.deleteIfExists(png);
         }
     }
 
@@ -257,8 +290,8 @@ public class OcrService {
     private String cacheKey(byte[] pdf) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(pdf);
-            // "-u4": formato com sublinhado e recortes de questao; caches antigos nao servem mais.
-            return HexFormat.of().formatHex(hash, 0, 12) + "-" + language + "-" + dpi + "-u4";
+            // "-u5": alternativas com romanos relidas e tabelas de alternativas recortadas; caches antigos nao servem mais.
+            return HexFormat.of().formatHex(hash, 0, 12) + "-" + language + "-" + dpi + "-u5";
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

@@ -5,6 +5,7 @@ import com.pdf2questao.importer.ParseFailure;
 import com.pdf2questao.importer.ParseResult;
 import com.pdf2questao.importer.ParsedQuestion;
 import com.pdf2questao.importer.parser.ExamParser;
+import com.pdf2questao.importer.parser.support.OcrLineRepair;
 import com.pdf2questao.importer.parser.support.PdfMetadataDetector;
 import com.pdf2questao.importer.parser.support.RichText;
 import com.pdf2questao.question.QuestionCategory;
@@ -61,6 +62,7 @@ public class FccPdfParser implements ExamParser {
     // Alternativas em forma de tabela, lidas sem nenhum parenteses ("A Business ...", "Cc Data ...").
     private static final Pattern BARE_ROW = Pattern.compile("^\\s*([A-E])[a-z]?\\s+(\\S.*)$");
     private static final Pattern STRICT_MARKER = Pattern.compile("^\\s*\\(([A-E])\\)\\s*(.*)$");
+    private static final Pattern ROMAN_ITEM = Pattern.compile("^[IVX]{1,4}\\s*[.)\\-\u2013]\\s");
     private static final Pattern PASSAGE_CUE = Pattern.compile("(?i)quest(õ|o)es?\\b(.*)");
     private static final Pattern NUMBER_RANGE = Pattern.compile("(\\d{1,3})\\s*(?:a|à|ao|até|-)\\s*(\\d{1,3})");
     private static final Pattern NUMBER = Pattern.compile("\\b\\d{1,3}\\b");
@@ -89,7 +91,8 @@ public class FccPdfParser implements ExamParser {
 
     @Override
     public ParseResult parse(String rawText) {
-        String text = rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n");
+        // Bolinhas, travessoes, rotulos romanos e pontilhados lidos errado pelo OCR (ver OcrLineRepair).
+        String text = OcrLineRepair.repair(rawText.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n"));
         String plainText = RichText.plain(text);
         // Provas da FCC sao sempre da FCC; o detector generico confundia com palavras do texto ("OBJETIVA").
         String organization = "FCC";
@@ -136,13 +139,64 @@ public class FccPdfParser implements ExamParser {
                 continue;
             }
             List<String> reasons = reviewReasons(block, statement);
+            String[] alts = alternatives(block, statement, reasons);
             questions.add(new ParsedQuestion(block.number, statement,
-                    block.alt(0), block.alt(1), block.alt(2), block.alt(3), block.alt(4),
+                    alts[0], alts[1], alts[2], alts[3], alts[4],
                     null, heading, block.category != null ? block.category : categoryFromBlocks(blocks),
                     passages.get(block.number), block.page, !reasons.isEmpty(), String.join("; ", reasons),
                     block.headingBefore));
         }
         return new ParseResult(organization, year, questions, failures, title[0]);
+    }
+
+    /**
+     * Em questao de "assinale os itens corretos" (enunciado com I., II., III.), as alternativas sao listas
+     * de romanos que o OCR gruda e deforma ("IeTIII,apenas."); elas voltam como "I e III, apenas.".
+     * Se a leitura teve de adivinhar ou deixou duas alternativas iguais, a questao vai para revisao.
+     */
+    private static String[] alternatives(Block block, String statement, List<String> reasons) {
+        String[] alts = new String[5];
+        for (int i = 0; i < 5; i++) {
+            alts[i] = cleanAlternative(block.alt(i));
+        }
+        boolean romanItems = Arrays.stream(RichText.plain(statement).split("\n"))
+                .filter(l -> ROMAN_ITEM.matcher(l).find()).count() >= 2;
+        if (!romanItems) {
+            return alts;
+        }
+        String[] fixed = alts.clone();
+        boolean guess = false;
+        for (int i = 0; i < 5; i++) {
+            if (alts[i] != null && alts[i].equals(RichText.plain(alts[i]))) {
+                String roman = OcrLineRepair.romanList(alts[i]);
+                if (roman != null) {
+                    fixed[i] = roman;
+                    guess |= OcrLineRepair.romanListIsGuess(alts[i]);
+                }
+            }
+        }
+        if (Arrays.stream(fixed).filter(a -> a != null).distinct().count()
+                < Arrays.stream(fixed).filter(a -> a != null).count()) {
+            reasons.add("alternativas de numerais romanos ilegiveis no OCR (conferir no PDF)");
+            return alts;
+        }
+        if (guess) {
+            reasons.add("numerais romanos das alternativas reconstruidos do OCR (conferir no PDF)");
+        }
+        return fixed;
+    }
+
+    /**
+     * Alternativa nunca fica escondida: quando o recorte do enunciado pega a alternativa (tabela de
+     * alternativas, "(A)" lido como "(4)"), o texto dela vem marcado como oculto. Tambem sai a barra
+     * solta que o OCR poe entre o marcador e o texto ("(E) | reconheceu").
+     */
+    static String cleanAlternative(String alt) {
+        if (alt == null) {
+            return null;
+        }
+        String visible = alt.replace(RichText.open('h'), "").replace(RichText.close('h'), "");
+        return RichText.trim(visible.replaceFirst("^((?:\u27E6[^\u27E7]*\u27E7)*)[|!\\[\\]]\\s+", "$1"));
     }
 
     private QuestionCategory categoryFromBlocks(List<Block> blocks) {
@@ -578,9 +632,11 @@ public class FccPdfParser implements ExamParser {
      */
     static String joinLines(List<String> lines) {
         StringBuilder out = new StringBuilder();
+        boolean inListItem = false;
         for (String line : lines) {
             if (out.length() == 0) {
                 out.append(line);
+                inListItem = OcrLineRepair.isListItem(RichText.plain(line));
                 continue;
             }
             String plainOut = RichText.plain(out.toString());
@@ -591,6 +647,15 @@ public class FccPdfParser implements ExamParser {
             if (hyphenated) {
                 // Tira so o hifen; marcas de estilo que vinham depois dele continuam no lugar.
                 out.deleteCharAt(out.lastIndexOf("-"));
+            } else if (OcrLineRepair.isListItem(plainLine)) {
+                // Item de lista ("• ...", "– ...", "2. ...", "II. ...") fica na propria linha.
+                out.append('\n');
+                inListItem = true;
+            } else if (inListItem && plainOut.endsWith(".") && !plainLine.isEmpty()
+                    && Character.isUpperCase(plainLine.charAt(0))) {
+                // Frase que vem depois do ultimo item, sem linha em branco entre eles.
+                out.append('\n');
+                inListItem = false;
             } else {
                 out.append(' ');
             }

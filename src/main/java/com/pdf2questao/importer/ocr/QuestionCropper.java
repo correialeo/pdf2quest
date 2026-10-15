@@ -36,7 +36,11 @@ public final class QuestionCropper {
     private static final int TABLE_RULES = 3;
 
     private static final Pattern NUMBER_TOKEN = Pattern.compile("^\\S{1,3}\\.$");
-    private static final Pattern ALTERNATIVE_START = Pattern.compile("^[({\\[|]?[A-E0€@&]{1,2}[)\\]}].*");
+    // "(4)" e "(8)" sao leituras comuns de "(A)" e "(B)".
+    private static final Pattern ALTERNATIVE_START = Pattern.compile("^[({\\[|]?[A-E0€@&48]{1,2}[)\\]}].*");
+    /** Linha de tabela de alternativas, sem parenteses: "A Business ...", "Cc Data ..." (o C lido como "Cc"). */
+    private static final Pattern TABLE_ROW = Pattern.compile("^([A-E])[a-z]?$");
+    private static final Pattern LAST_TABLE_ROW = Pattern.compile("^E\\s.*");
     private static final Pattern MATH = Pattern.compile(
             "[=√∑∫±≤≥÷×λμσπΣ^]"
                     + "|\\b[PEV]\\s*\\(|\\bVar\\b|(?<![\\d/])\\d{1,3}\\s*/\\s*\\d{1,3}(?![\\d/])"
@@ -60,7 +64,7 @@ public final class QuestionCropper {
 
     /** Questao na pagina: {@code stem} sao as linhas do enunciado, {@code stemBottom} a altura da alternativa (A). */
     private record Region(int top, int bottom, UnderlineDetector.Word number, List<UnderlineDetector.Line> lines,
-                          List<UnderlineDetector.Line> stem, int stemBottom) {
+                          List<UnderlineDetector.Line> stem, int stemBottom, boolean tableAlternatives) {
     }
 
     public static Annotated annotate(String text, String tsv, BufferedImage image, int dpi) {
@@ -105,6 +109,8 @@ public final class QuestionCropper {
                     (int) (contentWidth * TABLE_RULE_MIN_WIDTH), (int) (contentWidth * SEPARATOR_WIDTH)).size()
                     >= TABLE_RULES;
             boolean formula = MATH.matcher(stemText).find() || overlappingBlocks(region.stem());
+            // Tabela de alternativas: as bordas largas nao contam como regras de tabela, mas e tabela.
+            table |= region.tableAlternatives();
             if (!table && !formula) {
                 continue;
             }
@@ -113,7 +119,7 @@ public final class QuestionCropper {
                 continue;
             }
             crops.add(crop);
-            tagStem(out, at, number, crops.size());
+            tagStem(out, at, number, crops.size(), region.tableAlternatives());
             cursor -= dropStrayFragments(out, at, region);
         }
         return new Annotated(String.join("\n", out), crops);
@@ -140,25 +146,8 @@ public final class QuestionCropper {
         for (int s = 0; s < separators.size(); s++) {
             int top = separators.get(s)[1] + 1;
             int limit = s + 1 < separators.size() ? separators.get(s + 1)[0] : footerTop;
-            List<UnderlineDetector.Line> inside = new ArrayList<>();
-            for (UnderlineDetector.Line line : lines) {
-                UnderlineDetector.Word first = line.words().get(0);
-                int center = first.top() + first.height() / 2;
-                if (center >= top && center < limit) {
-                    inside.add(line);
-                }
-            }
-            UnderlineDetector.Word number = null;
-            for (UnderlineDetector.Line line : inside) {
-                UnderlineDetector.Word first = line.words().get(0);
-                if (first.top() - top > 200) {
-                    break;
-                }
-                if (first.left() - minX < 60 && NUMBER_TOKEN.matcher(first.text()).matches()) {
-                    number = first;
-                    break;
-                }
-            }
+            List<UnderlineDetector.Line> inside = linesBetween(lines, top, limit);
+            UnderlineDetector.Word number = questionNumber(inside, top, minX);
             if (number == null) {
                 continue;
             }
@@ -173,10 +162,71 @@ public final class QuestionCropper {
                 stem.add(line);
             }
             if (stemBottom > top) {
-                regions.add(new Region(top, limit, number, inside, stem, stemBottom));
+                regions.add(new Region(top, limit, number, inside, stem, stemBottom, false));
+            } else {
+                // As linhas de uma tabela larga parecem separadoras: a regiao segue ate a proxima questao.
+                int next = s + 1;
+                while (next < separators.size() && questionNumber(linesBetween(lines, separators.get(next)[1] + 1,
+                        next + 1 < separators.size() ? separators.get(next + 1)[0] : footerTop),
+                        separators.get(next)[1] + 1, minX) == null) {
+                    next++;
+                }
+                int tableLimit = next < separators.size() ? separators.get(next)[0] : footerTop;
+                Region table = tableAlternatives(top, tableLimit, number, linesBetween(lines, top, tableLimit));
+                if (table != null) {
+                    regions.add(table);
+                }
             }
         }
         return regions;
+    }
+
+    private static List<UnderlineDetector.Line> linesBetween(List<UnderlineDetector.Line> lines, int top, int limit) {
+        List<UnderlineDetector.Line> inside = new ArrayList<>();
+        for (UnderlineDetector.Line line : lines) {
+            UnderlineDetector.Word first = line.words().get(0);
+            int center = first.top() + first.height() / 2;
+            if (center >= top && center < limit) {
+                inside.add(line);
+            }
+        }
+        return inside;
+    }
+
+    /** Numero da questao ("21.") na margem esquerda, logo abaixo do topo da regiao. */
+    private static UnderlineDetector.Word questionNumber(List<UnderlineDetector.Line> inside, int top, int minX) {
+        for (UnderlineDetector.Line line : inside) {
+            UnderlineDetector.Word first = line.words().get(0);
+            if (first.top() - top > 200) {
+                return null;
+            }
+            if (first.left() - minX < 60 && NUMBER_TOKEN.matcher(first.text()).matches()) {
+                return first;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Alternativas que sao linhas de uma tabela ("A | Business ... | Deployment"): sem "(A)", o enunciado
+     * iria ate o fim da pagina. Aqui a regiao vai ate a linha E, e a tabela inteira entra no recorte; o
+     * texto das linhas continua no texto, para o parser montar as alternativas.
+     */
+    private static Region tableAlternatives(int top, int limit, UnderlineDetector.Word number,
+                                            List<UnderlineDetector.Line> inside) {
+        for (int k = 0; k + 5 <= inside.size(); k++) {
+            boolean rows = true;
+            for (int j = 0; j < 5 && rows; j++) {
+                java.util.regex.Matcher m = TABLE_ROW.matcher(inside.get(k + j).words().get(0).text());
+                rows = inside.get(k + j).words().size() > 1 && m.matches() && m.group(1).charAt(0) == 'A' + j;
+            }
+            if (rows && inside.get(k).words().get(0).top() > number.bottom()) {
+                List<UnderlineDetector.Line> stem = new ArrayList<>(inside.subList(0, k + 5));
+                int bottom = extent(inside.get(k + 4))[3] + 12;
+                return new Region(top, limit, number, inside, stem, bottom, true);
+            }
+        }
+        return null;
     }
 
     private static String linesText(List<UnderlineDetector.Line> lines) {
@@ -308,9 +358,9 @@ public final class QuestionCropper {
 
     /**
      * "41. Um auditor..." vira "41. ⟦img:1⟧⟦h⟧Um auditor...⟦/h⟧", e cada linha seguinte do enunciado (ate a
-     * alternativa (A)) e escondida do mesmo jeito. A marca e por linha porque o parser junta o enunciado linha a linha.
+     * alternativa (A), ou ate a linha E de uma tabela de alternativas) e escondida do mesmo jeito. A marca e por linha porque o parser junta o enunciado linha a linha.
      */
-    private static void tagStem(List<String> lines, int index, String number, int imageIndex) {
+    private static void tagStem(List<String> lines, int index, String number, int imageIndex, boolean tableRows) {
         String first = lines.get(index);
         int at = first.indexOf(number) + number.length();
         while (at < first.length() && Character.isWhitespace(first.charAt(at))) {
@@ -319,6 +369,10 @@ public final class QuestionCropper {
         lines.set(index, first.substring(0, at) + RichText.image(imageIndex) + hide(first.substring(at)));
         for (int i = index + 1; i < lines.size() && !ALTERNATIVE_START.matcher(lines.get(i).strip()).matches(); i++) {
             lines.set(i, hide(lines.get(i)));
+            // Tabela de alternativas: a ultima linha escondida e a da alternativa E.
+            if (tableRows && LAST_TABLE_ROW.matcher(lines.get(i).replace(RichText.open('h'), "").strip()).matches()) {
+                break;
+            }
         }
     }
 

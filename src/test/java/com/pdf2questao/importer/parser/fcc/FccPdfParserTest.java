@@ -135,6 +135,80 @@ class FccPdfParserTest {
         assertEquals(4, parse().questions().size());
     }
 
+    // Trechos reais do OCR: lista com bolinhas e pontilhado, itens romanos e alternativas de romanos grudados.
+    private static final String LISTAS = """
+            ⟦p:1⟧
+            PROVA 3 - CONHECIMENTOS ESPECÍFICOS
+
+            1. O Patrimônio Liquido de uma empresa era composto das contas a seguir:
+
+            ' Capital Social ..... ici esierieneasereneneemcaieiecen nessa naseonecase TODODDO
+            “ Reserva Legal ........ seen meneeneeeecrcecao TSDDDO
+
+            No ano de 2025, a empresa estabelece a seguinte destinação:
+
+            “ Reserva Legal: constituída nos termos da Lei nº 6404/1976.
+            " Retenção de Lucros: saldo remanescente.
+
+            Com base nessas informações,
+
+            (A) um.
+            (B) dois.
+            (C) tres.
+            (D) quatro.
+            (E) cinco.
+
+            2. Considere as seguintes transações:
+
+            I. Recebeu um terreno em doação.
+            II. Vendeu ações que estavam em Tesouraria.
+            Iv. Pagou dividendos.
+            As transações listadas são reais.
+
+            As transações que alteraram o Patrimônio foram:
+            (A) IIIleV, apenas.
+
+            (B) IeTII,apenas.
+
+            (C) I, IIIe Iv.
+
+            (D) IelIVv, apenas.
+
+            (E) Nenhuma delas.
+            """;
+
+    @Test
+    void listasDoEnunciadoFicamUmItemPorLinha() {
+        ParsedQuestion q = parser.parse(LISTAS).questions().get(0);
+
+        assertTrue(q.statement().contains("\n• Capital Social ..... 1.000.000\n• Reserva Legal ..... 150.000\n"),
+                q.statement());
+        assertTrue(q.statement().contains("\n• Reserva Legal: constituída"), q.statement());
+        assertTrue(q.statement().contains("\n• Retenção de Lucros"), q.statement());
+    }
+
+    @Test
+    void alternativasDeRomanosSaemLegiveis() {
+        ParsedQuestion q = parser.parse(LISTAS).questions().get(1);
+
+        assertTrue(q.statement().contains("\nII. Vendeu ações"), q.statement());
+        assertTrue(q.statement().contains("\nIV. Pagou dividendos.\nAs transações listadas"), q.statement());
+        assertEquals("III e V, apenas.", q.alternativeA());
+        assertEquals("I e II, apenas.", q.alternativeB());
+        assertEquals("I, III e IV.", q.alternativeC());
+        assertEquals("I e IV, apenas.", q.alternativeD());
+        assertEquals("Nenhuma delas.", q.alternativeE());
+        // "IelIVv": o "l" podia ser um I; a leitura e um palpite.
+        assertTrue(q.needsReview());
+        assertTrue(q.reviewReason().contains("romanos"), q.reviewReason());
+    }
+
+    @Test
+    void alternativaNuncaFicaEscondidaNemComBarraSolta() {
+        assertEquals("não fez nenhum registro.", FccPdfParser.cleanAlternative("⟦h⟧não fez nenhum registro.⟦/h⟧"));
+        assertEquals("reconheceu a perda.", FccPdfParser.cleanAlternative("| reconheceu a perda."));
+    }
+
     @Test
     void tituloDeSecaoViraSugestaoNaPrimeiraQuestaoDepoisDele() {
         assertEquals("Legislação Tributária", question(3).sectionHeading());
