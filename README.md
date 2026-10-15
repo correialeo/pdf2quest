@@ -88,6 +88,9 @@ Os scripts não rodam direto no Windows. Duas opções:
 - **Importar gabarito** de um PDF separado e ligar as respostas às questões.
 - **Importar questões sem PDF**, por planilha CSV (qualquer layout: você escolhe as colunas) ou JSON
   ([formato documentado](docs/importacao/formato-json.md)), com prévia, validação e detecção de duplicatas.
+- **Estudos:** páginas e subpáginas de resumo com editor visual (títulos, listas, checklists, tabelas, links,
+  código) e salvamento automático, cronograma de tarefas por dia com tempo estimado e dedicado, e uma caixa
+  de entrada para anotações rápidas.
 - **Blocos de estudo:** recortes reutilizáveis de uma ou várias provas, com tempo limite opcional.
 - **Perfis de pontuação:** peso por disciplina e nota mínima por grupo, como no edital.
 - **Resolver no modo foco**, com riscar alternativas, grifar o texto base e marcar "é chute?".
@@ -133,6 +136,10 @@ Se for baixar uma versão nova do projeto, leve esses arquivos para a pasta nova
 mvn spring-boot:run   # sobe em http://localhost:8080
 mvn test              # roda os testes
 ```
+
+O schema do banco é versionado pelo Flyway (`src/main/resources/db/migration`). Instalações existentes são
+atualizadas sozinhas ao iniciar: as migrações só acrescentam colunas e tabelas (a V6 adiciona a importação por
+arquivo e a área de Estudos) e nunca apagam dados. Rollbacks manuais ficam em `db/rollback`.
 
 A importação segue um padrão de plugin por banca (`ExamParser` / `GabaritoTableParser`, descobertos pelo
 Spring e indexados por `Banca`): adicionar uma banca nova não mexe no resto do sistema. Estrutura de pacotes

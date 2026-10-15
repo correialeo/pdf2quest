@@ -48,6 +48,11 @@
     --bs-card-bg: #16171a;
 }
 
+/* "hidden" vale mesmo com classes de layout do Bootstrap (d-flex usa !important e mostrava os avisos escondidos). */
+[hidden] {
+    display: none !important;
+}
+
 body {
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "cv11", "ss01";
@@ -1192,3 +1197,243 @@ pre {
 .csv-sample td, .csv-sample th {
     white-space: nowrap;
 }
+
+/* ---- Estudos ---- */
+.study-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.study-tabs a {
+    padding: .45rem .75rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    font-size: .875rem;
+}
+
+.study-tabs a:hover { color: var(--bs-body-color); }
+
+.study-tabs a.active {
+    color: var(--bs-body-color);
+    border-bottom-color: var(--accent);
+    font-weight: 500;
+}
+
+.quick-note {
+    display: flex;
+    gap: .5rem;
+    align-items: flex-end;
+}
+
+.quick-note textarea { resize: vertical; }
+
+.page-list-row, .task-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .55rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+}
+
+.page-list-row:last-child, .task-row:last-child { border-bottom: 0; }
+a.page-list-row:hover, .page-list-row:hover { background: var(--bs-tertiary-bg); }
+
+.new-page-form {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    gap: .5rem;
+}
+
+.new-page-form input[name=title] { flex: 2 1 16rem; }
+.new-page-form input[name=subject] { flex: 1 1 10rem; }
+
+.task-info { flex: 1; min-width: 0; }
+
+.task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem .75rem;
+    font-size: .8rem;
+    color: var(--bs-secondary-color);
+}
+
+.task-check {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-size: 1.15rem;
+    line-height: 1;
+    color: var(--bs-secondary-color);
+}
+
+.task-check:hover { color: var(--ok); }
+.task-row.is-done .task-check { color: var(--ok); }
+.task-row.is-done .task-info > a { text-decoration: line-through !important; color: var(--bs-secondary-color) !important; }
+.task-row.is-overdue .task-check { color: var(--bad); }
+
+.inbox-text { white-space: pre-wrap; }
+
+.study-page-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 992px) {
+    .study-page-layout { grid-template-columns: 13rem minmax(0, 1fr); }
+}
+
+.study-tree {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+}
+
+.study-tree-link {
+    display: block;
+    padding: .25rem .5rem;
+    border-radius: var(--bs-border-radius-sm);
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    font-size: .85rem;
+}
+
+.study-tree-link:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); }
+.study-tree-link.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+
+.study-breadcrumbs a { color: var(--bs-secondary-color); text-decoration: none; }
+.study-breadcrumbs .bi { font-size: .7rem; color: var(--bs-secondary-color); margin: 0 .2rem; }
+
+.save-status { font-size: .8rem; color: var(--bs-secondary-color); }
+.save-status.is-ok { color: var(--ok); }
+.save-status.is-bad { color: var(--bad); white-space: normal !important; }
+
+.page-title-input {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--bs-body-color);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    outline: none;
+    padding: .25rem 0;
+}
+
+.editor-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .15rem;
+    padding: .35rem 0;
+    margin-bottom: .5rem;
+    background: var(--bs-body-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.editor-toolbar button {
+    min-width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--bs-border-radius-sm);
+    background: none;
+    color: var(--bs-secondary-color);
+    font-size: .85rem;
+    font-weight: 600;
+}
+
+.editor-toolbar button:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); }
+.editor-toolbar .sep { width: 1px; margin: .3rem .25rem; background: var(--bs-border-color); }
+
+.rich-content {
+    min-height: 50vh;
+    outline: none;
+    line-height: 1.65;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+}
+
+.rich-content { position: relative; }
+
+/* Pagina vazia: dica dos atalhos no lugar do texto. */
+.rich-content:empty::before, .rich-content:has(> p:only-child > br:only-child)::before {
+    content: attr(data-placeholder);
+    position: absolute;
+    color: var(--bs-secondary-color);
+    pointer-events: none;
+}
+
+.rich-content h1 { font-size: 1.6rem; margin: 1.4rem 0 .5rem; }
+.rich-content h2 { font-size: 1.3rem; margin: 1.2rem 0 .4rem; }
+.rich-content h3 { font-size: 1.1rem; margin: 1rem 0 .35rem; }
+.rich-content p { margin: 0 0 .5rem; }
+.rich-content blockquote {
+    margin: .5rem 0;
+    padding: .5rem 1rem;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 var(--bs-border-radius-sm) var(--bs-border-radius-sm) 0;
+}
+.rich-content pre {
+    padding: .75rem 1rem;
+    background: var(--bs-tertiary-bg);
+    border-radius: var(--bs-border-radius-sm);
+    font-size: .875rem;
+    white-space: pre-wrap;
+}
+.rich-content hr { margin: 1.25rem 0; opacity: .2; }
+.rich-content table { border-collapse: collapse; margin: .5rem 0 1rem; width: 100%; }
+.rich-content th, .rich-content td { border: 1px solid var(--bs-border-color); padding: .35rem .6rem; vertical-align: top; min-width: 4rem; }
+.rich-content th { background: var(--bs-tertiary-bg); font-weight: 600; }
+
+.rich-content ul[data-checklist] { list-style: none; padding-left: .25rem; }
+.rich-content ul[data-checklist] > li { position: relative; padding-left: 1.7rem; }
+.rich-content ul[data-checklist] > li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .3rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 1.5px solid var(--bs-secondary-color);
+    border-radius: .25rem;
+    cursor: pointer;
+}
+.rich-content ul[data-checklist] > li[data-checked="true"]::before {
+    background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3E%3Cpath d='M13.5 4.5 6 12 2.5 8.5l1-1L6 10l6.5-6.5z'/%3E%3C/svg%3E") center/80% no-repeat;
+    border-color: var(--accent);
+}
+.rich-content ul[data-checklist] > li[data-checked="true"] { color: var(--bs-secondary-color); text-decoration: line-through; }
+
+/* Cabecalho de cada dia do cronograma (abre/fecha a lista do dia). */
+.day-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    cursor: pointer;
+    list-style: none;
+    padding: .15rem 0;
+}
+
+.day-header::-webkit-details-marker { display: none; }
+.day-header::before {
+    content: "\F285";
+    font-family: "bootstrap-icons";
+    font-size: .7rem;
+    color: var(--bs-secondary-color);
+    transition: transform .15s ease;
+}
+details[open] > .day-header::before { transform: rotate(90deg); }

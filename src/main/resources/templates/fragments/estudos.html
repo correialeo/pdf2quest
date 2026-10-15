@@ -1,0 +1,21 @@
+<!-- Pecas compartilhadas pelas telas da area de Estudos. -->
+
+<!-- Abas do topo: active = overview | pages | schedule | inbox. -->
+<nav th:fragment="tabs(active)" class="study-tabs" aria-label="Estudos">
+    <a href="/estudos" th:classappend="${active == 'overview'} ? 'active'"><i class="bi bi-journal-richtext"></i> Visão geral</a>
+    <a href="/estudos/paginas" th:classappend="${active == 'pages'} ? 'active'"><i class="bi bi-file-earmark-text"></i> Páginas e resumos</a>
+    <a href="/estudos/cronograma" th:classappend="${active == 'schedule'} ? 'active'"><i class="bi bi-calendar-check"></i> Cronograma</a>
+    <a href="/estudos/caixa-de-entrada" th:classappend="${active == 'inbox'} ? 'active'"><i class="bi bi-inbox"></i> Caixa de entrada</a>
+</nav>
+
+<!-- Sugestoes para os campos de disciplina (o usuario pode digitar outra). -->
+<datalist th:fragment="subjects" id="subjectOptions">
+    <option th:each="s : ${subjects}" th:value="${s}"></option>
+</datalist>
+
+<!-- Anotacao rapida: vai para a caixa de entrada sem escolher nada. -->
+<form th:fragment="quickNote" method="post" action="/estudos/caixa-de-entrada" class="quick-note">
+    <textarea name="content" class="form-control" rows="2" required
+              placeholder="Anote rápido: uma dúvida, um artigo para revisar, uma ideia… (Ctrl+Enter guarda)"></textarea>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-inbox me-1"></i>Guardar</button>
+</form>

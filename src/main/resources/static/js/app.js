@@ -83,7 +83,20 @@
         });
     }
 
+    // Anotacao rapida (Estudos): Ctrl/Cmd+Enter guarda sem tirar a mao do teclado.
+    function setupQuickNote() {
+        document.querySelectorAll('.quick-note textarea').forEach(function (area) {
+            area.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && area.value.trim() !== '') {
+                    e.preventDefault();
+                    area.form.submit();
+                }
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
+        setupQuickNote();
         setupThemeToggle();
         highlightActiveNavLink();
         setupSidebarCollapse();

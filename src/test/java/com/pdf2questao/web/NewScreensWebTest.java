@@ -1,6 +1,8 @@
 package com.pdf2questao.web;
 
 import com.pdf2questao.Pdf2QuestaoApplication;
+import com.pdf2questao.study.StudyPage;
+import com.pdf2questao.study.StudyPageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,8 @@ class NewScreensWebTest {
 
     @Autowired
     MockMvc mvc;
+    @Autowired
+    StudyPageService pageService;
 
     @Test
     void importacaoJsonDoInicioAoFim() throws Exception {
@@ -105,6 +109,49 @@ class NewScreensWebTest {
         mvc.perform(get(key.getResponse().getRedirectedUrl())).andExpect(status().isOk())
                 .andExpect(content().string(containsString("Conflitos (1)")))
                 .andExpect(content().string(containsString("Respostas sem questão correspondente (1)")));
+    }
+
+    @Test
+    void telasDeEstudosEAutosave() throws Exception {
+        mvc.perform(get("/estudos")).andExpect(status().isOk()).andExpect(content().string(containsString("Para hoje")));
+        mvc.perform(get("/estudos/paginas")).andExpect(status().isOk()).andExpect(content().string(containsString("Criar página")));
+        mvc.perform(get("/estudos/cronograma")).andExpect(status().isOk()).andExpect(content().string(containsString("Nova tarefa")));
+        mvc.perform(get("/estudos/caixa-de-entrada")).andExpect(status().isOk()).andExpect(content().string(containsString("Caixa vazia")));
+
+        MvcResult created = mvc.perform(post("/estudos/paginas").param("title", "Página web"))
+                .andExpect(redirectedUrlPattern("/estudos/paginas/*")).andReturn();
+        String pageUrl = created.getResponse().getRedirectedUrl();
+        Long id = Long.parseLong(pageUrl.substring(pageUrl.lastIndexOf('/') + 1));
+        mvc.perform(post("/estudos/paginas").param("parentId", id.toString()).param("title", "Filha"));
+        mvc.perform(get(pageUrl)).andExpect(status().isOk()).andExpect(content().string(containsString("Filha")))
+                .andExpect(content().string(containsString("data-version=\"0\"")));
+
+        mvc.perform(put(pageUrl + "/conteudo").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Novo\",\"content\":\"<p>oi</p>\",\"version\":0}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.version").value(1));
+        // Versao antiga: recusa e devolve o que esta gravado, para o editor ver se e conflito de verdade.
+        mvc.perform(put(pageUrl + "/conteudo").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Velho\",\"content\":\"<p>x</p>\",\"version\":0}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.title").value("Novo")).andExpect(jsonPath("$.content").value("<p>oi</p>"));
+        mvc.perform(get(pageUrl)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                .header().string("Cache-Control", "no-store"));
+        StudyPage page = pageService.find(id).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("Novo", page.getTitle());
+
+        mvc.perform(post("/estudos/cronograma").param("title", "Tarefa web").param("plannedDate", java.time.LocalDate.now().toString())
+                .param("pageId", id.toString())).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/estudos/cronograma")).andExpect(status().isOk()).andExpect(content().string(containsString("Tarefa web")));
+        mvc.perform(post("/estudos/caixa-de-entrada").param("content", "nota web")).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/estudos/caixa-de-entrada")).andExpect(status().isOk()).andExpect(content().string(containsString("nota web")));
+        // Com tarefa para hoje, o aviso de dia vazio nao pode aparecer (th:if junto de th:replace o mostrava sempre).
+        mvc.perform(get("/estudos")).andExpect(status().isOk()).andExpect(content().string(containsString("Novo")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Nada planejado para hoje"))));
+
+
+        mvc.perform(post(pageUrl + "/excluir")).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/estudos/paginas"));
+        mvc.perform(put(pageUrl + "/conteudo").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"x\",\"content\":\"\",\"version\":1}")).andExpect(status().isNotFound());
     }
 
 }
