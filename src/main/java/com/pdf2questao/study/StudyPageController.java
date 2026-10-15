@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Map;
 
 /** Paginas e resumos: lista em arvore, editor com salvamento automatico, subpaginas. */
@@ -23,11 +25,59 @@ public class StudyPageController {
     private final StudyPageService pageService;
     private final StudyTaskService taskService;
     private final StudySubjects subjects;
+    private final DocxImportService docxImportService;
 
-    public StudyPageController(StudyPageService pageService, StudyTaskService taskService, StudySubjects subjects) {
+    public StudyPageController(StudyPageService pageService, StudyTaskService taskService, StudySubjects subjects,
+                               DocxImportService docxImportService) {
         this.pageService = pageService;
         this.taskService = taskService;
         this.subjects = subjects;
+        this.docxImportService = docxImportService;
+    }
+
+    @PostMapping("/estudos/importar")
+    public String importDocx(@RequestParam(value = "file", required = false) MultipartFile file,
+                             RedirectAttributes redirectAttributes) throws IOException {
+        if (file == null || file.isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", "Escolha um arquivo do Word (.docx).");
+            return "redirect:/estudos/paginas";
+        }
+        try {
+            var preview = docxImportService.preview(file.getOriginalFilename(), file.getBytes(), null);
+            return "redirect:/estudos/importar/" + preview.token();
+        } catch (DocxReader.InvalidDocxException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/estudos/paginas";
+        }
+    }
+
+    @GetMapping("/estudos/importar/{token}")
+    public String importPreview(@PathVariable String token, Model model, RedirectAttributes redirectAttributes) {
+        var preview = docxImportService.get(token);
+        if (preview.isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", "Esta prévia expirou. Envie o arquivo de novo.");
+            return "redirect:/estudos/paginas";
+        }
+        model.addAttribute("preview", preview.get());
+        model.addAttribute("pages", pageService.flatTree());
+        return "estudos-importar";
+    }
+
+    @PostMapping("/estudos/importar/{token}")
+    public String importConfirm(@PathVariable String token, @RequestParam(defaultValue = "") String title,
+                                @RequestParam(required = false) Long parentId,
+                                @RequestParam(defaultValue = "false") boolean createTasks,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            var outcome = docxImportService.confirm(token, title, parentId, createTasks);
+            redirectAttributes.addFlashAttribute("message", "Documento importado como página"
+                    + (outcome.tasksCreated() > 0 ? " e " + outcome.tasksCreated() + " tarefas criadas no cronograma" : "")
+                    + ".");
+            return "redirect:/estudos/paginas/" + outcome.pageId();
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/estudos/paginas";
+        }
     }
 
     @GetMapping("/estudos/paginas")

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Páginas e resumos')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Páginas e resumos</h1>
+            <p class="page-subtitle">Organize por assunto: cada página pode ter subpáginas, como um caderno com divisórias.</p>
+        </div>
+    </div>
+    <nav th:replace="~{fragments/estudos :: tabs('pages')}"></nav>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="post" action="/estudos/paginas" class="card p-3 mb-3 new-page-form">
+        <input type="text" name="title" class="form-control" placeholder="Título da nova página (ex.: Direito Administrativo – Atos)" maxlength="255"/>
+        <input type="text" name="subject" class="form-control" list="subjectOptions" placeholder="Disciplina (opcional)"/>
+        <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>Criar página</button>
+    </form>
+    <datalist th:replace="~{fragments/estudos :: subjects}"></datalist>
+    <form method="post" action="/estudos/importar" enctype="multipart/form-data" class="d-flex flex-wrap align-items-center gap-2 mb-3 small">
+        <label class="btn btn-sm btn-outline-secondary mb-0" for="docxFile"><i class="bi bi-file-earmark-word me-1"></i>Importar do Word (.docx)</label>
+        <input type="file" name="file" id="docxFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+               class="visually-hidden" onchange="this.form.submit()"/>
+        <span class="text-muted">Vira uma página; se tiver tabela de cronograma com datas, você pode criar as tarefas também.</span>
+    </form>
+
+    <form method="get" class="d-flex align-items-center gap-2 mb-2" th:unless="${tree.isEmpty()}">
+        <label class="small text-muted text-nowrap" for="filtro">Disciplina</label>
+        <select id="filtro" name="disciplina" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+            <option value="">Todas</option>
+            <option th:each="s : ${subjects}" th:value="${s}" th:text="${s}" th:selected="${s == disciplina}"></option>
+        </select>
+    </form>
+
+    <div th:if="${tree.isEmpty()}" class="empty-state">
+        <i class="bi bi-file-earmark-text"></i>
+        <span>Nenhuma página ainda. Dê um título acima e clique em <strong>Criar página</strong>; o texto é salvo sozinho enquanto você escreve.</span>
+    </div>
+    <div class="card page-list" th:unless="${tree.isEmpty()}">
+        <th:block th:each="n : ${tree}">
+        <div class="page-list-row" th:if="${disciplina == null or n.page.subject == disciplina}"
+             th:style="'padding-left: ' + (${disciplina == null} ? ${1 + n.depth * 1.5} : 1) + 'rem'">
+            <i class="bi text-muted" th:classappend="${n.children.isEmpty()} ? 'bi-file-earmark-text' : 'bi-folder2-open'"></i>
+            <a class="text-reset text-decoration-none text-truncate" th:href="@{/estudos/paginas/{id}(id=${n.page.id})}" th:text="${n.page.displayTitle}"></a>
+            <span class="chip" th:if="${n.page.subject != null}" th:text="${n.page.subject}"></span>
+            <span class="ms-auto d-flex align-items-center gap-1">
+                <span class="text-muted small text-nowrap d-none d-md-inline" th:text="${#temporals.format(n.page.updatedAt, 'dd/MM/yyyy')}"></span>
+                <form method="post" th:action="@{/estudos/paginas/{id}/mover(id=${n.page.id})}" th:if="${disciplina == null}">
+                    <input type="hidden" name="direcao" value="-1"/>
+                    <button class="icon-btn border-0" title="Subir" aria-label="Subir"><i class="bi bi-arrow-up"></i></button>
+                </form>
+                <form method="post" th:action="@{/estudos/paginas/{id}/mover(id=${n.page.id})}" th:if="${disciplina == null}">
+                    <input type="hidden" name="direcao" value="1"/>
+                    <button class="icon-btn border-0" title="Descer" aria-label="Descer"><i class="bi bi-arrow-down"></i></button>
+                </form>
+            </span>
+        </div>
+        </th:block>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

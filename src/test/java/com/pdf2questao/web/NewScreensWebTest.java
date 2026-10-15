@@ -154,4 +154,33 @@ class NewScreensWebTest {
                 .content("{\"title\":\"x\",\"content\":\"\",\"version\":1}")).andExpect(status().isNotFound());
     }
 
+    @Autowired
+    com.pdf2questao.study.StudyTaskRepository taskRepository;
+
+    @Test
+    void docxViraPaginaETarefasSemDuplicarNaReimportacao() throws Exception {
+        String body = com.pdf2questao.study.DocxImportTest.p("Heading1", "Plano docx")
+                + "<w:tbl>" + com.pdf2questao.study.DocxImportTest.row("Dia", "A1 – P1 (60 min)")
+                + com.pdf2questao.study.DocxImportTest.row("Seg 02/03/2026", "Docx: tarefa um")
+                + com.pdf2questao.study.DocxImportTest.row("Ter 03/03", "Docx: tarefa dois") + "</w:tbl>";
+        MockMultipartFile file = new MockMultipartFile("file", "plano.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                com.pdf2questao.study.DocxImportTest.docx(body, null));
+        String preview = mvc.perform(multipart("/estudos/importar").file(file)).andReturn().getResponse().getRedirectedUrl();
+        mvc.perform(get(preview)).andExpect(status().isOk())
+                .andExpect(content().string(containsString("Criar <strong>2</strong> tarefas")))
+                .andExpect(content().string(containsString("Docx: tarefa dois")));
+        String page = mvc.perform(post(preview).param("createTasks", "true"))
+                .andExpect(redirectedUrlPattern("/estudos/paginas/*")).andReturn().getResponse().getRedirectedUrl();
+        Long pageId = Long.parseLong(page.substring(page.lastIndexOf('/') + 1));
+        mvc.perform(get(page)).andExpect(status().isOk()).andExpect(content().string(containsString("Plano docx")));
+        org.junit.jupiter.api.Assertions.assertEquals(2, taskRepository.findByPageId(pageId).size());
+
+        String again = mvc.perform(multipart("/estudos/importar").file(file)).andReturn().getResponse().getRedirectedUrl();
+        mvc.perform(get(again)).andExpect(status().isOk())
+                .andExpect(content().string(containsString("2 tarefas iguais")));
+
+        mvc.perform(multipart("/estudos/importar").file(new MockMultipartFile("file", "x.docx", "application/octet-stream",
+                "nao".getBytes()))).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/estudos/paginas"));
+    }
 }

@@ -46,6 +46,15 @@ public class StudyTask {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    /** Cabecalho de bloco vindo do .docx ("B – TI (90 min)"): so repete disciplina e tempo, ja mostrados na lista. */
+    private static final java.util.regex.Pattern BLOCK_ONLY =
+            java.util.regex.Pattern.compile("^\\S{1,4} – [^\\n]{1,40}\\(\\d+ min\\)$");
+
+    /** Descricao para a lista do cronograma: nula quando e so o cabecalho do bloco importado. */
+    public String getListDescription() {
+        return description == null || BLOCK_ONLY.matcher(description.strip()).matches() ? null : description;
+    }
+
     public boolean isOverdue() {
         return !done && plannedDate != null && plannedDate.isBefore(LocalDate.now());
     }

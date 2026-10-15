@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Importar documento')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Importar documento</h1>
+            <p class="page-subtitle" th:text="${preview.fileName} + ' · nada foi gravado ainda.'"></p>
+        </div>
+    </div>
+    <nav th:replace="~{fragments/estudos :: tabs('pages')}"></nav>
+
+    <form method="post" th:action="@{/estudos/importar/{t}(t=${preview.token})}" class="card p-3 mb-4">
+        <div class="row g-2">
+            <div class="col-md-7">
+                <label class="form-label small">Título da página</label>
+                <input type="text" name="title" class="form-control" th:value="${preview.title}" maxlength="255"/>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small">Dentro de</label>
+                <select name="parentId" class="form-select">
+                    <option value="">(nenhuma: página principal)</option>
+                    <option th:each="n : ${pages}" th:value="${n.page.id}" th:text="${#strings.repeat('— ', n.depth)} + ${n.page.displayTitle}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="form-check mt-3" th:if="${preview.newTasks() > 0}">
+            <input class="form-check-input" type="checkbox" name="createTasks" value="true" id="createTasks" checked/>
+            <label class="form-check-label" for="createTasks">
+                Criar <strong th:text="${preview.newTasks()}"></strong> tarefas no cronograma
+                (<span th:text="${#temporals.format(preview.firstDate(), 'dd/MM/yyyy')}"></span> a
+                <span th:text="${#temporals.format(preview.lastDate(), 'dd/MM/yyyy')}"></span>,
+                <span th:text="${preview.totalMinutes() / 60}"></span> h planejadas), ligadas a esta página
+            </label>
+        </div>
+        <div class="form-text" th:if="${preview.existingTasks() > 0}"
+             th:text="${preview.existingTasks()} + ' tarefas iguais (mesmo dia e título) já estão no cronograma e não serão repetidas.'"></div>
+        <p class="small text-muted mt-3 mb-0" th:if="${preview.tasks.isEmpty()}">
+            Não encontramos tabela de cronograma (primeira coluna com datas como "Qui 15/10"); o documento entra só como página.</p>
+        <div class="d-flex gap-2 mt-3">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Importar</button>
+            <a href="/estudos/paginas" class="btn btn-outline-secondary">Desistir</a>
+        </div>
+    </form>
+
+    <details class="mb-4" th:unless="${preview.tasks.isEmpty()}" open>
+        <summary class="section-title d-inline-block m-0" th:text="'Tarefas encontradas (' + ${preview.tasks.size()} + ')'"></summary>
+        <div class="card mt-2 table-responsive" style="max-height: 28rem">
+            <table class="table table-sm mb-0 small">
+                <thead><tr><th>Dia</th><th>Tarefa</th><th>Disciplina</th><th>Tempo</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="t : ${preview.tasks}" th:classappend="${t.existing} ? 'text-muted'">
+                    <td class="text-nowrap" th:text="${#temporals.format(t.item.date, 'EEE dd/MM')}"></td>
+                    <td th:text="${t.item.title}"></td>
+                    <td class="text-nowrap" th:text="${t.item.subject} ?: '—'"></td>
+                    <td class="text-nowrap" th:text="${t.item.minutes != null} ? ${t.item.minutes} + ' min' : '—'"></td>
+                    <td class="text-nowrap"><span th:if="${t.existing}">já existe</span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </details>
+
+    <div class="section-title">Como a página vai ficar</div>
+    <div class="card p-4"><div class="rich-content" style="min-height: 0" th:utext="${preview.html}"></div></div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Cronograma')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Cronograma</h1>
+            <p class="page-subtitle">Planeje o que estudar em cada dia e acompanhe o tempo que você realmente dedicou.</p>
+        </div>
+    </div>
+    <nav th:replace="~{fragments/estudos :: tabs('schedule')}"></nav>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="post" action="/estudos/cronograma" class="card p-3 mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label small" for="taskTitle">Nova tarefa</label>
+                <input type="text" name="title" id="taskTitle" class="form-control" required maxlength="255"
+                       placeholder="Ex.: Ler Lei 8.112 – arts. 1 a 50"/>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Dia</label>
+                <input type="date" name="plannedDate" class="form-control" th:value="${today}"/>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Disciplina</label>
+                <input type="text" name="subject" class="form-control" list="subjectOptions"/>
+            </div>
+            <div class="col-6 col-md-1">
+                <label class="form-label small">Minutos</label>
+                <input type="number" name="estimatedMinutes" class="form-control" min="0" step="5" placeholder="60"/>
+            </div>
+            <div class="col-6 col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Adicionar</button>
+            </div>
+        </div>
+        <details class="mt-2">
+            <summary class="small text-muted">Mais detalhes (descrição, página de resumo)</summary>
+            <div class="row g-2 mt-1">
+                <div class="col-md-7"><textarea name="description" class="form-control form-control-sm" rows="2" placeholder="Descrição"></textarea></div>
+                <div class="col-md-5">
+                    <select name="pageId" class="form-select form-select-sm">
+                        <option value="">Sem página de resumo</option>
+                        <option th:each="n : ${pages}" th:value="${n.page.id}" th:text="${#strings.repeat('— ', n.depth)} + ${n.page.displayTitle}"></option>
+                    </select>
+                </div>
+            </div>
+        </details>
+    </form>
+    <datalist th:replace="~{fragments/estudos :: subjects}"></datalist>
+
+    <div class="row row-cols-3 g-3 mb-4" th:unless="${groups.isEmpty()}">
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Tarefas da semana', ${week.done} + ' de ' + ${week.planned}, '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Planejado na semana', ${week.estimatedMinutes} + ' min', '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Estudado na semana', ${week.spentMinutes} + ' min', 'text-ok')}"></div></div>
+    </div>
+
+    <div th:if="${groups.isEmpty()}" class="empty-state">
+        <i class="bi bi-calendar-check"></i>
+        <span>Nenhuma tarefa ainda. Escreva o que vai estudar acima, escolha o dia e clique em <strong>Adicionar</strong>.</span>
+    </div>
+
+    <th:block th:each="g : ${groups}">
+    <details class="mb-3" th:open="${g.kind != 'done'}">
+        <summary class="day-header">
+            <span class="section-title m-0" th:classappend="${g.kind == 'overdue'} ? 'text-bad' : ''" th:text="${g.label}"></span>
+            <span class="text-muted small" th:text="${g.tasks.size()} + (${g.tasks.size() == 1} ? ' tarefa' : ' tarefas') + (${g.estimatedMinutes() > 0} ? ' · ' + ${g.estimatedMinutes()} + ' min' : '')"></span>
+        </summary>
+        <div class="card task-list mt-2">
+            <div class="task-row" th:each="t : ${g.tasks}" th:classappend="${t.done} ? 'is-done'">
+                <form method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}" class="task-done-form">
+                    <input type="hidden" name="done" th:value="${!t.done}"/>
+                    <input type="hidden" name="spentMinutes" value=""/>
+                    <button type="submit" class="task-check" th:title="${t.done} ? 'Reabrir' : 'Concluir'"
+                            th:attr="aria-label=${t.done} ? 'Reabrir tarefa' : 'Concluir tarefa',data-ask-time=${!t.done and t.spentMinutes == null}">
+                        <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
+                </form>
+                <div class="task-info">
+                    <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
+                    <div class="task-meta">
+                        <span th:if="${g.kind == 'done' and t.plannedDate != null}" th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span>
+                        <span th:if="${t.subject != null}" class="fw-medium" th:text="${t.subject}"></span>
+                        <span th:if="${t.estimatedMinutes != null or t.spentMinutes != null}"><i class="bi bi-clock"></i>
+                            <span th:text="(${t.spentMinutes != null} ? ${t.spentMinutes} + ' de ' : '') + (${t.estimatedMinutes != null} ? ${t.estimatedMinutes} : '?') + ' min'"></span></span>
+                        <a th:if="${t.pageId != null}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
+                    </div>
+                    <div class="small text-muted text-truncate" th:if="${t.listDescription != null}" th:text="${t.listDescription}"></div>
+                </div>
+                <div class="dropdown">
+                    <button type="button" class="icon-btn border-0" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mais ações"><i class="bi bi-three-dots"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
+                        <li><hr class="dropdown-divider"/></li>
+                        <li>
+                            <form method="post" th:action="@{/estudos/cronograma/{id}/excluir(id=${t.id})}" onsubmit="return confirm('Apagar esta tarefa?')">
+                                <button type="submit" class="dropdown-item text-bad"><i class="bi bi-trash me-2"></i>Apagar</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </details>
+    </th:block>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    // Ao concluir, pergunta (opcional) quanto tempo foi estudado.
+    document.querySelectorAll('.task-done-form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            var button = form.querySelector('[data-ask-time]');
+            if (button && button.getAttribute('data-ask-time') === 'true') {
+                var minutes = window.prompt('Quantos minutos você estudou? (pode deixar em branco)', '');
+                if (minutes !== null && /^\d+$/.test(minutes.trim())) {
+                    form.querySelector('[name=spentMinutes]').value = minutes.trim();
+                }
+            }
+        });
+    });
+</script>
+</body>
+</html>

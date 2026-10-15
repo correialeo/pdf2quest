@@ -161,4 +161,12 @@ class StudyIntegrationTest {
         assertTrue(inboxService.all().stream().noneMatch(n -> n.getId().equals(note.getId())));
     }
 
+    @Test
+    void descricaoQueSoRepeteOBlocoNaoApareceNaLista() {
+        StudyTask task = new StudyTask();
+        task.setDescription("B – TI (90 min)");
+        assertNull(task.getListDescription());
+        task.setDescription("Ler com calma (90 min)");
+        assertEquals("Ler com calma (90 min)", task.getListDescription());
+    }
 }
