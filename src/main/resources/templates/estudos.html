@@ -28,16 +28,13 @@
             <th:block th:if="${dueTasks.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-calendar-check', 'Nada planejado para hoje.', 'Planejar uma tarefa', '/estudos/cronograma')}"></div></th:block>
             <div class="card task-list" th:unless="${dueTasks.isEmpty()}">
                 <div class="task-row" th:each="t : ${dueTasks}" th:classappend="${t.overdue} ? 'is-overdue'">
-                    <form method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}">
-                        <input type="hidden" name="done" value="true"/>
-                        <button type="submit" class="task-check" title="Concluir" aria-label="Concluir tarefa"><i class="bi bi-circle"></i></button>
-                    </form>
+                    <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
                     <div class="task-info">
                         <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
                         <div class="task-meta">
                             <span th:if="${t.overdue}" class="text-bad">Atrasada · <span th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span></span>
                             <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
-                            <span th:if="${t.estimatedMinutes != null}"><i class="bi bi-clock"></i> <span th:text="${t.estimatedMinutes} + ' min'"></span></span>
+                            <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                         </div>
                     </div>
                 </div>

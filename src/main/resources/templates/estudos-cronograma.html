@@ -62,35 +62,29 @@
         <span>Nenhuma tarefa ainda. Escreva o que vai estudar acima, escolha o dia e clique em <strong>Adicionar</strong>.</span>
     </div>
 
+    <div class="d-flex justify-content-end mb-2 small" th:if="${hiddenDays > 0 or showAll}">
+        <a th:if="${!showAll}" href="/estudos/cronograma?ver=todas" th:text="'Mostrar dias anteriores já concluídos (' + ${hiddenDays} + ')'"></a>
+        <a th:if="${showAll}" href="/estudos/cronograma">Ocultar dias antigos já concluídos</a>
+    </div>
+
     <th:block th:each="g : ${groups}">
-    <details class="mb-3" th:open="${g.kind != 'done'}">
+    <details class="mb-3" th:open="${g.kind != 'past' or g.doneCount() < g.tasks.size()}">
         <summary class="day-header">
             <span class="section-title m-0" th:classappend="${g.kind == 'overdue'} ? 'text-bad' : ''" th:text="${g.label}"></span>
-            <span class="text-muted small" th:text="${g.tasks.size()} + (${g.tasks.size() == 1} ? ' tarefa' : ' tarefas') + (${g.estimatedMinutes() > 0} ? ' · ' + ${g.estimatedMinutes()} + ' min' : '')"></span>
+            <span class="text-muted small" th:text="(${g.doneCount() > 0} ? ${g.doneCount()} + ' de ' + ${g.tasks.size()} + (${g.doneCount() == 1} ? ' concluída' : ' concluídas') : ${g.tasks.size()} + (${g.tasks.size() == 1} ? ' tarefa' : ' tarefas')) + (${g.estimatedMinutes() > 0} ? ' · ' + (${g.spentMinutes() > 0} ? ${g.spentMinutes()} + ' de ' : '') + ${g.estimatedMinutes()} + ' min' : (${g.spentMinutes() > 0} ? ' · ' + ${g.spentMinutes()} + ' min' : ''))"></span>
             <span class="ms-auto" th:if="${g.date != null}">
                 <th:block th:replace="~{fragments/estudos :: dayButton(${g.date}, ${summaries[g.date]}, ${summaries[g.date] != null} ? 'Abrir resumo' : 'Resumo do dia', '')}"></th:block>
             </span>
         </summary>
         <div class="card task-list mt-2">
             <div class="task-row" th:each="t : ${g.tasks}" th:classappend="${t.done} ? 'is-done'">
-                <form method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}" class="task-done-form">
-                    <input type="hidden" name="done" th:value="${!t.done}"/>
-                    <input type="hidden" name="spentMinutes" value=""/>
-                    <button type="submit" class="task-check" th:title="${t.done} ? 'Reabrir' : 'Concluir'"
-                            th:attr="aria-label=${t.done} ? 'Reabrir tarefa' : 'Concluir tarefa',data-ask-time=${!t.done and t.spentMinutes == null}">
-                        <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
-                </form>
+                <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
                 <div class="task-info">
                     <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
                     <div class="task-meta">
-                        <span th:if="${g.kind == 'done' and t.plannedDate != null}" th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span>
                         <span th:if="${t.subject != null}" class="fw-medium" th:text="${t.subject}"></span>
-                        <span th:if="${t.estimatedMinutes != null or t.spentMinutes != null}"><i class="bi bi-clock"></i>
-                            <span th:text="(${t.spentMinutes != null} ? ${t.spentMinutes} + ' de ' : '') + (${t.estimatedMinutes != null} ? ${t.estimatedMinutes} : '?') + ' min'"></span></span>
+                        <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                         <a th:if="${t.pageId != null}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
-                        <th:block th:if="${g.kind == 'done' and t.plannedDate != null}">
-                            <th:block th:replace="~{fragments/estudos :: dayButton(${t.plannedDate}, ${summaries[t.plannedDate]}, 'resumo do dia', 'is-link')}"></th:block>
-                        </th:block>
                     </div>
                     <div class="small text-muted text-truncate" th:if="${t.listDescription != null}" th:text="${t.listDescription}"></div>
                 </div>
@@ -112,19 +106,5 @@
     </th:block>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
-<script>
-    // Ao concluir, pergunta (opcional) quanto tempo foi estudado.
-    document.querySelectorAll('.task-done-form').forEach(function (form) {
-        form.addEventListener('submit', function () {
-            var button = form.querySelector('[data-ask-time]');
-            if (button && button.getAttribute('data-ask-time') === 'true') {
-                var minutes = window.prompt('Quantos minutos você estudou? (pode deixar em branco)', '');
-                if (minutes !== null && /^\d+$/.test(minutes.trim())) {
-                    form.querySelector('[name=spentMinutes]').value = minutes.trim();
-                }
-            }
-        });
-    });
-</script>
 </body>
 </html>

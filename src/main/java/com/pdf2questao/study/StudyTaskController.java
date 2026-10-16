@@ -36,11 +36,15 @@ public class StudyTaskController {
     }
 
     @GetMapping("/estudos/cronograma")
-    public String list(Model model) {
+    public String list(@RequestParam(defaultValue = "") String ver, Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
-        var groups = taskService.groups(today);
+        boolean showAll = ver.equals("todas");
+        var schedule = taskService.schedule(today, showAll);
+        var groups = schedule.groups();
         model.addAttribute("groups", groups);
+        model.addAttribute("showAll", showAll);
+        model.addAttribute("hiddenDays", schedule.hiddenDays());
         var dates = groups.stream().map(StudyTaskService.TaskGroup::date).filter(java.util.Objects::nonNull).toList();
         model.addAttribute("summaries", dates.isEmpty() ? java.util.Map.of()
                 : daySummaryService.existing(java.util.Collections.min(dates), java.util.Collections.max(dates)));
@@ -108,6 +112,20 @@ public class StudyTaskController {
                        @RequestParam(required = false) Integer spentMinutes,
                        @RequestHeader(value = "Referer", required = false) String referer) {
         taskService.setDone(id, done, spentMinutes);
+        return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
+    /** Corrige os minutos dedicados (campo vazio apaga o registro). */
+    @PostMapping("/estudos/cronograma/{id}/tempo")
+    public String spent(@PathVariable Long id, @RequestParam(required = false) Integer spentMinutes,
+                        @RequestHeader(value = "Referer", required = false) String referer,
+                        RedirectAttributes redirectAttributes) {
+        try {
+            taskService.setSpent(id, spentMinutes);
+            redirectAttributes.addFlashAttribute("message", "Tempo atualizado.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
         return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
     }
 

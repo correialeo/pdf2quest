@@ -30,13 +30,28 @@ public class StudyTaskService {
         this.pageRepository = pageRepository;
     }
 
-    /** Grupo da lista do cronograma ("Atrasadas", "Hoje · qua, 15/10", "Sem data", "Concluídas"). */
-    /** {@code date}: o dia do grupo (nulo em "Atrasadas", "Sem data" e "Concluidas"). */
+    /** Grupo da lista do cronograma ("Atrasada · ter, 13/10", "Hoje · qua, 15/10", "Sem data"). */
+    /** {@code date}: o dia do grupo (nulo em "Sem data"). Pendentes e concluidas do dia ficam juntas. */
     public record TaskGroup(String label, String kind, LocalDate date, List<StudyTask> tasks) {
 
         public int estimatedMinutes() {
             return tasks.stream().mapToInt(t -> t.getEstimatedMinutes() == null ? 0 : t.getEstimatedMinutes()).sum();
         }
+
+        public int spentMinutes() {
+            return tasks.stream().mapToInt(t -> t.getSpentMinutes() == null ? 0 : t.getSpentMinutes()).sum();
+        }
+
+        public int doneCount() {
+            return (int) tasks.stream().filter(StudyTask::isDone).count();
+        }
+    }
+
+    /** O cronograma esconde dias passados ja concluidos ha mais que isso (a nao ser que peca "todas"). */
+    public static final int RECENT_DAYS = 7;
+
+    /** Lista do cronograma e quantos dias concluidos antigos ficaram de fora. */
+    public record Schedule(List<TaskGroup> groups, int hiddenDays) {
     }
 
     /** Dados para o formulario de tarefa (criar e editar usam o mesmo). */
@@ -47,32 +62,42 @@ public class StudyTaskService {
     public record WeekSummary(int planned, int done, int estimatedMinutes, int spentMinutes) {
     }
 
-    /** Pendentes por data (atrasadas primeiro), sem data, e as concluidas por ultimo (mais recentes primeiro). */
+    /** Atalho: so os grupos da lista padrao. */
     public List<TaskGroup> groups(LocalDate today) {
-        List<StudyTask> all = taskRepository.findAll();
-        List<TaskGroup> groups = new ArrayList<>();
-        List<StudyTask> pending = all.stream().filter(t -> !t.isDone())
+        return schedule(today, false).groups();
+    }
+
+    /**
+     * Um grupo por dia, com as tarefas pendentes e as concluidas. Dias passados ja todos concluidos aparecem
+     * so nos ultimos {@link #RECENT_DAYS} dias, ou sempre com {@code showAll}.
+     */
+    public Schedule schedule(LocalDate today, boolean showAll) {
+        List<StudyTask> all = taskRepository.findAll().stream()
                 .sorted(Comparator.comparing(StudyTask::getPlannedDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(StudyTask::getId)).toList();
-
-        // Um grupo por dia, inclusive os atrasados: cada dia tem o seu resumo.
+        List<TaskGroup> groups = new ArrayList<>();
         Map<LocalDate, List<StudyTask>> byDate = new LinkedHashMap<>();
-        pending.stream().filter(t -> t.getPlannedDate() != null)
+        all.stream().filter(t -> t.getPlannedDate() != null)
                 .forEach(t -> byDate.computeIfAbsent(t.getPlannedDate(), d -> new ArrayList<>()).add(t));
-        byDate.forEach((date, tasks) -> groups.add(new TaskGroup(
-                date.isBefore(today) ? "Atrasada · " + dayLabel(date, today) : dayLabel(date, today),
-                date.isBefore(today) ? "overdue" : date.equals(today) ? "today" : "day", date, tasks)));
-        List<StudyTask> undated = pending.stream().filter(t -> t.getPlannedDate() == null).toList();
+        int hidden = 0;
+        for (var entry : byDate.entrySet()) {
+            LocalDate date = entry.getKey();
+            List<StudyTask> tasks = entry.getValue();
+            boolean pending = tasks.stream().anyMatch(t -> !t.isDone());
+            boolean past = date.isBefore(today);
+            if (past && !pending && !showAll && date.isBefore(today.minusDays(RECENT_DAYS))) {
+                hidden++;
+                continue;
+            }
+            String kind = past ? (pending ? "overdue" : "past") : date.equals(today) ? "today" : "day";
+            String label = kind.equals("overdue") ? "Atrasada · " + dayLabel(date, today) : dayLabel(date, today);
+            groups.add(new TaskGroup(label, kind, date, tasks));
+        }
+        List<StudyTask> undated = all.stream().filter(t -> t.getPlannedDate() == null).toList();
         if (!undated.isEmpty()) {
             groups.add(new TaskGroup("Sem data", "undated", null, undated));
         }
-        List<StudyTask> done = all.stream().filter(StudyTask::isDone)
-                .sorted(Comparator.comparing(StudyTask::getDoneAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
-        if (!done.isEmpty()) {
-            groups.add(new TaskGroup("Concluídas", "done", null, done));
-        }
-        return groups;
+        return new Schedule(groups, hidden);
     }
 
     /** Tarefas de hoje e atrasadas, para a visao geral. */
@@ -155,6 +180,17 @@ public class StudyTaskService {
         if (spentMinutes != null && spentMinutes >= 0) {
             task.setSpentMinutes(spentMinutes);
         }
+        return taskRepository.save(task);
+    }
+
+    /** Corrige o tempo dedicado (nulo = nao registrado), sem mudar se esta concluida. */
+    @Transactional
+    public StudyTask setSpent(Long id, Integer spentMinutes) {
+        if (negative(spentMinutes)) {
+            throw new IllegalArgumentException("O tempo não pode ser negativo.");
+        }
+        StudyTask task = taskRepository.findById(id).orElseThrow();
+        task.setSpentMinutes(spentMinutes);
         return taskRepository.save(task);
     }
 

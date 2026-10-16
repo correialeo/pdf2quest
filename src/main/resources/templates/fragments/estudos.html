@@ -30,3 +30,26 @@
             <i class="bi bi-journal-plus"></i><span th:if="${label != ''}" th:text="${label}"></span></button>
     </form>
 </th:block>
+
+<!-- Concluir/reabrir. Ao concluir, o app.js pergunta os minutos (ja preenchidos com o estimado). -->
+<form th:fragment="taskCheck(t)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}" class="task-done-form"
+      th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+    <input type="hidden" name="done" th:value="${!t.done}"/>
+    <input type="hidden" name="spentMinutes" value=""/>
+    <button type="submit" class="task-check" th:title="${t.done} ? 'Reabrir' : 'Concluir'"
+            th:attr="aria-label=${t.done} ? 'Reabrir tarefa' : 'Concluir tarefa'">
+        <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
+</form>
+
+<!-- Tempo da tarefa ("45 de 60 min"); clicar corrige os minutos dedicados. -->
+<form th:fragment="taskTime(t)" method="post" th:action="@{/estudos/cronograma/{id}/tempo(id=${t.id})}" class="task-time-form d-inline"
+      th:attr="data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+    <input type="hidden" name="spentMinutes" th:value="${t.spentMinutes}"/>
+    <button type="submit" class="task-time" title="Alterar os minutos estudados">
+        <i class="bi bi-clock"></i>
+        <span th:if="${t.spentMinutes != null}" th:text="${t.spentMinutes} + (${t.estimatedMinutes != null} ? ' de ' + ${t.estimatedMinutes} : '') + ' min'"></span>
+        <span th:if="${t.spentMinutes == null and t.estimatedMinutes != null}" th:text="${t.estimatedMinutes} + ' min'"></span>
+        <span th:if="${t.spentMinutes == null and t.done}" class="text-warn">· sem tempo</span>
+        <span th:if="${t.spentMinutes == null and t.estimatedMinutes == null and !t.done}">tempo</span>
+    </button>
+</form>

@@ -104,7 +104,28 @@ class StudyIntegrationTest {
     }
 
     @Test
+    void diasAntigosJaConcluidosSoAparecemAoPedirTodas() {
+        taskRepository.deleteAll();
+        LocalDate today = LocalDate.of(2026, 10, 15);
+        StudyTask old = taskService.create(new StudyTaskService.TaskForm("Antiga", null, null, today.minusDays(20), 30, null, null));
+        StudyTask recent = taskService.create(new StudyTaskService.TaskForm("Recente", null, null, today.minusDays(2), 30, null, null));
+        taskService.setDone(old.getId(), true, 30);
+        taskService.setDone(recent.getId(), true, 25);
+
+        var normal = taskService.schedule(today, false);
+        assertEquals(1, normal.hiddenDays());
+        assertTrue(normal.groups().stream().noneMatch(g -> today.minusDays(20).equals(g.date())));
+        var recentGroup = normal.groups().stream().filter(g -> today.minusDays(2).equals(g.date())).findFirst().orElseThrow();
+        assertEquals("past", recentGroup.kind());
+
+        var all = taskService.schedule(today, true);
+        assertEquals(0, all.hiddenDays());
+        assertTrue(all.groups().stream().anyMatch(g -> today.minusDays(20).equals(g.date())));
+    }
+
+    @Test
     void tarefasCriarConcluirReabrirEditarEExcluir() {
+        taskRepository.deleteAll();
         LocalDate today = LocalDate.of(2026, 10, 15);
         StudyTask overdue = taskService.create(new StudyTaskService.TaskForm("Atrasada", null, "Português",
                 today.minusDays(2), 50, null, null));
@@ -122,8 +143,16 @@ class StudyIntegrationTest {
         assertTrue(done.isDone());
         assertNotNull(done.getDoneAt());
         assertEquals(45, done.getSpentMinutes());
-        assertTrue(taskService.groups(today).stream().anyMatch(g -> g.kind().equals("done")
-                && g.tasks().stream().anyMatch(t -> t.getId().equals(todayTask.getId()))));
+        // A concluida continua no seu dia, junto das pendentes.
+        var todayGroup = taskService.groups(today).stream().filter(g -> today.equals(g.date())).findFirst().orElseThrow();
+        assertTrue(todayGroup.tasks().stream().anyMatch(t -> t.getId().equals(todayTask.getId())));
+        assertEquals(1, todayGroup.doneCount());
+        assertEquals(45, todayGroup.spentMinutes());
+
+        assertEquals(60, taskService.setSpent(todayTask.getId(), 60).getSpentMinutes());
+        assertTrue(taskRepository.findById(todayTask.getId()).orElseThrow().isDone());
+        assertThrows(IllegalArgumentException.class, () -> taskService.setSpent(todayTask.getId(), -5));
+        taskService.setSpent(todayTask.getId(), 45);
 
         StudyTask reopened = taskService.setDone(todayTask.getId(), false, null);
         assertFalse(reopened.isDone());

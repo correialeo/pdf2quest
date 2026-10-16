@@ -55,17 +55,12 @@
             </div>
             <div class="task-list" th:unless="${dayTasks.isEmpty()}">
                 <div class="task-row" th:each="t : ${dayTasks}" th:classappend="${t.done} ? 'is-done'">
-                    <form method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}">
-                        <input type="hidden" name="done" th:value="${!t.done}"/>
-                        <button type="submit" class="task-check" th:title="${t.done} ? 'Reabrir' : 'Concluir'"
-                                th:attr="aria-label=${t.done} ? 'Reabrir tarefa' : 'Concluir tarefa'">
-                            <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
-                    </form>
+                    <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
                     <div class="task-info">
                         <a class="text-reset text-decoration-none" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
                         <div class="task-meta">
                             <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
-                            <span th:if="${t.estimatedMinutes != null}"><i class="bi bi-clock"></i> <span th:text="${t.estimatedMinutes} + ' min'"></span></span>
+                            <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                             <a th:if="${t.pageId != null and t.pageId != page.id}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
                         </div>
                     </div>

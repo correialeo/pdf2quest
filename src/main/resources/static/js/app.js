@@ -95,7 +95,66 @@
         });
     }
 
+    // Cronograma: ao concluir (ou ao clicar no tempo) pergunta os minutos estudados, ja com o estimado.
+    function setupTaskTime() {
+        var forms = document.querySelectorAll('.task-done-form, .task-time-form');
+        if (!forms.length) return;
+        var dialog = document.createElement('dialog');
+        dialog.className = 'task-time-dialog';
+        dialog.innerHTML = '<form method="dialog">'
+            + '<div class="fw-semibold mb-1" data-role="heading"></div>'
+            + '<div class="small text-muted mb-3 text-truncate" data-role="title"></div>'
+            + '<label class="form-label small" for="taskTimeInput">Minutos estudados</label>'
+            + '<input type="number" id="taskTimeInput" class="form-control mb-3" min="0" step="5" inputmode="numeric"/>'
+            + '<div class="d-flex flex-wrap gap-2 justify-content-end">'
+            + '<button type="button" class="btn btn-link btn-sm me-auto px-0" data-role="skip"></button>'
+            + '<button type="button" class="btn btn-outline-secondary btn-sm" data-role="cancel">Cancelar</button>'
+            + '<button type="submit" class="btn btn-primary btn-sm" data-role="ok"></button>'
+            + '</div></form>';
+        document.body.appendChild(dialog);
+        var input = dialog.querySelector('input');
+        var target = null;
+
+        function finish(minutes) {
+            target.querySelector('[name=spentMinutes]').value = minutes;
+            dialog.close();
+            target.submit();
+        }
+
+        function open(form, completing) {
+            target = form;
+            var spent = form.dataset.spent, estimate = form.dataset.estimate;
+            dialog.querySelector('[data-role=heading]').textContent = completing ? 'Concluir tarefa' : 'Tempo estudado';
+            dialog.querySelector('[data-role=title]').textContent = form.dataset.title || '';
+            dialog.querySelector('[data-role=ok]').textContent = completing ? 'Concluir' : 'Salvar';
+            dialog.querySelector('[data-role=skip]').textContent = completing ? 'Concluir sem registrar tempo' : 'Apagar o tempo';
+            dialog.querySelector('[data-role=skip]').hidden = !completing && !spent;
+            input.value = spent || estimate || '';
+            dialog.showModal();
+            input.select();
+        }
+
+        dialog.querySelector('form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var value = input.value.trim();
+            if (value !== '' && !/^\d+$/.test(value)) { input.focus(); return; }
+            finish(value);
+        });
+        dialog.querySelector('[data-role=skip]').addEventListener('click', function () { finish(''); });
+        dialog.querySelector('[data-role=cancel]').addEventListener('click', function () { dialog.close(); });
+
+        forms.forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                var completing = form.classList.contains('task-done-form');
+                if (completing && form.dataset.done === 'true') return; // reabrir nao pergunta
+                e.preventDefault();
+                open(form, completing);
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
+        setupTaskTime();
         setupQuickNote();
         setupThemeToggle();
         highlightActiveNavLink();
