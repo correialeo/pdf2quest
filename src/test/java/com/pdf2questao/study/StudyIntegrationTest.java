@@ -75,8 +75,8 @@ class StudyIntegrationTest {
 
         taskService.setDone(review.getId(), true, null);
         StudyTask reviewed = taskRepository.findById(a.getId()).orElseThrow();
-        assertEquals(today.plusDays(1), reviewed.getNextReviewDate());
-        assertEquals(1, reviewed.getCurrentStep());
+        assertEquals(today.plusDays(3), reviewed.getNextReviewDate());
+        assertEquals(2, reviewed.getCurrentStep());
         StudyTask doneReview = taskRepository.findById(review.getId()).orElseThrow();
         assertNull(doneReview.getNextReviewDate());
         assertNull(taskRepository.findById(c.getId()).orElseThrow().getNextReviewDate());
@@ -90,20 +90,21 @@ class StudyIntegrationTest {
         StudyTask task = taskService.create(new StudyTaskService.TaskForm("SRS", null, null, today, null, null, null));
         taskService.setDone(task.getId(), true, null);
         StudyTask done = taskRepository.findById(task.getId()).orElseThrow();
-        assertEquals(0, done.getCurrentStep());
+        assertEquals(1, done.getCurrentStep());
         assertEquals(LocalDate.now().plusDays(1), done.getNextReviewDate());
 
-        int[] expected = {1, 3, 7, 14, 30, 30};
+        // A primeira revisao (1 dia) ja foi agendada ao concluir: os "lembrei" seguem 3, 7, 14, 30.
+        int[] expected = {3, 7, 14, 30, 30};
         for (int i = 0; i < expected.length; i++) {
             StudyTask t = spacedRepetition.remembered(task.getId(), today);
             assertEquals(today.plusDays(expected[i]), t.getNextReviewDate());
-            assertEquals(Math.min(i + 1, 4), t.getCurrentStep());
+            assertEquals(Math.min(i + 2, 4), t.getCurrentStep());
         }
         assertTrue(spacedRepetition.due(today.plusDays(30)).stream().anyMatch(t -> t.getId().equals(task.getId())));
         assertFalse(spacedRepetition.due(today.plusDays(29)).stream().anyMatch(t -> t.getId().equals(task.getId())));
 
         StudyTask forgot = spacedRepetition.forgot(task.getId(), today);
-        assertEquals(0, forgot.getCurrentStep());
+        assertEquals(1, forgot.getCurrentStep());
         assertEquals(today.plusDays(1), forgot.getNextReviewDate());
 
         StudyTask reopened = taskService.setDone(task.getId(), false, null);

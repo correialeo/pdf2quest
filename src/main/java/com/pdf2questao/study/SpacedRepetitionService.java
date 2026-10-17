@@ -9,8 +9,8 @@ import java.util.List;
 
 /**
  * Revisao espacada das tarefas estudadas. Os intervalos (em dias) vem de {@code pdf2questao.revisao.intervalos}:
- * lembrou = proxima revisao em {@code intervalos[etapa]} dias e sobe uma etapa (ate a ultima);
- * esqueceu = volta para a etapa 0 e revisa de novo em {@code intervalos[0]} dias.
+ * a etapa e o indice do intervalo usado no proximo "lembrei". Concluir (ou esquecer) agenda em {@code intervalos[0]}
+ * e deixa a etapa em 1; lembrou = proxima revisao em {@code intervalos[etapa]} dias e sobe uma etapa (ate a ultima).
  * <p>
  * Os assuntos a revisar no dia viram uma tarefa so no cronograma ({@code pdf2questao.revisao.minutos}); concluir a
  * tarefa conta como "lembrei" para todos os assuntos que ainda estao nela.
@@ -54,8 +54,7 @@ public class SpacedRepetitionService {
     @Transactional
     public StudyTask forgot(Long id, LocalDate today) {
         StudyTask task = taskRepository.findById(id).orElseThrow();
-        task.setCurrentStep(0);
-        task.setNextReviewDate(today.plusDays(intervals.get(0)));
+        restart(task, today);
         return taskRepository.save(task);
     }
 
@@ -100,8 +99,13 @@ public class SpacedRepetitionService {
     /** Primeira revisao de uma tarefa recem-concluida (se ainda nao tiver uma). */
     void scheduleFirst(StudyTask task, LocalDate today) {
         if (!task.isReview() && task.getNextReviewDate() == null) {
-            task.setCurrentStep(0);
-            task.setNextReviewDate(today.plusDays(intervals.get(0)));
+            restart(task, today);
         }
+    }
+
+    /** Revisa em {@code intervalos[0]}; o proximo "lembrei" ja usa o intervalo seguinte. */
+    private void restart(StudyTask task, LocalDate today) {
+        task.setCurrentStep(Math.min(1, intervals.size() - 1));
+        task.setNextReviewDate(today.plusDays(intervals.get(0)));
     }
 }
