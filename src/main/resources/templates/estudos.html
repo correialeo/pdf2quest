@@ -36,6 +36,16 @@
                             <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
                             <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                         </div>
+                        <ul class="review-items" th:if="${t.review and !t.done and !dueReviews.isEmpty()}">
+                            <li th:each="r : ${dueReviews}">
+                                <a class="text-reset" th:href="${r.pageId != null} ? @{/estudos/paginas/{id}(id=${r.pageId})} : @{/estudos/cronograma/{id}/editar(id=${r.id})}" th:text="${r.title}"></a>
+                                <span class="text-muted" th:if="${r.subject != null}" th:text="'· ' + ${r.subject}"></span>
+                                <form method="post" th:action="@{/estudos/cronograma/{id}/revisar(id=${r.id})}" class="d-inline">
+                                    <button type="submit" name="lembrei" value="false" class="btn btn-link btn-sm p-0 ms-1 text-bad"
+                                            title="Esqueci: sai da revisão de hoje e volta amanhã">esqueci</button>
+                                </form>
+                            </li>
+                        </ul>
                     </div>
                 </div>
             </div>

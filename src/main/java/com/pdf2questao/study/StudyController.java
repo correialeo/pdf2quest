@@ -18,11 +18,14 @@ public class StudyController {
     private final StudyPageService pageService;
     private final StudyTaskService taskService;
     private final InboxService inboxService;
+    private final SpacedRepetitionService spacedRepetition;
     private final StudySubjects subjects;
     private final DaySummaryService daySummaryService;
 
     public StudyController(StudyPageService pageService, StudyTaskService taskService, InboxService inboxService,
-                           StudySubjects subjects, DaySummaryService daySummaryService) {
+                           StudySubjects subjects, DaySummaryService daySummaryService,
+                           SpacedRepetitionService spacedRepetition) {
+        this.spacedRepetition = spacedRepetition;
         this.pageService = pageService;
         this.taskService = taskService;
         this.inboxService = inboxService;
@@ -34,7 +37,9 @@ public class StudyController {
     public String overview(Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
+        spacedRepetition.syncReviewTask(today);
         model.addAttribute("dueTasks", taskService.dueBy(today));
+        model.addAttribute("dueReviews", spacedRepetition.due(today));
         model.addAttribute("todaySummary", daySummaryService.existing(today, today).get(today));
         model.addAttribute("week", taskService.week(today));
         model.addAttribute("recentPages", pageService.recent());

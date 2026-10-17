@@ -42,6 +42,74 @@ class StudyIntegrationTest {
     StudyPageRepository pageRepository;
     @Autowired
     StudyTaskRepository taskRepository;
+    @Autowired
+    SpacedRepetitionService spacedRepetition;
+
+    @Test
+    void revisoesDoDiaViramUmaTarefaSoEConcluirAvancaTodas() {
+        LocalDate today = LocalDate.now();
+        StudyTask a = taskService.create(new StudyTaskService.TaskForm("Atos", null, "Adm", today, null, null, null));
+        StudyTask b = taskService.create(new StudyTaskService.TaskForm("Crase", null, "Port", today, null, null, null));
+        StudyTask c = taskService.create(new StudyTaskService.TaskForm("Pendente", null, null, today, null, null, null));
+        for (StudyTask t : List.of(a, b)) {
+            taskService.setDone(t.getId(), true, null);
+            StudyTask saved = taskRepository.findById(t.getId()).orElseThrow();
+            saved.setNextReviewDate(today);
+            taskRepository.save(saved);
+        }
+
+        spacedRepetition.syncReviewTask(today);
+        spacedRepetition.syncReviewTask(today);
+        StudyTask review = taskRepository.findByReviewDate(today).orElseThrow();
+        assertEquals("Revisão · 2 assuntos", review.getTitle());
+        assertEquals(25, review.getEstimatedMinutes());
+        assertEquals(today, review.getPlannedDate());
+        assertTrue(review.getDescription().contains("Atos (Adm)"));
+        assertFalse(review.getDescription().contains("Pendente"));
+        assertTrue(taskService.dueBy(today).stream().anyMatch(t -> t.getId().equals(review.getId())));
+
+        // Esqueci um: sai da tarefa de hoje e volta amanha.
+        spacedRepetition.forgot(b.getId(), today);
+        spacedRepetition.syncReviewTask(today);
+        assertEquals("Revisão · 1 assunto", taskRepository.findById(review.getId()).orElseThrow().getTitle());
+
+        taskService.setDone(review.getId(), true, null);
+        StudyTask reviewed = taskRepository.findById(a.getId()).orElseThrow();
+        assertEquals(today.plusDays(1), reviewed.getNextReviewDate());
+        assertEquals(1, reviewed.getCurrentStep());
+        StudyTask doneReview = taskRepository.findById(review.getId()).orElseThrow();
+        assertNull(doneReview.getNextReviewDate());
+        assertNull(taskRepository.findById(c.getId()).orElseThrow().getNextReviewDate());
+        spacedRepetition.syncReviewTask(today);
+        assertEquals(1, taskRepository.findAll().stream().filter(StudyTask::isReview).count());
+    }
+
+    @Test
+    void revisaoEspacadaAvancaNosIntervalosEVoltaAoEsquecer() {
+        LocalDate today = LocalDate.of(2030, 1, 10);
+        StudyTask task = taskService.create(new StudyTaskService.TaskForm("SRS", null, null, today, null, null, null));
+        taskService.setDone(task.getId(), true, null);
+        StudyTask done = taskRepository.findById(task.getId()).orElseThrow();
+        assertEquals(0, done.getCurrentStep());
+        assertEquals(LocalDate.now().plusDays(1), done.getNextReviewDate());
+
+        int[] expected = {1, 3, 7, 14, 30, 30};
+        for (int i = 0; i < expected.length; i++) {
+            StudyTask t = spacedRepetition.remembered(task.getId(), today);
+            assertEquals(today.plusDays(expected[i]), t.getNextReviewDate());
+            assertEquals(Math.min(i + 1, 4), t.getCurrentStep());
+        }
+        assertTrue(spacedRepetition.due(today.plusDays(30)).stream().anyMatch(t -> t.getId().equals(task.getId())));
+        assertFalse(spacedRepetition.due(today.plusDays(29)).stream().anyMatch(t -> t.getId().equals(task.getId())));
+
+        StudyTask forgot = spacedRepetition.forgot(task.getId(), today);
+        assertEquals(0, forgot.getCurrentStep());
+        assertEquals(today.plusDays(1), forgot.getNextReviewDate());
+
+        StudyTask reopened = taskService.setDone(task.getId(), false, null);
+        assertNull(reopened.getNextReviewDate());
+        assertEquals(0, reopened.getCurrentStep());
+    }
 
     @Test
     void criaEditaPaginaESalvaConteudoComVersao() {

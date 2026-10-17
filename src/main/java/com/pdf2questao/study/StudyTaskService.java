@@ -24,10 +24,13 @@ public class StudyTaskService {
 
     private final StudyTaskRepository taskRepository;
     private final StudyPageRepository pageRepository;
+    private final SpacedRepetitionService spacedRepetition;
 
-    public StudyTaskService(StudyTaskRepository taskRepository, StudyPageRepository pageRepository) {
+    public StudyTaskService(StudyTaskRepository taskRepository, StudyPageRepository pageRepository,
+                            SpacedRepetitionService spacedRepetition) {
         this.taskRepository = taskRepository;
         this.pageRepository = pageRepository;
+        this.spacedRepetition = spacedRepetition;
     }
 
     /** Grupo da lista do cronograma ("Atrasada · ter, 13/10", "Hoje · qua, 15/10", "Sem data"). */
@@ -171,12 +174,20 @@ public class StudyTaskService {
         return minutes != null && minutes < 0;
     }
 
-    /** Conclui ou reabre. Ao concluir, pode registrar o tempo dedicado. */
+    /** Conclui ou reabre. Ao concluir, pode registrar o tempo dedicado e agenda a primeira revisao; reabrir tira do ciclo de revisao. */
     @Transactional
     public StudyTask setDone(Long id, boolean done, Integer spentMinutes) {
         StudyTask task = taskRepository.findById(id).orElseThrow();
         task.setDone(done);
         task.setDoneAt(done ? LocalDateTime.now() : null);
+        if (done && task.isReview()) {
+            spacedRepetition.completeReview(LocalDate.now());
+        } else if (done) {
+            spacedRepetition.scheduleFirst(task, LocalDate.now());
+        } else {
+            task.setCurrentStep(0);
+            task.setNextReviewDate(null);
+        }
         if (spentMinutes != null && spentMinutes >= 0) {
             task.setSpentMinutes(spentMinutes);
         }

@@ -20,9 +20,11 @@ public class StudyTaskController {
     private final StudyPageService pageService;
     private final StudySubjects subjects;
     private final DaySummaryService daySummaryService;
+    private final SpacedRepetitionService spacedRepetition;
 
     public StudyTaskController(StudyTaskService taskService, StudyPageService pageService, StudySubjects subjects,
-                               DaySummaryService daySummaryService) {
+                               DaySummaryService daySummaryService, SpacedRepetitionService spacedRepetition) {
+        this.spacedRepetition = spacedRepetition;
         this.taskService = taskService;
         this.pageService = pageService;
         this.subjects = subjects;
@@ -40,6 +42,7 @@ public class StudyTaskController {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
         boolean showAll = ver.equals("todas");
+        spacedRepetition.syncReviewTask(today);
         var schedule = taskService.schedule(today, showAll);
         var groups = schedule.groups();
         model.addAttribute("groups", groups);
@@ -127,6 +130,23 @@ public class StudyTaskController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
+    /**
+     * Revisao espacada de um assunto: {@code lembrei=true} avanca nos intervalos; {@code false} volta para o primeiro
+     * e sai da tarefa de revisao de hoje.
+     */
+    @PostMapping("/estudos/cronograma/{id}/revisar")
+    public String review(@PathVariable Long id, @RequestParam boolean lembrei,
+                         @RequestHeader(value = "Referer", required = false) String referer) {
+        LocalDate today = LocalDate.now();
+        if (lembrei) {
+            spacedRepetition.remembered(id, today);
+        } else {
+            spacedRepetition.forgot(id, today);
+        }
+        spacedRepetition.syncReviewTask(today);
+        return "redirect:" + StudyController.sameSite(referer, "/estudos");
     }
 
     @PostMapping("/estudos/cronograma/{id}/excluir")
