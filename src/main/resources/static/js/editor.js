@@ -295,11 +295,82 @@
         {pattern: /^```$/, run: commands.code}
     ];
 
+    function placeCaret(node) {
+        var range = document.createRange();
+        range.setStart(node, 0);
+        range.collapse(true);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    // Move o item para uma sublista dentro do item anterior (cria a sublista se preciso).
+    function indentItem(li) {
+        var previous = li.previousElementSibling;
+        if (!previous || previous.tagName !== 'LI') {
+            return false;
+        }
+        var parentList = li.parentNode;
+        var sublist = previous.lastElementChild;
+        if (!sublist || sublist.tagName !== parentList.tagName) {
+            sublist = document.createElement(parentList.tagName);
+            if (parentList.hasAttribute('data-checklist')) {
+                sublist.setAttribute('data-checklist', '');
+            }
+            previous.appendChild(sublist);
+        }
+        sublist.appendChild(li);
+        changed();
+        return true;
+    }
+
+    // Tira o item da sublista e o coloca logo depois do item pai (os irmaos de baixo vao junto, como sublista dele).
+    function outdentItem(li) {
+        var list = li.parentNode;
+        var parentItem = list.parentNode;
+        if (!parentItem || parentItem.tagName !== 'LI') {
+            return false;
+        }
+        while (li.nextElementSibling) {
+            var rest = li.lastElementChild && li.lastElementChild.tagName === list.tagName
+                ? li.lastElementChild : li.appendChild(list.cloneNode(false));
+            rest.appendChild(li.nextElementSibling);
+        }
+        parentItem.parentNode.insertBefore(li, parentItem.nextSibling);
+        if (!list.children.length) {
+            list.remove();
+        }
+        changed();
+        return true;
+    }
+
     editor.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+            var item = closest(window.getSelection().anchorNode, 'li');
+            if (item) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    outdentItem(item);
+                } else {
+                    indentItem(item);
+                }
+                return;
+            }
+        }
         if (e.key === ' ') {
             var block = currentBlock();
             var text = block ? block.textContent : editor.textContent;
             var selection = window.getSelection();
+            // "- " num item vazio de lista vira subitem (sublista dentro do item anterior).
+            if (block && block.tagName === 'LI' && /^[-*]$/.test(text) && selection.isCollapsed
+                    && selection.anchorOffset === text.length && block.previousElementSibling) {
+                e.preventDefault();
+                block.textContent = '';
+                block.appendChild(document.createElement('br'));
+                indentItem(block);
+                placeCaret(block);
+                return;
+            }
             if (block && !/^(LI|PRE|TD|TH)$/.test(block.tagName) && selection.isCollapsed
                     && selection.anchorOffset === text.length) {
                 for (var i = 0; i < SHORTCUTS.length; i++) {
