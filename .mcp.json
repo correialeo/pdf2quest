@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pdf2questao": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}

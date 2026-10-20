@@ -24,7 +24,21 @@
         <hibernate-community-dialects.version>6.6.4.Final</hibernate-community-dialects.version>
         <pdfbox.version>3.0.8</pdfbox.version>
         <springdoc.version>2.8.17</springdoc.version>
+        <!-- 1.1.x e a linha do Spring AI para Spring Boot 3.x (a 2.x exige Boot 4). -->
+        <spring-ai.version>1.1.8</spring-ai.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -38,6 +52,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!-- Servidor MCP (Streamable HTTP em /mcp): ferramentas para o Claude Code usar o sistema. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>

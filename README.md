@@ -100,6 +100,33 @@ Os scripts não rodam direto no Windows. Duas opções:
 
 Descrição detalhada em [`sobre.md`](sobre.md).
 
+## Estudar junto com o Claude (MCP)
+
+Com o sistema aberto, o [Claude Code](https://claude.com/claude-code) consegue usar os seus dados direto da conversa,
+pelo servidor MCP em `http://localhost:8080/mcp`. Na pasta do projeto, o arquivo `.mcp.json` já configura isso: ao
+abrir o Claude Code aqui, aprove o servidor `pdf2questao`. Para usar de qualquer pasta:
+
+```bash
+claude mcp add --transport http --scope user pdf2questao http://localhost:8080/mcp
+```
+
+(Se rodar em outra porta, troque o `8080` no endereço.)
+
+| Ferramenta                  | O que faz                                                                  |
+| --------------------------- | -------------------------------------------------------------------------- |
+| `desempenho_por_disciplina` | Acertos por disciplina, piores primeiro                                    |
+| `ultimo_simulado`           | Nota projetada do último simulado com perfil do edital e os mínimos        |
+| `listar_erros`              | Questões do caderno de erros (até 20), com a sua resposta e a certa        |
+| `registrar_treino`          | Grava as questões resolvidas no chat, com as suas respostas, como sessão   |
+| `tarefas_de_hoje`           | Tarefas do cronograma de hoje e atrasadas                                  |
+| `concluir_tarefa`           | Conclui uma tarefa, com os minutos dedicados                               |
+| `revisoes_de_hoje`          | Assuntos da revisão espaçada que vencem hoje                               |
+| `marcar_revisao`            | Lembrei / esqueci de um assunto da revisão                                 |
+| `anexar_ao_resumo_do_dia`   | Acrescenta um texto (Markdown simples) ao resumo do dia                    |
+
+Exemplos: *"me treina nos meus erros de Economia e registra o treino no fim"*, *"faz a revisão de hoje comigo"*,
+*"resume o que treinamos no resumo do dia"*. Nenhuma ferramenta apaga dados.
+
 ## Onde ficam os meus dados?
 
 Tudo fica dentro da pasta do projeto:
