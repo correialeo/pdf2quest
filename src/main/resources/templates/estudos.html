@@ -82,7 +82,7 @@
                th:href="@{/resultado/{id}(id=${practice.lastScored.id})}" th:with="sc=${practice.lastScore}">
                 <div class="d-flex justify-content-between align-items-baseline gap-2">
                     <span class="stat-label">Último simulado · projeção</span>
-                    <span class="badge" th:classappend="${sc.projectedPassed} ? 'text-bg-success' : 'text-bg-danger'"
+                    <span class="badge" th:if="${sc.projectedPassed != null}" th:classappend="${sc.projectedPassed} ? 'text-bg-success' : 'text-bg-danger'"
                           th:text="${sc.projectedPassed} ? 'passa' : 'não passa'"></span>
                 </div>
                 <div class="fs-5 fw-semibold">

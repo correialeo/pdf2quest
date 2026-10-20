@@ -112,20 +112,26 @@ claude mcp add --transport http --scope user pdf2questao http://localhost:8080/m
 
 (Se rodar em outra porta, troque o `8080` no endereço.)
 
-| Ferramenta                  | O que faz                                                                  |
-| --------------------------- | -------------------------------------------------------------------------- |
-| `desempenho_por_disciplina` | Acertos por disciplina, piores primeiro                                    |
-| `ultimo_simulado`           | Nota projetada do último simulado com perfil do edital e os mínimos        |
-| `listar_erros`              | Questões do caderno de erros (até 20), com a sua resposta e a certa        |
-| `registrar_treino`          | Grava as questões resolvidas no chat, com as suas respostas, como sessão   |
-| `tarefas_de_hoje`           | Tarefas do cronograma de hoje e atrasadas                                  |
-| `concluir_tarefa`           | Conclui uma tarefa, com os minutos dedicados                               |
-| `revisoes_de_hoje`          | Assuntos da revisão espaçada que vencem hoje                               |
-| `marcar_revisao`            | Lembrei / esqueci de um assunto da revisão                                 |
-| `anexar_ao_resumo_do_dia`   | Acrescenta um texto (Markdown simples) ao resumo do dia                    |
+| Área              | Ferramentas                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| Desempenho        | `desempenho_por_disciplina`, `resumo_de_erros`, `ultimo_simulado`, `historico_simulados`, `ver_resultado` |
+| Treino            | `listar_erros`, `registrar_treino` (questões do chat com as suas respostas)                  |
+| Simulado inédito  | `ler_edital`, `estrutura_do_edital`, `salvar_perfil_edital`, `provas_da_banca`, `exemplos_da_banca`, `criar_simulado`, `adicionar_questoes`, `status_simulado`, `finalizar_simulado` |
+| Discursiva        | `criar_discursiva`, `listar_discursivas`, `ler_discursiva`, `corrigir_discursiva`            |
+| Rotina            | `tarefas_de_hoje`, `concluir_tarefa`, `criar_tarefa`, `revisoes_de_hoje`, `marcar_revisao`, `anexar_ao_resumo_do_dia`, `buscar_paginas`, `ler_pagina` |
 
-Exemplos: *"me treina nos meus erros de Economia e registra o treino no fim"*, *"faz a revisão de hoje comigo"*,
-*"resume o que treinamos no resumo do dia"*. Nenhuma ferramenta apaga dados.
+**Simulado inédito da banca:** no Claude Code, use o prompt `/mcp__pdf2questao__montar_simulado` (ou peça
+*"monta um simulado inédito da P1 e P2 do edital ~/Downloads/edital.pdf, cargo C03"*). O roteiro faz o Claude ler
+o edital e gravar o perfil de pontuação, pesquisar provas reais da banca na internet e as que você já importou,
+e escrever as questões uma a uma (inspiração real, pegadinha da banca e gabarito comentado), na quantidade e peso do
+edital. O sistema recusa começar sem essa pesquisa e aceita no máximo 5 questões por vez. No fim vira um bloco com
+o tempo da prova, para resolver no sistema com nota projetada.
+
+**Discursiva:** peça *"cria uma discursiva da P3 no estilo da FCC"*, escreva em **Discursivas** (tempo e contador
+de linhas, rascunho salvo sozinho), entregue e peça *"corrige a discursiva 1"*.
+
+Outros exemplos: *"me treina nos meus erros de Economia e registra o treino no fim"*, *"faz a revisão de hoje
+comigo"*, *"analisa meu último simulado e agenda reforço nas piores matérias"*. Nenhuma ferramenta apaga dados.
 
 ## Onde ficam os meus dados?
 

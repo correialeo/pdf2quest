@@ -52,6 +52,7 @@ public final class ScoringCalculator {
     }
 
     /**
+     * @param projectedPassed bate todos os minimos na projecao; null se algum grupo com minimo nao caiu na sessao.
      * @param coverage fracao do maximo da prova coberta pela sessao (0 a 1); null em relatorio antigo,
      *                 gravado antes de existir a projecao.
      */
@@ -92,6 +93,7 @@ public final class ScoringCalculator {
         double projectedBase = 0;
         double coveredTotal = 0;
         boolean allProjectedMet = true;
+        boolean allMinGroupsCovered = true;
         int index = 0;
         for (GroupSpec group : profile.groups()) {
             List<RuleResult> rules = new ArrayList<>();
@@ -123,7 +125,7 @@ public final class ScoringCalculator {
                 projectedBase += max;
                 allProjectedMet &= projectedMinMet;
             } else if (group.minScore() != null) {
-                allProjectedMet = false;   // grupo com minimo que nao caiu: nao da para dizer que passou
+                allMinGroupsCovered = false;   // grupo com minimo que nao caiu: nao da para dizer se passaria
             }
             coveredTotal += coveredMax;
             groups.add(new GroupResult(group.name(), points, max, group.minScore(), minMet, rules,
@@ -133,7 +135,8 @@ public final class ScoringCalculator {
         }
         boolean minTotalMet = profile.minTotal() == null || total >= profile.minTotal();
         Double projectedScaled = projectedBase == 0 ? null : projectedTotal / projectedBase * maxTotal;
-        Boolean projectedPassed = projectedScaled == null ? null : allProjectedMet
+        // Simulado so de uma prova (ex.: P1): cada grupo coberto diz se bate o minimo; "passaria" fica sem resposta.
+        Boolean projectedPassed = projectedScaled == null || !allMinGroupsCovered ? null : allProjectedMet
                 && (profile.minTotal() == null || projectedScaled >= profile.minTotal());
         return new ScoreResult(profile.name(), total, maxTotal, profile.minTotal(), minTotalMet,
                 allGroupsMet && minTotalMet, groups, unweighted, projectedScaled, projectedPassed,

@@ -11,6 +11,11 @@ public interface StudyPageRepository extends JpaRepository<StudyPage, Long> {
 
     List<StudyPage> findTop6ByOrderByUpdatedAtDesc();
 
+    /** Paginas com o termo no titulo ou no texto (sem diferenciar maiusculas), as editadas por ultimo primeiro. */
+    @Query(value = "SELECT * FROM study_page WHERE title LIKE '%' || :term || '%' "
+            + "OR content LIKE '%' || :term || '%' ORDER BY updated_at DESC", nativeQuery = true)
+    List<StudyPage> search(@org.springframework.data.repository.query.Param("term") String term);
+
     java.util.Optional<StudyPage> findBySummaryDate(java.time.LocalDate date);
 
     /** Resumo do dia anterior/seguinte que ja existe (as setas do resumo navegam so entre resumos escritos). */

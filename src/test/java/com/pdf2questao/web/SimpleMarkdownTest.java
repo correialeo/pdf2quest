@@ -1,4 +1,4 @@
-package com.pdf2questao.mcp;
+package com.pdf2questao.web;
 
 import org.junit.jupiter.api.Test;
 

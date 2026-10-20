@@ -85,6 +85,37 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
 
     List<Question> findByImportJobId(Long importJobId);
 
+    /**
+     * Questoes reais da banca (com gabarito, sem as escritas pelo Claude), sorteadas, para servir de modelo de estilo.
+     * {@code subject} filtra por parte do nome da disciplina (vazio = todas).
+     */
+    @Query(value = "SELECT * FROM question WHERE upper(organization) = upper(:banca) AND correct_answer IS NOT NULL " +
+            "AND (source IS NULL OR source NOT IN ('Simulado do Claude', 'Treino no Claude')) " +
+            "AND (:subject IS NULL OR lower(subject) LIKE '%' || lower(:subject) || '%') " +
+            "ORDER BY random() LIMIT :quantity", nativeQuery = true)
+    List<Question> findBancaSamples(@Param("banca") String banca, @Param("subject") String subject,
+                                    @Param("quantity") int quantity);
+
+    /** [import_job_id, questoes] das provas reais da banca no banco (sem as escritas pelo Claude). */
+    @Query(value = "SELECT import_job_id, COUNT(*) FROM question WHERE upper(organization) = upper(:banca) " +
+            "AND import_job_id IS NOT NULL AND (source IS NULL OR source NOT IN ('Simulado do Claude', 'Treino no Claude')) " +
+            "GROUP BY import_job_id", nativeQuery = true)
+    List<Object[]> bancaJobs(@Param("banca") String banca);
+
+    /** [disciplina, erros no caderno] (a ultima resposta da questao foi errada). */
+    @Query(value = "SELECT COALESCE(q.subject, '(sem disciplina)'), COUNT(*) FROM question q WHERE q.id IN (" +
+            "  SELECT a.question_id FROM attempt a " +
+            "  WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +
+            "  AND a.correct = 0) GROUP BY 1 ORDER BY 2 DESC", nativeQuery = true)
+    List<Object[]> errorNotebookBySubject();
+
+    /** [disciplina, acertos no chute] (a ultima resposta acertou, marcada como chute). */
+    @Query(value = "SELECT COALESCE(q.subject, '(sem disciplina)'), COUNT(*) FROM question q WHERE q.id IN (" +
+            "  SELECT a.question_id FROM attempt a " +
+            "  WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +
+            "  AND a.correct = 1 AND a.guessed = 1) GROUP BY 1 ORDER BY 2 DESC", nativeQuery = true)
+    List<Object[]> luckyGuessesBySubject();
+
     /** [id, external_id] das questoes que vieram de JSON/CSV com identificador. */
     @Query("SELECT q.id, q.externalId FROM Question q WHERE q.externalId IS NOT NULL")
     List<Object[]> findExternalIds();

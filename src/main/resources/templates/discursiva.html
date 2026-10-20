@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head(${essay.title})}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container-xxl page">
+    <div class="page-header">
+        <div>
+            <a href="/discursivas" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Discursivas</a>
+            <h1 th:text="${essay.title}"></h1>
+            <p class="page-subtitle">
+                <span th:if="${essay.banca != null}" th:text="${essay.banca} + ' · '"></span>
+                <span th:if="${essay.timeLimitMinutes != null}" th:text="${essay.timeLimitMinutes} + ' min · '"></span>
+                <span th:if="${essay.maxLines != null}" th:text="'até ' + ${essay.maxLines} + ' linhas · '"></span>
+                <span th:if="${essay.maxScore != null}" th:text="'vale ' + ${#numbers.formatDecimal(essay.maxScore, 1, 0)} + ' pontos'"></span>
+            </p>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card p-4">
+                <div class="section-title mt-0">Enunciado</div>
+                <div class="essay-prompt" th:text="${essay.prompt}"></div>
+                <th:block th:if="${essay.criteria != null}">
+                    <div class="section-title">Critérios de correção</div>
+                    <div class="essay-prompt small text-muted" th:text="${essay.criteria}"></div>
+                </th:block>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <!-- Escrita: rascunho salvo sozinho; tempo conta com a pagina aberta e sem pausa. -->
+            <form th:unless="${essay.submitted}" method="post" th:action="@{/discursivas/{id}/entregar(id=${essay.id})}" id="essayForm">
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+                    <button type="button" class="focus-timer" id="timer" title="Pausar">
+                        <i class="bi bi-pause-fill" aria-hidden="true"></i><span id="timerText"></span></button>
+                    <span class="small" id="lineCount"></span>
+                    <span class="small text-muted ms-auto" id="saveStatus" role="status"></span>
+                </div>
+                <textarea name="text" id="essayText" class="form-control essay-text" rows="22" spellcheck="true"
+                          th:text="${essay.text}" placeholder="Escreva sua resposta. Parágrafos separados por Enter."></textarea>
+                <input type="hidden" name="millis" id="millis" value="0"/>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="form-text">Linhas estimadas como na folha de respostas (≈ <span th:text="${charsPerLine}"></span> caracteres por linha).</span>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-send me-1"></i>Entregar</button>
+                </div>
+            </form>
+
+            <th:block th:if="${essay.submitted}">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-baseline">
+                        <div class="section-title mt-0">Sua resposta</div>
+                        <span class="small text-muted" th:text="${usedLines} + ' linhas · ' + ${essay.activeMillis == null ? 0 : essay.activeMillis / 60000} + ' min'"></span>
+                    </div>
+                    <div class="essay-prompt" th:text="${essay.text}"></div>
+                </div>
+                <div class="card p-4 mt-3" th:if="${essay.corrected}">
+                    <div class="d-flex justify-content-between align-items-baseline">
+                        <div class="section-title mt-0">Correção</div>
+                        <span class="fs-5 fw-semibold" th:text="${#numbers.formatDecimal(essay.score, 1, 1)} + (${essay.maxScore != null} ? ' / ' + ${#numbers.formatDecimal(essay.maxScore, 1, 0)} : '')"></span>
+                    </div>
+                    <div class="rich-text" th:utext="${feedbackHtml}"></div>
+                </div>
+                <div class="empty-state mt-3" th:unless="${essay.corrected}">
+                    <i class="bi bi-chat-dots"></i>
+                    <span>Entregue. No Claude Code, peça: <em th:text="'corrige a discursiva ' + ${essay.id}"></em>.</span>
+                </div>
+            </th:block>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script th:inline="javascript" th:unless="${essay.submitted}">
+    const essayId = /*[[${essay.id}]]*/ 0;
+    const limitMillis = /*[[${essay.timeLimitMinutes != null ? essay.timeLimitMinutes * 60000 : null}]]*/ null;
+    const maxLines = /*[[${essay.maxLines}]]*/ null;
+    const charsPerLine = /*[[${charsPerLine}]]*/ 70;
+    const text = document.getElementById('essayText');
+    const clock = {sent: /*[[${essay.activeMillis ?: 0}]]*/ 0, pending: 0, paused: false, last: Date.now()};
+
+    function tick() {
+        const now = Date.now();
+        if (!clock.paused && document.visibilityState === 'visible') { clock.pending += now - clock.last; }
+        clock.last = now;
+        const used = clock.sent + clock.pending;
+        const label = document.getElementById('timerText');
+        const timer = document.getElementById('timer');
+        const format = function (ms) {
+            const s = Math.floor(Math.abs(ms) / 1000);
+            return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        };
+        if (limitMillis === null) {
+            label.textContent = format(used);
+        } else {
+            const left = limitMillis - used;
+            label.textContent = left > 0 ? format(left) : '+' + format(left) + ' fora do tempo';
+            timer.classList.toggle('is-over', left <= 0);
+        }
+    }
+    function lines() {
+        let n = 0;
+        text.value.trim().split(/\n/).forEach(function (p) {
+            if (text.value.trim() !== '') { n += Math.max(1, Math.ceil(p.trim().length / charsPerLine)); }
+        });
+        const out = document.getElementById('lineCount');
+        out.textContent = n + (maxLines ? ' de ' + maxLines : '') + ' linhas';
+        out.className = 'small ' + (maxLines && n > maxLines ? 'text-bad fw-semibold' : 'text-muted');
+    }
+    let dirty = false, saving = false;
+    function save() {
+        tick();
+        if (saving || (!dirty && clock.pending < 1000)) { return; }
+        saving = true;
+        const millis = clock.pending, sentText = text.value;
+        clock.pending = 0;
+        dirty = false;
+        fetch('/discursivas/' + essayId + '/rascunho', {
+            method: 'POST', keepalive: true, headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: sentText, millis: millis})
+        }).then(function (r) {
+            if (!r.ok) { throw new Error(r.status); }
+            clock.sent += millis;
+            document.getElementById('saveStatus').textContent = 'Rascunho salvo';
+        }).catch(function () {
+            clock.pending += millis;
+            dirty = true;
+            document.getElementById('saveStatus').textContent = 'Falha ao salvar; tentando de novo…';
+        }).finally(function () { saving = false; });
+    }
+    text.addEventListener('input', function () { dirty = true; lines(); });
+    document.getElementById('timer').addEventListener('click', function () {
+        tick();
+        clock.paused = !clock.paused;
+        text.readOnly = clock.paused;
+        this.classList.toggle('is-paused', clock.paused);
+        this.querySelector('i').className = 'bi ' + (clock.paused ? 'bi-play-fill' : 'bi-pause-fill');
+        this.title = clock.paused ? 'Continuar' : 'Pausar';
+    });
+    document.getElementById('essayForm').addEventListener('submit', function (e) {
+        if (!confirm('Entregar? Depois de entregue, o texto não pode mais ser alterado.')) { e.preventDefault(); return; }
+        tick();
+        document.getElementById('millis').value = clock.pending;
+    });
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('pagehide', save);
+    setInterval(tick, 1000);
+    setInterval(save, 5000);
+    tick();
+    lines();
+</script>
+</body>
+</html>

@@ -150,7 +150,7 @@ public class StructuredImportService {
         }
         ImportOutcome outcome;
         try {
-            outcome = transactions.execute(status -> save(preview, items, options));
+            outcome = transactions.execute(status -> save(preview, items, options, null));
         } catch (RuntimeException e) {
             return ImportOutcome.failure("Não foi possível gravar a importação; nada foi alterado. Detalhe: "
                     + rootMessage(e));
@@ -159,14 +159,43 @@ public class StructuredImportService {
         return outcome;
     }
 
-    private ImportOutcome save(ImportPreview preview, List<PreviewItem> items, ImportOptions options) {
-        ImportJob job = new ImportJob();
-        job.setFileName(preview.getFileName());
-        job.setSourceFormat(preview.getFormat());
-        job.setBanca(preview.getBanca());
-        job.setTitle(firstNonBlank(options.title(), preview.getTitle()));
-        job.setStartedAt(LocalDateTime.now());
-        job = importJobRepository.save(job);
+    /**
+     * Acrescenta as questoes de um JSON a uma prova ja existente (ex.: simulado criado pelo Claude, que chega em
+     * lotes). So questoes novas e validas entram; as com erro voltam no relatorio. A numeracao continua a da prova.
+     */
+    public ImportOutcome appendJson(Long importJobId, byte[] json) {
+        ImportJob job = importJobRepository.findById(importJobId).orElseThrow();
+        ImportPreview preview = previewJson(job.getFileName(), json);
+        previews.remove(preview.getToken());
+        if (!preview.getFileErrors().isEmpty()) {
+            return ImportOutcome.failure(String.join(" ", preview.getFileErrors()));
+        }
+        try {
+            return transactions.execute(status -> save(preview, preview.getItems(),
+                    new ImportOptions(null, false, false, true), job));
+        } catch (RuntimeException e) {
+            return ImportOutcome.failure("Não foi possível gravar as questões; nada foi alterado. Detalhe: "
+                    + rootMessage(e));
+        }
+    }
+
+    private ImportOutcome save(ImportPreview preview, List<PreviewItem> items, ImportOptions options,
+                               ImportJob appendTo) {
+        ImportJob job = appendTo;
+        int offset = 0;
+        if (job == null) {
+            job = new ImportJob();
+            job.setFileName(preview.getFileName());
+            job.setSourceFormat(preview.getFormat());
+            job.setBanca(preview.getBanca());
+            job.setTitle(firstNonBlank(options.title(), preview.getTitle()));
+            job.setStartedAt(LocalDateTime.now());
+            job = importJobRepository.save(job);
+        } else {
+            offset = questionRepository.findByImportJobId(job.getId()).stream()
+                    .map(Question::getQuestionNumber).filter(java.util.Objects::nonNull)
+                    .max(Integer::compare).orElse(0);
+        }
 
         int created = 0;
         int updated = 0;
@@ -218,7 +247,7 @@ public class StructuredImportService {
             question.setImportJobId(job.getId());
             question.setExternalId(q.externalId);
             // Sem numero no arquivo, a posicao no arquivo vira o numero (ordem das listas e faixas dos blocos).
-            question.setQuestionNumber(q.number != null ? q.number : position);
+            question.setQuestionNumber(q.number != null ? q.number : offset + position);
             fill(question, item, passageId(q, job.getId(), passages));
             questionRepository.save(question);
             answered.putIfAbsent(question.getId(), item);
@@ -227,10 +256,16 @@ public class StructuredImportService {
                 detectedYear = q.year;
             }
         }
-        job.setImportedQuestions(created);
-        job.setFailedQuestions((int) items.stream().filter(i -> i.getStatus() == PreviewItem.Status.INVALIDA).count());
-        job.setDetectedOrganization(preview.getBanca());
-        job.setDetectedYear(detectedYear);
+        int failed = (int) items.stream().filter(i -> i.getStatus() == PreviewItem.Status.INVALIDA).count();
+        if (appendTo == null) {
+            job.setImportedQuestions(created);
+            job.setFailedQuestions(failed);
+            job.setDetectedOrganization(preview.getBanca());
+            job.setDetectedYear(detectedYear);
+        } else {
+            job.setImportedQuestions(job.getImportedQuestions() + created);
+            job.setFailedQuestions(job.getFailedQuestions() + failed);
+        }
         job.setFinishedAt(LocalDateTime.now());
         report.add(0, "Importação " + preview.getFormat() + ": " + created + " criadas, " + updated
                 + " atualizadas, " + skipped + " não importadas.");
@@ -245,7 +280,8 @@ public class StructuredImportService {
                     answers).getId();
             report.add(1, answers.size() + " respostas suas registradas como sessão de treino #" + trainingSessionId + ".");
         }
-        job.setReport(String.join("\n", report));
+        job.setReport(appendTo == null || job.getReport() == null ? String.join("\n", report)
+                : job.getReport() + "\n" + String.join("\n", report));
         importJobRepository.save(job);
         return new ImportOutcome(job.getId(), created, updated, skipped, null, trainingSessionId);
     }

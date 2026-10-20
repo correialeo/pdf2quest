@@ -71,7 +71,7 @@
                                 <span class="text-muted fw-normal fs-6" th:text="'de ' + ${#numbers.formatDecimal(score.maxTotal, 1, 1)}"></span>
                             </div>
                         </div>
-                        <span class="badge" th:classappend="${score.projectedPassed} ? 'text-bg-success' : 'text-bg-danger'"
+                        <span class="badge" th:if="${score.projectedPassed != null}" th:classappend="${score.projectedPassed} ? 'text-bg-success' : 'text-bg-danger'"
                               th:text="${score.projectedPassed} ? 'Nesse ritmo, passa' : 'Nesse ritmo, não passa'"></span>
                     </div>
                     <div class="d-flex flex-wrap gap-3 small mt-1">

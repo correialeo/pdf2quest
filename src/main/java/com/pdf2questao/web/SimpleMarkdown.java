@@ -1,4 +1,4 @@
-package com.pdf2questao.mcp;
+package com.pdf2questao.web;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,12 +8,12 @@ import java.util.List;
  * listas com "- " ou "* " (2 espacos de recuo por nivel viram sublista), **negrito**, *italico* e paragrafos.
  * O resultado ainda passa pelo {@code HtmlSanitizer} ao ser gravado.
  */
-final class SimpleMarkdown {
+public final class SimpleMarkdown {
 
     private SimpleMarkdown() {
     }
 
-    static String toHtml(String markdown) {
+    public static String toHtml(String markdown) {
         if (markdown == null || markdown.isBlank()) {
             return "";
         }

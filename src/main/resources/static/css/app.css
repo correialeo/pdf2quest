@@ -1525,3 +1525,7 @@ details[open] > .day-header::before { transform: rotate(90deg); }
 /* Erro global (fragments/nav): por cima do conteudo, no canto superior direito. */
 .global-alert { position: fixed; top: 1rem; right: 1rem; z-index: 1080; max-width: min(28rem, calc(100vw - 2rem)); box-shadow: var(--bs-box-shadow); }
 .score-projection { padding-bottom: .75rem; border-bottom: 1px solid var(--bs-border-color); }
+
+/* Discursiva: enunciado com as quebras de linha do texto; area de escrita com fonte de leitura confortavel. */
+.essay-prompt { white-space: pre-wrap; line-height: 1.6; }
+.essay-text { font-size: 1rem; line-height: 1.7; min-height: 28rem; }

@@ -1,13 +1,12 @@
 package com.pdf2questao.mcp;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pdf2questao.dashboard.DashboardService;
 import com.pdf2questao.dashboard.SubjectStat;
 import com.pdf2questao.importer.structured.ImportOptions;
 import com.pdf2questao.importer.structured.ImportOutcome;
 import com.pdf2questao.importer.structured.ImportPreview;
-import com.pdf2questao.importer.structured.JsonQuestionReader;
 import com.pdf2questao.importer.structured.PreviewItem;
+import com.pdf2questao.importer.structured.QuestionDraft;
 import com.pdf2questao.importer.structured.StructuredImportService;
 import com.pdf2questao.question.PassageRepository;
 import com.pdf2questao.question.Question;
@@ -58,7 +57,6 @@ public class StudyMcpTools {
     private final DaySummaryService daySummaryService;
     private final StudyPageService pageService;
     private final String baseUrl;
-    private final ObjectMapper mapper = new ObjectMapper();
 
     public StudyMcpTools(DashboardService dashboardService, AttemptRepository attemptRepository,
                          QuestionRepository questionRepository, PassageRepository passageRepository,
@@ -189,6 +187,11 @@ public class StudyMcpTools {
             @McpToolParam(description = "Por que a correta está certa e onde o usuário errou.", required = false)
             String explicacao,
             @McpToolParam(description = "Texto de apoio, se houver.", required = false) String textoBase) {
+
+        QuestionDraft toDraft() {
+            return new QuestionDraft(enunciado, alternativas, resposta, suaResposta, chute, disciplina, assunto,
+                    explicacao, textoBase);
+        }
     }
 
     public record TrainingResult(Integer questoesNovas, Integer jaExistiam, Integer acertos, Integer erros,
@@ -209,41 +212,9 @@ public class StudyMcpTools {
             return new TrainingResult(null, null, null, null, List.of(), null, "Nenhuma questão enviada.");
         }
         String stamp = LocalDate.now().toString().replace("-", "") + "-" + System.currentTimeMillis() % 100000;
-        List<Map<String, Object>> list = new ArrayList<>();
-        for (int i = 0; i < questoes.size(); i++) {
-            TrainingQuestion q = questoes.get(i);
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", "claude-" + stamp + "-" + (i + 1));
-            m.put("tipo", q.alternativas() == null || q.alternativas().isEmpty() ? "certo_errado" : "multipla_escolha");
-            m.put("enunciado", q.enunciado());
-            if (q.alternativas() != null && !q.alternativas().isEmpty()) {
-                m.put("alternativas", q.alternativas());
-            }
-            m.put("resposta", q.resposta());
-            m.put("suaResposta", q.suaResposta());
-            m.put("chute", q.chute());
-            m.put("disciplina", q.disciplina());
-            m.put("assunto", q.assunto());
-            m.put("explicacao", q.explicacao());
-            m.put("textoBase", q.textoBase());
-            m.put("fonte", "Treino no Claude");
-            list.add(m);
-        }
-        Map<String, Object> exam = new LinkedHashMap<>();
-        exam.put("titulo", titulo);
-        exam.put("banca", banca);
-        Map<String, Object> root = new LinkedHashMap<>();
-        root.put("formato", JsonQuestionReader.FORMAT);
-        root.put("versao", JsonQuestionReader.VERSION);
-        root.put("prova", exam);
-        root.put("questoes", list);
-
-        ImportPreview preview;
-        try {
-            preview = importService.previewJson("treino-claude-" + stamp + ".json", mapper.writeValueAsBytes(root));
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            return new TrainingResult(null, null, null, null, List.of(), null, e.getMessage());
-        }
+        List<QuestionDraft> drafts = questoes.stream().map(TrainingQuestion::toDraft).toList();
+        byte[] json = QuestionDraft.toJson(titulo, banca, "claude-" + stamp, "Treino no Claude", drafts);
+        ImportPreview preview = importService.previewJson("treino-claude-" + stamp + ".json", json);
         List<String> warnings = new ArrayList<>(preview.getFileErrors());
         for (PreviewItem item : preview.getItems()) {
             item.getErrors().forEach(e -> warnings.add(item.getSource().getLabel() + ": " + e));
@@ -353,7 +324,7 @@ public class StudyMcpTools {
             @McpToolParam(description = "Dia no formato AAAA-MM-DD; vazio = hoje.", required = false) String data) {
         LocalDate date = data == null || data.isBlank() ? LocalDate.now() : LocalDate.parse(data.trim());
         StudyPage page = daySummaryService.open(date);
-        String content = (page.getContent() == null ? "" : page.getContent()) + SimpleMarkdown.toHtml(texto);
+        String content = (page.getContent() == null ? "" : page.getContent()) + com.pdf2questao.web.SimpleMarkdown.toHtml(texto);
         pageService.saveContent(page.getId(), page.getTitle(), content, page.getVersion());
         return new SummaryAppended(page.getId(), page.getTitle(), baseUrl + "/estudos/paginas/" + page.getId());
     }
@@ -369,16 +340,11 @@ public class StudyMcpTools {
                 .toLowerCase(java.util.Locale.ROOT).trim();
     }
 
-    /** Texto das questoes de PDF tem marcas de destaque/imagem; para o chat basta o texto. */
     private static String plain(String text) {
-        if (text == null) {
-            return null;
-        }
-        return com.pdf2questao.importer.parser.support.RichText.TOKEN.matcher(text).replaceAll("")
-                .replaceAll("<[^>]+>", " ").replaceAll("[ \\t]+", " ").strip();
+        return McpText.plain(text);
     }
 
     private static String clip(String text) {
-        return text == null || text.length() <= MAX_TEXT ? text : text.substring(0, MAX_TEXT) + "…";
+        return McpText.clip(text, MAX_TEXT);
     }
 }

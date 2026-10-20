@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Discursivas')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Discursivas</h1>
+            <p class="page-subtitle">Estudos de caso criados pelo Claude no estilo da banca. Escreva aqui com o tempo da
+                prova e peça a correção no Claude Code.</p>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <th:block th:if="${essays.isEmpty()}">
+        <div class="empty-state">
+            <i class="bi bi-pencil-square"></i>
+            <span>Nenhuma discursiva ainda. No Claude Code, peça: <em>"cria uma discursiva da P3 no estilo da FCC"</em>.</span>
+        </div>
+    </th:block>
+    <div class="card page-list" th:unless="${essays.isEmpty()}">
+        <a class="page-list-row" th:each="e : ${essays}" th:href="@{/discursivas/{id}(id=${e.id})}">
+            <i class="bi bi-pencil-square text-muted"></i>
+            <span class="text-truncate" th:text="${e.title}"></span>
+            <span class="ms-auto small text-nowrap"
+                  th:classappend="${e.corrected} ? 'text-ok' : (${e.submitted} ? 'text-guess' : 'text-muted')"
+                  th:text="${e.corrected} ? 'Nota ' + ${#numbers.formatDecimal(e.score, 1, 1)} + (${e.maxScore != null} ? ' de ' + ${#numbers.formatDecimal(e.maxScore, 1, 0)} : '')
+                         : (${e.submitted} ? 'Entregue · aguardando correção' : (${e.startedAt != null} ? 'Em andamento' : 'Nova'))"></span>
+        </a>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

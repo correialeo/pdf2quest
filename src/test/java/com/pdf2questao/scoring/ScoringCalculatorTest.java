@@ -119,11 +119,12 @@ class ScoringCalculatorTest {
     }
 
     @Test
-    void grupoComMinimoQueNaoCaiuNaoDaComoAprovado() {
+    void grupoComMinimoQueNaoCaiuDeixaOPassariaSemResposta() {
         ScoreResult result = ScoringCalculator.calculate(PROFILE, items("TI", 4, 0));
 
         assertEquals(null, result.groups().get(0).projectedPoints());
-        assertFalse(result.projectedPassed());
+        assertTrue(result.groups().get(1).projectedMinMet());
+        assertEquals(null, result.projectedPassed());
     }
 
     @Test
