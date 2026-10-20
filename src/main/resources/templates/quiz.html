@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head(${quiz.title})}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page lesson-page">
+    <a th:if="${lesson != null}" th:href="@{/aulas/{id}(id=${lesson.id})}" class="small text-muted text-decoration-none">
+        <i class="bi bi-arrow-left me-1"></i><span th:text="${lesson.title}"></span></a>
+    <a th:if="${lesson == null}" href="/aulas" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Aulas</a>
+    <div class="d-flex align-items-baseline justify-content-between gap-2 mt-1">
+        <h1 class="m-0" th:text="${quiz.title}"></h1>
+        <span class="small text-muted text-nowrap" id="quizScore"></span>
+    </div>
+    <p class="page-subtitle">
+        <span th:if="${quiz.subject != null}" th:text="${quiz.subject}"></span>
+        <span th:if="${quiz.topic != null}" th:text="' · ' + ${quiz.topic}"></span>
+        <span th:if="${quiz.level != null}" th:text="' · nível ' + ${quiz.level}"></span>
+    </p>
+    <div class="card p-3 mb-3 small" th:if="${quiz.doubts != null or (quiz.previousErrors != null and !quiz.previousErrors.isEmpty())}">
+        <div th:if="${quiz.doubts != null}"><span class="fw-medium">Suas dúvidas:</span> <span th:text="${quiz.doubts}"></span></div>
+        <div th:if="${quiz.previousErrors != null and !quiz.previousErrors.isEmpty()}" class="text-muted">
+            <span class="fw-medium">Retoma erros anteriores:</span> <span class="essay-prompt" th:text="${quiz.previousErrors}"></span></div>
+    </div>
+
+    <!-- Clicar numa alternativa responde: ela fica verde/vermelha com o porque; se errou, a correta aparece.
+         Depois de responder, clicar nas outras mostra a explicacao delas. -->
+    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : ''">
+        <div class="small text-muted mb-1" th:text="${q.position} + ' de ' + ${questions.size()} + (${q.topic != null} ? ' · ' + ${q.topic} : '')"></div>
+        <div class="quiz-statement" th:text="${q.statement}"></div>
+        <div class="quiz-options">
+            <button type="button" class="quiz-option" th:each="a : ${q.alternativeList()}" th:attr="data-letter=${a.letra}">
+                <span class="alt-letter" th:text="${a.letra}"></span>
+                <span class="quiz-option-body">
+                    <span th:text="${a.texto}"></span>
+                    <span class="quiz-why" hidden th:text="${a.explicacao}"></span>
+                </span>
+            </button>
+        </div>
+    </div>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Terminou? No Claude Code, diga "fiz o quiz": ele corrige as dúvidas e agenda o reforço.</span>
+        <form method="post" th:action="@{/quizzes/{id}/refazer(id=${quiz.id})}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Refazer</button>
+        </form>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script th:inline="javascript">
+    const quizId = /*[[${quiz.id}]]*/ 0;
+    const cards = Array.from(document.querySelectorAll('.quiz-question'));
+
+    function score() {
+        const done = cards.filter(c => c.dataset.selected);
+        const right = done.filter(c => c.dataset.selected === c.dataset.correct).length;
+        document.getElementById('quizScore').textContent = done.length === 0 ? cards.length + ' perguntas'
+            : right + ' de ' + done.length + ' certas' + (done.length < cards.length ? ' · ' + (cards.length - done.length) + ' faltando' : '');
+    }
+
+    /** Mostra o resultado: a escolhida (certa/errada) com o porquê e a correta destacada. */
+    function reveal(card) {
+        const selected = card.dataset.selected, correct = card.dataset.correct;
+        card.classList.add('is-answered');
+        card.querySelectorAll('.quiz-option').forEach(function (opt) {
+            const letter = opt.dataset.letter;
+            opt.classList.toggle('is-correct', letter === correct);
+            opt.classList.toggle('is-wrong', letter === selected && selected !== correct);
+            opt.classList.toggle('is-open', letter === selected || letter === correct);
+            opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
+        });
+    }
+
+    cards.forEach(function (card) {
+        if (card.dataset.selected) { reveal(card); }
+        card.querySelectorAll('.quiz-option').forEach(function (opt) {
+            opt.addEventListener('click', function () {
+                if (card.dataset.selected) {
+                    opt.classList.toggle('is-open');
+                    opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
+                    return;
+                }
+                if (card.dataset.sending) { return; }
+                card.dataset.sending = '1';
+                fetch('/quizzes/' + quizId + '/responder', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({questionId: Number(card.dataset.id), selected: opt.dataset.letter})
+                }).then(function (r) {
+                    if (!r.ok) { throw new Error(r.status); }
+                    return r.json();
+                }).then(function (res) {
+                    card.dataset.selected = opt.dataset.letter;
+                    card.dataset.correct = res.correctAnswer;
+                    reveal(card);
+                    score();
+                }).catch(function () {
+                    alert('Não foi possível salvar a resposta. Tente de novo.');
+                }).finally(function () { delete card.dataset.sending; });
+            });
+        });
+    });
+    score();
+</script>
+</body>
+</html>

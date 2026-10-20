@@ -20,4 +20,10 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
             + "  WHERE a2.quiz_question_id = a.quiz_question_id) "
             + "GROUP BY 1, 2 ORDER BY 3 * 1.0 / COUNT(*), 1, 2", nativeQuery = true)
     List<Object[]> statsByTopic();
+
+    /** [acertos, respondidas] de todos os quizzes (ultima resposta de cada pergunta). */
+    @Query(value = "SELECT COALESCE(SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), 0), COUNT(*) FROM quiz_attempt a "
+            + "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM quiz_attempt a2 "
+            + "  WHERE a2.quiz_question_id = a.quiz_question_id)", nativeQuery = true)
+    List<Object[]> totals();
 }

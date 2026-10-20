@@ -11,7 +11,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-/** Aula escrita pelo Claude (Markdown) sobre um topico do edital, com um quiz ligado a ela. */
+/** Aula escrita pelo Claude (Markdown) sobre um topico do edital; pode ter varios quizzes. */
 @Entity
 @Getter
 @Setter
@@ -30,8 +30,7 @@ public class Lesson {
     /** Tarefa do cronograma que a aula cobre (opcional). */
     private Long taskId;
     private LocalDateTime createdAt = LocalDateTime.now();
-    /** Quando o quiz foi respondido inteiro. */
+    /** Legado (V16): o estado do quiz agora fica em {@link Quiz}. */
     private LocalDateTime finishedAt;
-    /** Refazer o quiz: respostas anteriores a isto saem da tela (continuam no historico). */
     private LocalDateTime restartedAt;
 }

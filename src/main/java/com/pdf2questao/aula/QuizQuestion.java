@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Pergunta de quiz de uma aula. Separada das questoes de prova/simulado (metricas proprias). Cada alternativa traz a
+ * Pergunta de um quiz. Separada das questoes de prova/simulado (metricas proprias). Cada alternativa traz a
  * explicacao de por que esta certa ou errada, mostrada ao clicar nela.
  */
 @Entity
@@ -31,6 +31,8 @@ public class QuizQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long quizId;
+    /** Aula do quiz (null = quiz avulso), para filtrar sem juntar tabelas. */
     private Long lessonId;
     private Integer position;
     private String subject;

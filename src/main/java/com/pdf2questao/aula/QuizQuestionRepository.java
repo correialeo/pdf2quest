@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long> {
 
-    List<QuizQuestion> findByLessonIdOrderByPosition(Long lessonId);
+    List<QuizQuestion> findByQuizIdOrderByPosition(Long quizId);
 }

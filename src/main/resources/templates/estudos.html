@@ -107,8 +107,7 @@
                     <a class="page-list-row" th:each="l : ${lessons}" th:href="@{/aulas/{id}(id=${l.id})}">
                         <i class="bi bi-mortarboard text-muted"></i>
                         <span class="text-truncate" th:text="${l.title}"></span>
-                        <span class="ms-auto small text-nowrap" th:classappend="${l.finishedAt != null} ? 'text-ok' : 'text-guess'"
-                              th:text="${l.finishedAt != null} ? 'quiz feito' : 'estudar'"></span>
+                        <span class="ms-auto small text-nowrap text-muted" th:text="${#temporals.format(l.createdAt, 'dd/MM')}"></span>
                     </a>
                 </div>
             </th:block>

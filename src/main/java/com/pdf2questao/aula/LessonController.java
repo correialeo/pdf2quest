@@ -9,7 +9,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-/** Lista de aulas e a tela da aula com o quiz (resposta corrigida na hora, com o porque de cada alternativa). */
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/** Aulas (com seus quizzes), quizzes avulsos e a tela do quiz (corrigida na hora, com o porque de cada alternativa). */
 @Controller
 public class LessonController {
 
@@ -22,7 +25,11 @@ public class LessonController {
     @GetMapping("/aulas")
     public String list(Model model) {
         model.addAttribute("lessons", lessonService.all());
+        model.addAttribute("done", lessonService.all().stream()
+                .collect(Collectors.toMap(Lesson::getId, l -> lessonService.lessonDone(l.getId()))));
+        model.addAttribute("loose", lessonService.allQuizzes().stream().filter(q -> q.getLessonId() == null).toList());
         model.addAttribute("stats", lessonService.stats());
+        model.addAttribute("totals", lessonService.totals());
         return "aulas";
     }
 
@@ -31,23 +38,35 @@ public class LessonController {
         Lesson lesson = lessonService.find(id);
         model.addAttribute("lesson", lesson);
         model.addAttribute("contentHtml", SimpleMarkdown.toHtml(lesson.getContent()));
+        model.addAttribute("quizzes", lessonService.quizzes(id));
+        Map<Long, LessonService.QuizResult> results = lessonService.quizzes(id).stream()
+                .collect(Collectors.toMap(Quiz::getId, q -> lessonService.result(q.getId())));
+        model.addAttribute("results", results);
+        return "aula";
+    }
+
+    @GetMapping("/quizzes/{id}")
+    public String quiz(@PathVariable Long id, Model model) {
+        Quiz quiz = lessonService.quiz(id);
+        model.addAttribute("quiz", quiz);
+        model.addAttribute("lesson", quiz.getLessonId() == null ? null : lessonService.find(quiz.getLessonId()));
         model.addAttribute("questions", lessonService.questions(id));
         model.addAttribute("answers", lessonService.latest(id));
-        return "aula";
+        return "quiz";
     }
 
     public record AnswerRequest(Long questionId, String selected) {
     }
 
-    @PostMapping("/aulas/{id}/responder")
+    @PostMapping("/quizzes/{id}/responder")
     @ResponseBody
     public LessonService.AnswerResult answer(@PathVariable Long id, @RequestBody AnswerRequest request) {
         return lessonService.answer(request.questionId(), request.selected());
     }
 
-    @PostMapping("/aulas/{id}/refazer")
+    @PostMapping("/quizzes/{id}/refazer")
     public String restart(@PathVariable Long id) {
         lessonService.restart(id);
-        return "redirect:/aulas/" + id + "#quiz";
+        return "redirect:/quizzes/" + id;
     }
 }

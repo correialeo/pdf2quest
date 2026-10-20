@@ -12,6 +12,14 @@
         </div>
     </div>
 
+    <!-- Placar geral dos quizzes (ultima resposta de cada pergunta), separado do das provas e simulados. -->
+    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Acertos', ${totals.acertos}, 'text-ok')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Erros', ${totals.erros}, 'text-bad')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Aproveitamento', ${totals.respondidas == 0} ? '–' : ${#numbers.formatDecimal(totals.percentual, 1, 1)} + '%', '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Quizzes', ${totals.quizzes}, '')}"></div></div>
+    </div>
+
     <div class="row g-4">
         <div class="col-lg-7">
             <th:block th:if="${lessons.isEmpty()}">
@@ -24,8 +32,21 @@
                         <span th:text="${l.title}"></span>
                         <span class="text-muted small" th:if="${l.subject != null}" th:text="' · ' + ${l.subject}"></span>
                     </span>
-                    <span class="ms-auto small text-nowrap" th:classappend="${l.finishedAt != null} ? 'text-ok' : 'text-muted'"
-                          th:text="${l.finishedAt != null} ? 'quiz feito' : ${#temporals.format(l.createdAt, 'dd/MM')}"></span>
+                    <span class="ms-auto small text-nowrap" th:classappend="${done[l.id]} ? 'text-ok' : 'text-muted'"
+                          th:text="${done[l.id]} ? 'quizzes feitos' : ${#temporals.format(l.createdAt, 'dd/MM')}"></span>
+                </a>
+            </div>
+
+            <div class="section-title">Quizzes avulsos</div>
+            <div class="empty-state" th:if="${loose.isEmpty()}"><i class="bi bi-ui-checks"></i>
+                <span>No Claude Code: <em>"cria um quiz de AFO sobre créditos adicionais, nível prova"</em>.</span></div>
+            <div class="card page-list" th:unless="${loose.isEmpty()}">
+                <a class="page-list-row" th:each="q : ${loose}" th:href="@{/quizzes/{id}(id=${q.id})}">
+                    <i class="bi bi-ui-checks text-muted"></i>
+                    <span class="text-truncate"><span th:text="${q.title}"></span>
+                        <span class="text-muted small" th:if="${q.level != null}" th:text="' · ' + ${q.level}"></span></span>
+                    <span class="ms-auto small text-nowrap" th:classappend="${q.finishedAt != null} ? 'text-ok' : 'text-guess'"
+                          th:text="${q.finishedAt != null} ? 'feito' : 'responder'"></span>
                 </a>
             </div>
         </div>
