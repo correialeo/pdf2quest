@@ -53,6 +53,8 @@
           }
         },
         "resposta": { "type": "string" },
+        "suaResposta": { "type": "string", "description": "Resposta dada pelo usuario (treino feito fora do sistema)." },
+        "chute": { "type": "boolean", "description": "A resposta do usuario foi chute." },
         "anulada": { "type": "boolean" },
         "explicacao": { "type": "string" },
         "banca": { "type": "string" },

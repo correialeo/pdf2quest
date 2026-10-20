@@ -51,6 +51,48 @@
         </div>
     </div>
 
+    <!-- Treino no chat do Claude: instrucoes para o chat devolver o JSON com as respostas, e o campo para colar. -->
+    <section class="card p-4 mt-4" id="treino">
+        <h2 class="h5 mb-1"><i class="bi bi-chat-dots me-2"></i>Treino feito no Claude</h2>
+        <p class="text-muted small mb-3">Resolveu questões no chat? Traga as questões <strong>com as suas respostas</strong>:
+            elas viram uma sessão já corrigida, e os erros e chutes entram no caderno de erros e no desempenho por disciplina.</p>
+        <ol class="small mb-3">
+            <li>No começo (ou no fim) da conversa, cole as instruções:
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="copyPrompt">
+                    <i class="bi bi-clipboard me-1"></i>Copiar instruções para o Claude</button>
+                <span class="text-ok small ms-1" id="copyStatus" role="status"></span></li>
+            <li>Quando terminar, peça <em>"gere o JSON do treino"</em> e cole a resposta aqui embaixo.</li>
+        </ol>
+        <form method="post" action="/import/json-texto">
+            <textarea name="json" class="form-control font-monospace small" rows="5" required
+                      placeholder='{ "formato": "pdf2questao-questoes", "versao": 1, "questoes": [ ... ] }'></textarea>
+            <button type="submit" class="btn btn-primary mt-2">Ver prévia</button>
+        </form>
+        <textarea id="claudePrompt" hidden>Vou treinar questões de concurso com você. Ao final, quando eu pedir "gere o JSON do treino", responda SÓ com um bloco JSON neste formato (sem texto antes ou depois), com TODAS as questões que resolvi nesta conversa, na ordem:
+
+{
+  "formato": "pdf2questao-questoes",
+  "versao": 1,
+  "prova": { "titulo": "Treino Claude – &lt;assunto&gt; – &lt;data dd/mm&gt;", "banca": "&lt;banca imitada, ex.: FCC&gt;" },
+  "questoes": [
+    {
+      "id": "claude-&lt;aaaammdd&gt;-&lt;assunto-curto&gt;-&lt;n&gt;",
+      "tipo": "multipla_escolha",
+      "disciplina": "&lt;disciplina, use sempre o mesmo nome para a mesma matéria&gt;",
+      "assunto": "&lt;assunto dentro da disciplina&gt;",
+      "enunciado": "&lt;enunciado completo&gt;",
+      "alternativas": ["&lt;texto da A&gt;", "&lt;texto da B&gt;", "&lt;texto da C&gt;", "&lt;texto da D&gt;", "&lt;texto da E&gt;"],
+      "resposta": "&lt;letra correta&gt;",
+      "suaResposta": "&lt;letra que EU respondi&gt;",
+      "chute": false,
+      "explicacao": "&lt;por que a correta está certa e onde eu errei&gt;"
+    }
+  ]
+}
+
+Regras: "alternativas" só com o texto (sem "A)"); em questão Certo/Errado use "tipo": "certo_errado", sem "alternativas", e "resposta"/"suaResposta" como "Certo" ou "Errado". "chute": true se eu disse que chutei. Se eu não respondi uma questão, omita "suaResposta". Quebras de linha no texto como \n.</textarea>
+    </section>
+
     <div class="card p-3 mt-4 small text-muted">
         <div><i class="bi bi-shield-check me-1"></i>Nada é gravado sem a sua confirmação. Questões com erro nunca entram, e questões que parecem
             já existir são mostradas para você decidir.</div>
@@ -58,6 +100,19 @@
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    document.getElementById('copyPrompt').addEventListener('click', function () {
+        const text = document.getElementById('claudePrompt').value;
+        const status = document.getElementById('copyStatus');
+        navigator.clipboard.writeText(text).then(function () {
+            status.className = 'text-ok small ms-1';
+            status.textContent = 'Copiado. Cole no chat do Claude.';
+        }, function () {
+            status.className = 'text-bad small ms-1';
+            status.textContent = 'Não deu para copiar; selecione o texto manualmente.';
+        });
+    });
+</script>
 <script>
     document.querySelectorAll('.drop-zone input[type=file]').forEach(function (input) {
         input.addEventListener('change', function () {

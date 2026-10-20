@@ -1,4 +1,5 @@
--- Cronometro da sessao e modo "PROVA" (prova importada inteira). O CHECK do modo so muda recriando a tabela:
+-- Cronometro da sessao e modos "PROVA" (prova importada inteira) e "TREINO" (respostas dadas fora do sistema,
+-- importadas no JSON). O CHECK do modo so muda recriando a tabela:
 -- copia tudo para uma tabela nova com o CHECK novo e a coluna active_millis, e troca uma pela outra.
 -- active_millis = tempo com o resolver aberto e sem pausa (o navegador manda o que contou); nulo nas sessoes
 -- anteriores a esta versao.
@@ -6,7 +7,7 @@ CREATE TABLE study_session_new (
     id integer,
     correct_count integer not null,
     finished_at timestamp,
-    mode varchar(255) check (mode in ('PRATICA','SIMULADO','REFAZER','PROVA')),
+    mode varchar(255) check (mode in ('PRATICA','SIMULADO','REFAZER','PROVA','TREINO')),
     nota_dataprev float,
     percent float,
     question_ids_order clob,

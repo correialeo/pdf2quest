@@ -108,6 +108,16 @@ public class StructuredQuestionValidator {
         }
         item.setAlternatives(alternatives);
 
+        // Resposta do usuario invalida nao impede a questao de entrar: so fica sem a resposta dele.
+        if (q.userAnswer != null) {
+            String mine = Answers.normalize(q.userAnswer, type, alternatives.keySet());
+            if (mine == null) {
+                item.getWarnings().add("Sua resposta \"" + q.userAnswer + "\" não corresponde a nenhuma alternativa;"
+                        + " a questão entra sem ela.");
+            }
+            item.setUserAnswer(mine);
+        }
+
         if (q.annulled) {
             if (q.answer != null && !Answers.isAnnulledMarker(q.answer)) {
                 item.getWarnings().add("Questão anulada: a resposta \"" + q.answer + "\" foi ignorada.");

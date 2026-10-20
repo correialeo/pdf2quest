@@ -45,6 +45,8 @@ questões em outros programas, compartilhar questões entre pessoas ou migrar de
 | `categoria`   | texto                     | `"geral"` ou `"especifico"` (conhecimentos gerais/específicos). |
 | `fonte`       | texto                     | De onde a questão veio (livro, site...). |
 | `metadados`   | objeto                    | Qualquer informação extra; é guardada como está. |
+| `suaResposta` | texto                     | A resposta que **você** deu (mesmo formato de `resposta`). Questões com `suaResposta` viram uma sessão de treino já corrigida (menu **Importar treino do Claude**): acertos, erros e chutes entram no caderno de erros e nas estatísticas. Resposta que não é uma das alternativas só gera aviso. |
+| `chute`       | booleano                  | `true`: você marcou essa resposta como chute (entra no diagnóstico de chutes). |
 
 Campos desconhecidos são ignorados com aviso na prévia.
 

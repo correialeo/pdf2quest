@@ -1,11 +1,12 @@
 -- Desfaz V12. Rodar manualmente e depois: DELETE FROM flyway_schema_history WHERE version = '12';
 -- Faca backup do banco antes: o tempo contado das sessoes e as marcacoes de fora do tempo sao perdidos, e as
--- sessoes de prova completa (modo PROVA) voltam a ser SIMULADO.
+-- sessoes de prova completa (modo PROVA) voltam a ser SIMULADO e as de treino importado (TREINO), PRATICA.
 DROP INDEX IF EXISTS ix_question_import_job;
 DROP INDEX IF EXISTS ix_attempt_session;
 DROP INDEX IF EXISTS ix_attempt_question;
 ALTER TABLE attempt DROP COLUMN overtime;
 UPDATE study_session SET mode = 'SIMULADO' WHERE mode = 'PROVA';
+UPDATE study_session SET mode = 'PRATICA' WHERE mode = 'TREINO';
 CREATE TABLE study_session_old (
     id integer,
     correct_count integer not null,

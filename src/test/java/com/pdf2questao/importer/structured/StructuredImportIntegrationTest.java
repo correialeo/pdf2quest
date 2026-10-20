@@ -76,6 +76,41 @@ class StructuredImportIntegrationTest {
             """;
 
     @Test
+    void treinoComAsRespostasDoUsuarioViraSessaoCorrigida() {
+        ImportPreview preview = json("treino", """
+                {"id": "@-1", "enunciado": "@ um", "alternativas": ["x","y","z"], "resposta": "B", "suaResposta": "b"},
+                {"id": "@-2", "enunciado": "@ dois", "resposta": "Certo", "suaResposta": "Errado", "chute": true},
+                {"id": "@-3", "enunciado": "@ tres", "alternativas": ["x","y"], "resposta": "A", "suaResposta": "Q"},
+                {"id": "@-4", "enunciado": "@ quatro", "alternativas": ["x","y"], "resposta": "A"}
+                """);
+        assertTrue(preview.getItems().get(2).getWarnings().stream().anyMatch(w -> w.contains("Sua resposta")),
+                "resposta do usuario invalida so avisa");
+
+        ImportOutcome outcome = importService.confirm(preview.getToken(), DEFAULTS);
+        assertNull(outcome.error());
+        assertEquals(4, outcome.created());
+
+        var session = sessionService.getSession(outcome.trainingSessionId());
+        assertEquals(com.pdf2questao.session.SessionMode.TREINO, session.getMode());
+        assertNotNull(session.getFinishedAt());
+        assertEquals("Prova treino", session.getBlockName());
+        assertEquals(2, session.questionIds().size(), "so as questoes que o usuario respondeu");
+        assertEquals(1, session.getCorrectCount());
+        assertEquals(1, session.getWrongCount());
+        var wrong = attemptRepository.findBySessionIdAndQuestionId(session.getId(), session.questionIds().get(1))
+                .orElseThrow();
+        assertEquals("E", wrong.getSelectedAnswer());
+        assertTrue(wrong.getGuessed());
+
+        // Reimportar o mesmo treino nao duplica as questoes, mas registra as respostas de novo.
+        ImportOutcome again = importService.confirm(json("treino", """
+                {"id": "@-1", "enunciado": "@ um", "alternativas": ["x","y","z"], "resposta": "B", "suaResposta": "A"}
+                """).getToken(), DEFAULTS);
+        assertEquals(0, again.created());
+        assertEquals(0, sessionService.getSession(again.trainingSessionId()).getCorrectCount());
+    }
+
+    @Test
     void jsonValidoGravaQuestoesComOrigemEMetadados() {
         ImportPreview preview = json("grava", THREE);
         assertEquals(3, preview.getNewCount());

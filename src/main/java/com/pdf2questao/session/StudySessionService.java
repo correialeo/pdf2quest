@@ -152,6 +152,25 @@ public class StudySessionService {
         return sessionRepository.save(session);
     }
 
+    /** Resposta que o usuario deu fora do sistema; {@code guess} null = nao informado. */
+    public record TrainingAnswer(Long questionId, String selectedAnswer, Boolean guess) {
+    }
+
+    /**
+     * Registra um treino feito fora do sistema (ex.: questoes resolvidas no chat) como sessao ja finalizada: as
+     * respostas entram no caderno de erros, nos chutes e nas estatisticas como as de qualquer sessao.
+     */
+    @Transactional
+    public StudySession recordTraining(String name, List<TrainingAnswer> answers) {
+        StudySession session = createSession(SessionMode.TREINO,
+                answers.stream().map(TrainingAnswer::questionId).toList());
+        session.setBlockName(name);
+        for (TrainingAnswer answer : answers) {
+            answer(session.getId(), answer.questionId(), answer.selectedAnswer(), null, null, answer.guess());
+        }
+        return finish(session.getId());
+    }
+
     /** Resposta ja dada nesta sessao a uma questao (para repor a alternativa marcada e o "E chute?"). */
     public java.util.Optional<Attempt> attemptOf(Long sessionId, Long questionId) {
         return attemptRepository.findBySessionIdAndQuestionId(sessionId, questionId);

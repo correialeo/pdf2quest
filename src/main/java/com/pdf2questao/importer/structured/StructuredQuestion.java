@@ -23,6 +23,10 @@ public class StructuredQuestion {
     List<String[]> alternatives = new ArrayList<>();
     String answer;
     boolean annulled;
+    /** Resposta que o usuario deu fora do sistema (ex.: treino no chat); vira uma sessao ja corrigida. */
+    String userAnswer;
+    /** "E chute?" da resposta do usuario; null = nao informado. */
+    Boolean userGuess;
     String explanation;
     String organization;
     String exam;

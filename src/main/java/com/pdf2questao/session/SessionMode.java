@@ -5,7 +5,9 @@ public enum SessionMode {
     SIMULADO("Simulado"),
     REFAZER("Refazer questões"),
     /** Prova importada inteira, na ordem ("Resolver a prova"). */
-    PROVA("Prova completa");
+    PROVA("Prova completa"),
+    /** Questoes resolvidas fora do sistema (chat), importadas ja com as respostas. */
+    TREINO("Treino importado");
 
     private final String label;
 

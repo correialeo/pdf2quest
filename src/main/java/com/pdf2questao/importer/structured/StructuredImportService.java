@@ -9,6 +9,7 @@ import com.pdf2questao.question.Passage;
 import com.pdf2questao.question.PassageRepository;
 import com.pdf2questao.question.Question;
 import com.pdf2questao.question.QuestionRepository;
+import com.pdf2questao.session.StudySessionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -38,6 +39,7 @@ public class StructuredImportService {
     private final ImportJobRepository importJobRepository;
     private final PassageRepository passageRepository;
     private final TransactionTemplate transactions;
+    private final StudySessionService sessionService;
     private final ObjectMapper mapper = new ObjectMapper();
     private final StructuredQuestionValidator validator = new StructuredQuestionValidator();
     private final Map<String, ImportPreview> previews = new ConcurrentHashMap<>();
@@ -48,7 +50,9 @@ public class StructuredImportService {
     }
 
     public StructuredImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
-                                   PassageRepository passageRepository, PlatformTransactionManager transactionManager) {
+                                   PassageRepository passageRepository, PlatformTransactionManager transactionManager,
+                                   StudySessionService sessionService) {
+        this.sessionService = sessionService;
         this.questionRepository = questionRepository;
         this.importJobRepository = importJobRepository;
         this.passageRepository = passageRepository;
@@ -171,6 +175,8 @@ public class StructuredImportService {
         Map<String, Long> passages = new HashMap<>();
         List<String> report = new ArrayList<>();
         Integer detectedYear = null;
+        // Respostas do usuario no arquivo (treino feito fora): questao gravada -> resposta, na ordem do arquivo.
+        Map<Long, PreviewItem> answered = new LinkedHashMap<>();
         for (PreviewItem item : items) {
             position++;
             StructuredQuestion q = item.getSource();
@@ -184,6 +190,9 @@ public class StructuredImportService {
                     if (!options.includeDuplicates()) {
                         skipped++;
                         report.add(q.label + ": não importada, possível duplicata de " + item.getDuplicateOf());
+                        if (item.getExistingQuestionId() != null) {
+                            answered.putIfAbsent(item.getExistingQuestionId(), item);   // resposta vale na ja gravada
+                        }
                         continue;
                     }
                 }
@@ -191,11 +200,13 @@ public class StructuredImportService {
                     if (!options.updateExisting()) {
                         skipped++;
                         report.add(q.label + ": ID \"" + q.externalId + "\" já cadastrado, mantido como estava");
+                        answered.putIfAbsent(item.getExistingQuestionId(), item);
                         continue;
                     }
                     Question existing = questionRepository.findById(item.getExistingQuestionId()).orElseThrow();
                     fill(existing, item, passageId(q, existing.getImportJobId(), passages));
                     questionRepository.save(existing);
+                    answered.putIfAbsent(existing.getId(), item);
                     updated++;
                     report.add(q.label + ": ID \"" + q.externalId + "\" atualizado (questão #" + existing.getId() + ")");
                     continue;
@@ -210,6 +221,7 @@ public class StructuredImportService {
             question.setQuestionNumber(q.number != null ? q.number : position);
             fill(question, item, passageId(q, job.getId(), passages));
             questionRepository.save(question);
+            answered.putIfAbsent(question.getId(), item);
             created++;
             if (detectedYear == null) {
                 detectedYear = q.year;
@@ -222,9 +234,20 @@ public class StructuredImportService {
         job.setFinishedAt(LocalDateTime.now());
         report.add(0, "Importação " + preview.getFormat() + ": " + created + " criadas, " + updated
                 + " atualizadas, " + skipped + " não importadas.");
+        Long trainingSessionId = null;
+        List<StudySessionService.TrainingAnswer> answers = answered.entrySet().stream()
+                .filter(e -> e.getValue().getUserAnswer() != null)
+                .map(e -> new StudySessionService.TrainingAnswer(e.getKey(), e.getValue().getUserAnswer(),
+                        e.getValue().getSource().userGuess))
+                .toList();
+        if (!answers.isEmpty()) {
+            trainingSessionId = sessionService.recordTraining(firstNonBlank(job.getTitle(), job.getFileName()),
+                    answers).getId();
+            report.add(1, answers.size() + " respostas suas registradas como sessão de treino #" + trainingSessionId + ".");
+        }
         job.setReport(String.join("\n", report));
         importJobRepository.save(job);
-        return new ImportOutcome(job.getId(), created, updated, skipped, null);
+        return new ImportOutcome(job.getId(), created, updated, skipped, null, trainingSessionId);
     }
 
     /** Copia o conteudo validado para a questao. Usado tambem na atualizacao: id, prova e numero nao mudam. */

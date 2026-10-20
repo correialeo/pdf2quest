@@ -44,6 +44,26 @@ public class StructuredImportController {
         return "redirect:/import/previa/" + preview.getToken();
     }
 
+    /** JSON colado (ex.: copiado do chat do Claude no fim de um treino). */
+    @PostMapping("/import/json-texto")
+    public String pasteJson(@RequestParam(defaultValue = "") String json, RedirectAttributes redirectAttributes) {
+        String text = extractJson(json);
+        if (text.isBlank()) {
+            redirectAttributes.addFlashAttribute("error", "Cole o JSON das questões.");
+            return "redirect:/import/arquivo";
+        }
+        ImportPreview preview = importService.previewJson("treino-" + java.time.LocalDate.now() + ".json",
+                text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return "redirect:/import/previa/" + preview.getToken();
+    }
+
+    /** Tira o que vier em volta do JSON ao copiar do chat (```json ... ```, texto antes ou depois). */
+    static String extractJson(String pasted) {
+        int start = pasted.indexOf('{');
+        int end = pasted.lastIndexOf('}');
+        return start < 0 || end < start ? pasted.trim() : pasted.substring(start, end + 1);
+    }
+
     @PostMapping("/import/csv")
     public String uploadCsv(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes)
             throws IOException {
@@ -135,6 +155,12 @@ public class StructuredImportController {
                 + (outcome.updated() > 0 ? ", " + outcome.updated() + " atualizadas" : "")
                 + (outcome.skipped() > 0 ? ", " + outcome.skipped() + " não importadas (detalhes no relatório)" : "")
                 + ".");
+        if (outcome.trainingSessionId() != null) {
+            // Treino com as respostas do usuario: o que interessa e o resultado (acertos, erros, disciplinas).
+            redirectAttributes.addFlashAttribute("message", "Treino importado: " + outcome.created()
+                    + " questões novas. Os erros já estão no caderno de erros.");
+            return "redirect:/resultado/" + outcome.trainingSessionId();
+        }
         return "redirect:/import/result/" + outcome.importJobId();
     }
 

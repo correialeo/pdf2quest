@@ -30,6 +30,8 @@ public class PreviewItem {
     private Map<String, String> alternatives = new LinkedHashMap<>();
     /** Letra correta normalizada; nula se o arquivo nao trouxe gabarito ou a questao e anulada. */
     private String answer;
+    /** Resposta do usuario ja normalizada para a letra (null = nao respondeu ou resposta invalida). */
+    private String userAnswer;
     /** Questao cadastrada que motivou JA_EXISTE ou POSSIVEL_DUPLICATA. */
     private Long existingQuestionId;
     private String duplicateOf;
@@ -48,6 +50,8 @@ public class PreviewItem {
     public Map<String, String> getAlternatives() { return alternatives; }
     void setAlternatives(Map<String, String> alternatives) { this.alternatives = alternatives; }
     public String getAnswer() { return answer; }
+    public String getUserAnswer() { return userAnswer; }
+    void setUserAnswer(String userAnswer) { this.userAnswer = userAnswer; }
     void setAnswer(String answer) { this.answer = answer; }
     public Long getExistingQuestionId() { return existingQuestionId; }
     void setExistingQuestionId(Long id) { this.existingQuestionId = id; }

@@ -24,7 +24,8 @@ public class JsonQuestionReader {
     private static final Set<String> EXAM_FIELDS = Set.of("titulo", "banca", "concurso", "ano", "disciplina");
     private static final Set<String> QUESTION_FIELDS = Set.of("id", "numero", "tipo", "enunciado", "textoBase",
             "alternativas", "resposta", "anulada", "explicacao", "banca", "concurso", "ano", "disciplina",
-            "assunto", "subtopicos", "tags", "dificuldade", "categoria", "fonte", "referencias", "metadados");
+            "assunto", "subtopicos", "tags", "dificuldade", "categoria", "fonte", "referencias", "metadados",
+            "suaResposta", "chute");
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -134,6 +135,15 @@ public class JsonQuestionReader {
         }
         answer(node.get("resposta"), q);
         alternatives(node.get("alternativas"), q);
+        q.userAnswer = text(node, "suaResposta", q);
+        JsonNode guess = node.get("chute");
+        if (guess != null && !guess.isNull()) {
+            if (guess.isBoolean()) {
+                q.userGuess = guess.booleanValue();
+            } else {
+                q.readErrors.add("\"chute\" deve ser true ou false.");
+            }
+        }
 
         JsonNode metadata = node.get("metadados");
         if (metadata != null && !metadata.isNull()) {
