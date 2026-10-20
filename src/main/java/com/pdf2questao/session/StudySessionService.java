@@ -43,15 +43,28 @@ public class StudySessionService {
     /** Inicia uma sessao com as questoes do bloco (origens, faixas e exclusoes ja aplicadas). */
     public StudySession startBloco(Long blockId) {
         StudyBlock block = blockService.find(blockId).orElseThrow();
+        return startBloco(blockId, block.getTimeLimitMinutes(), false);
+    }
+
+    /**
+     * Inicio personalizado: {@code timeLimit} substitui o tempo do bloco (null = sem tempo); {@code shuffle}
+     * embaralha a ordem das questoes.
+     */
+    public StudySession startBloco(Long blockId, Integer timeLimit, boolean shuffle) {
+        StudyBlock block = blockService.find(blockId).orElseThrow();
         List<Long> ids = blockService.questionIds(blockId);
         if (ids.isEmpty()) {
             throw new EmptySessionException("O bloco '" + block.getName() + "' não tem questões.");
+        }
+        if (shuffle) {
+            ids = new ArrayList<>(ids);
+            Collections.shuffle(ids);
         }
         StudySession session = createSession(SessionMode.SIMULADO, ids);
         session.setBlockId(block.getId());
         session.setBlockName(block.getName());
         session.setScoringProfileId(block.getScoringProfileId());
-        session.setTimeLimitMinutes(block.getTimeLimitMinutes());
+        session.setTimeLimitMinutes(timeLimit == null || timeLimit <= 0 ? null : timeLimit);
         return sessionRepository.save(session);
     }
 
@@ -115,26 +128,23 @@ public class StudySessionService {
         return createSession(SessionMode.PRATICA, ids);
     }
 
-    public StudySession startSimulado(int qtyGerais, int qtyEspecificas, boolean keepExamOrder) {
-        List<Long> ids = new ArrayList<>();
-        if (keepExamOrder) {
-            ids.addAll(questionRepository.findOrderedIdsByCategory(QuestionCategory.GERAL.name(), qtyGerais));
-            ids.addAll(questionRepository.findOrderedIdsByCategory(QuestionCategory.ESPECIFICO.name(), qtyEspecificas));
-        } else {
-            ids.addAll(questionRepository.findRandomIdsByCategory(QuestionCategory.GERAL.name(), qtyGerais));
-            ids.addAll(questionRepository.findRandomIdsByCategory(QuestionCategory.ESPECIFICO.name(), qtyEspecificas));
-            Collections.shuffle(ids);
-        }
-        return createSession(SessionMode.SIMULADO, ids);
+    public StudySession startProva(Long importJobId) {
+        return startProva(importJobId, null);
     }
 
-    public StudySession startProva(Long importJobId) {
+    /** Prova importada inteira, na ordem; {@code timeLimit} em minutos (null = sem tempo). */
+    public StudySession startProva(Long importJobId, Integer timeLimit) {
         List<Long> ids = questionRepository.findByImportJobId(importJobId).stream()
                 .sorted(Comparator.comparing(Question::getQuestionNumber,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(Question::getId)
                 .toList();
-        return createSession(SessionMode.PROVA, ids);
+        StudySession session = createSession(SessionMode.PROVA, ids);
+        if (timeLimit != null && timeLimit > 0) {
+            session.setTimeLimitMinutes(timeLimit);
+            session = sessionRepository.save(session);
+        }
+        return session;
     }
 
     public StudySession startRefazer(List<Long> questionIds) {

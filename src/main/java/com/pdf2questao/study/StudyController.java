@@ -23,10 +23,13 @@ public class StudyController {
     private final StudySubjects subjects;
     private final DaySummaryService daySummaryService;
     private final DashboardService dashboardService;
+    private final com.pdf2questao.aula.LessonService lessonService;
 
     public StudyController(StudyPageService pageService, StudyTaskService taskService, InboxService inboxService,
                            StudySubjects subjects, DaySummaryService daySummaryService,
-                           SpacedRepetitionService spacedRepetition, DashboardService dashboardService) {
+                           SpacedRepetitionService spacedRepetition, DashboardService dashboardService,
+                           com.pdf2questao.aula.LessonService lessonService) {
+        this.lessonService = lessonService;
         this.dashboardService = dashboardService;
         this.spacedRepetition = spacedRepetition;
         this.pageService = pageService;
@@ -52,6 +55,7 @@ public class StudyController {
         model.addAttribute("recentPages", pageService.recent());
         model.addAttribute("inboxCount", inboxService.count());
         model.addAttribute("practice", dashboardService.today());
+        model.addAttribute("lessons", lessonService.all().stream().limit(3).toList());
         return "estudos";
     }
 

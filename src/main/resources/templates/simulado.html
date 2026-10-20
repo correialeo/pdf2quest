@@ -1,36 +1,78 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/head :: head('Simulado')}"></head>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Simulados')}"></head>
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
     <div class="page-header">
         <div>
-            <h1>Simulado</h1>
-            <p class="page-subtitle">Modelo do edital Dataprev: Conhecimentos Gerais valem peso 1 e Específicos, peso 2,5 na nota final.
-                Para outras provas, use um bloco com perfil de pontuação.</p>
+            <h1>Simulados</h1>
+            <p class="page-subtitle">Todos os simulados: os blocos (inclusive os criados pelo Claude) e as provas importadas.
+                Escolha o tempo e a ordem antes de começar.</p>
+        </div>
+        <a href="/blocos/novo" class="btn btn-outline-secondary"><i class="bi bi-plus-lg me-1"></i>Novo bloco</a>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <th:block th:unless="${open.isEmpty()}">
+        <div class="section-title mt-0">Em andamento</div>
+        <div class="card task-list mb-4">
+            <div class="task-row" th:each="o : ${open}">
+                <div class="task-info">
+                    <div class="fw-medium" th:text="${o.label()}"></div>
+                    <div class="task-meta" th:text="'Questão ' + ${o.resumeIndex + 1} + ' de ' + ${o.total()}"></div>
+                </div>
+                <a class="btn btn-primary btn-sm" th:href="@{/resolver/{id}(id=${o.session.id}, index=${o.resumeIndex})}">Continuar</a>
+            </div>
+        </div>
+    </th:block>
+
+    <div class="section-title" th:classappend="${open.isEmpty()} ? 'mt-0'">Blocos</div>
+    <th:block th:if="${blocks.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-collection', 'Nenhum bloco ainda. Crie um ou peça ao Claude um simulado inédito.', 'Criar bloco', '/blocos/novo')}"></div></th:block>
+    <div class="row row-cols-1 row-cols-lg-2 g-3 mb-4">
+        <div class="col" th:each="b : ${blocks}">
+            <!-- Inicio personalizado: tempo (vem o do bloco; vazio = sem tempo) e ordem. -->
+            <form method="post" action="/simulado/iniciar" class="card p-3 h-100 d-flex flex-column">
+                <input type="hidden" name="blockId" th:value="${b.block.id}"/>
+                <div class="d-flex justify-content-between align-items-baseline gap-2">
+                    <a class="fw-medium text-reset" th:href="@{/blocos/{id}(id=${b.block.id})}" th:text="${b.block.name}"></a>
+                    <span class="small text-muted text-nowrap" th:text="${b.questions} + ' questões'"></span>
+                </div>
+                <div class="small text-muted mb-2">
+                    <span th:text="${b.sessions} + (${b.sessions == 1} ? ' sessão' : ' sessões')"></span>
+                    <span th:if="${b.lastScore != null}" th:text="' · última nota ' + ${#numbers.formatDecimal(b.lastScore, 1, 1)}"></span>
+                    <span th:if="${b.lastPassed != null}" th:class="${b.lastPassed} ? 'text-ok' : 'text-bad'"
+                          th:text="${b.lastPassed} ? ' · bateu' : ' · não bateu'"></span>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-3 mt-auto">
+                    <label class="d-flex align-items-center gap-1 small">Tempo
+                        <input type="number" name="tempo" min="1" class="form-control form-control-sm" style="width: 6rem"
+                               th:value="${b.block.timeLimitMinutes}" placeholder="sem"/> min</label>
+                    <label class="form-check small m-0"><input type="checkbox" class="form-check-input" name="embaralhar" value="true"/>
+                        Embaralhar</label>
+                    <button type="submit" class="btn btn-primary btn-sm ms-auto"><i class="bi bi-play-fill me-1"></i>Iniciar</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <form method="post" action="/simulado/iniciar" class="card p-4 form-narrow">
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Conhecimentos Gerais</label>
-                <input type="number" name="qtyGerais" class="form-control" value="10" min="0" required/>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Conhecimentos Específicos</label>
-                <input type="number" name="qtyEspecificas" class="form-control" value="10" min="0" required/>
-            </div>
+    <div class="section-title">Provas importadas</div>
+    <th:block th:if="${groups.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-file-earmark-pdf', 'Nenhuma prova importada.', 'Importar prova', '/import')}"></div></th:block>
+    <th:block th:each="g : ${groups}">
+        <div class="small text-muted fw-medium mb-1" th:text="${g.banca}"></div>
+        <div class="card task-list mb-3">
+            <form method="post" action="/simulado/iniciar" class="task-row" th:each="p : ${g.provas}">
+                <input type="hidden" name="importJobId" th:value="${p.job.id}"/>
+                <div class="task-info">
+                    <a class="fw-medium text-reset" th:href="@{/dashboard/prova/{id}(id=${p.job.id})}" th:text="${p.job.displayName}"></a>
+                    <div class="task-meta" th:text="${p.totalQuestions} + ' questões' + (${p.answered > 0} ? ' · ' + ${p.answered} + ' respondidas' : '')"></div>
+                </div>
+                <label class="d-flex align-items-center gap-1 small text-nowrap">Tempo
+                    <input type="number" name="tempo" min="1" class="form-control form-control-sm" style="width: 5.5rem" placeholder="sem"/> min</label>
+                <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-fill me-1"></i>Resolver</button>
+            </form>
         </div>
-        <div class="form-check mb-3">
-            <input type="checkbox" class="form-check-input" name="keepExamOrder" value="true" id="keepExamOrder"/>
-            <label class="form-check-label" for="keepExamOrder">
-                Manter ordem original da prova (também agrupa por disciplina)
-            </label>
-        </div>
-        <button type="submit" class="btn btn-primary align-self-start"><i class="bi bi-play-fill me-1"></i>Iniciar simulado</button>
-    </form>
+    </th:block>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 </body>

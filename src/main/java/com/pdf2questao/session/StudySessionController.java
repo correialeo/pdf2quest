@@ -24,10 +24,12 @@ public class StudySessionController {
     private final PassageRepository passageRepository;
     private final ImportJobRepository importJobRepository;
     private final PdfStorage pdfStorage;
+    private final com.pdf2questao.dashboard.DashboardService dashboardService;
 
     public StudySessionController(StudySessionService sessionService, QuestionRepository questionRepository,
                                   PassageRepository passageRepository, ImportJobRepository importJobRepository,
-                                  PdfStorage pdfStorage) {
+                                  PdfStorage pdfStorage, com.pdf2questao.dashboard.DashboardService dashboardService) {
+        this.dashboardService = dashboardService;
         this.sessionService = sessionService;
         this.questionRepository = questionRepository;
         this.passageRepository = passageRepository;
@@ -35,15 +37,27 @@ public class StudySessionController {
         this.pdfStorage = pdfStorage;
     }
 
+    /** Todos os simulados: blocos (inclusive os criados pelo Claude) e provas importadas, com inicio personalizado. */
     @GetMapping("/simulado")
-    public String simuladoForm() {
+    public String simulados(Model model) {
+        var overview = dashboardService.overview();
+        model.addAttribute("blocks", overview.blocks());
+        model.addAttribute("groups", overview.groups());
+        model.addAttribute("open", overview.open());
         return "simulado";
     }
 
+    /**
+     * Inicia um bloco ou uma prova inteira. {@code tempo}: minutos (vazio = sem tempo); {@code embaralhar} so no
+     * bloco.
+     */
     @PostMapping("/simulado/iniciar")
-    public String iniciarSimulado(@RequestParam int qtyGerais, @RequestParam int qtyEspecificas,
-                                   @RequestParam(defaultValue = "false") boolean keepExamOrder) {
-        StudySession session = sessionService.startSimulado(qtyGerais, qtyEspecificas, keepExamOrder);
+    public String iniciarSimulado(@RequestParam(required = false) Long blockId,
+                                  @RequestParam(required = false) Long importJobId,
+                                  @RequestParam(required = false) Integer tempo,
+                                  @RequestParam(defaultValue = "false") boolean embaralhar) {
+        StudySession session = blockId != null ? sessionService.startBloco(blockId, tempo, embaralhar)
+                : sessionService.startProva(importJobId, tempo);
         return "redirect:/resolver/" + session.getId() + "?index=0";
     }
 

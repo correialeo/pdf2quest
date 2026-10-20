@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Aulas')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Aulas</h1>
+            <p class="page-subtitle">Aulas do tutor com quiz. No Claude Code, rode <em>/mcp__pdf2questao__rotina_estudo_do_dia</em>
+                para montar a aula de hoje a partir do cronograma.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <th:block th:if="${lessons.isEmpty()}">
+                <div class="empty-state"><i class="bi bi-mortarboard"></i><span>Nenhuma aula ainda.</span></div>
+            </th:block>
+            <div class="card page-list" th:unless="${lessons.isEmpty()}">
+                <a class="page-list-row" th:each="l : ${lessons}" th:href="@{/aulas/{id}(id=${l.id})}">
+                    <i class="bi bi-mortarboard text-muted"></i>
+                    <span class="text-truncate">
+                        <span th:text="${l.title}"></span>
+                        <span class="text-muted small" th:if="${l.subject != null}" th:text="' · ' + ${l.subject}"></span>
+                    </span>
+                    <span class="ms-auto small text-nowrap" th:classappend="${l.finishedAt != null} ? 'text-ok' : 'text-muted'"
+                          th:text="${l.finishedAt != null} ? 'quiz feito' : ${#temporals.format(l.createdAt, 'dd/MM')}"></span>
+                </a>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <!-- Desempenho dos quizzes, separado do das provas e simulados. -->
+            <div class="section-title mt-0">Quiz por tópico <span class="fw-normal">(piores primeiro)</span></div>
+            <div class="empty-state" th:if="${stats.isEmpty()}"><i class="bi bi-bar-chart"></i><span>Responda um quiz para ver aqui.</span></div>
+            <div class="card p-3" th:unless="${stats.isEmpty()}">
+                <div th:each="s : ${stats}" class="subject-row">
+                    <div class="d-flex justify-content-between small mb-1 gap-2">
+                        <span class="text-truncate" th:title="${s.disciplina}" th:text="${s.topico}"></span>
+                        <span class="text-nowrap" th:text="${s.acertos} + '/' + ${s.respondidas}"></span>
+                    </div>
+                    <div class="progress" style="height: 6px"><div class="progress-bar"
+                         th:classappend="${s.percentual >= 70} ? 'bg-success' : (${s.percentual >= 50} ? 'bg-warning' : 'bg-danger')"
+                         th:style="'width: ' + ${s.percentual} + '%'"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

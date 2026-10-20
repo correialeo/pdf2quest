@@ -5,7 +5,8 @@ import java.util.List;
 
 /**
  * Markdown simples (o que o Claude escreve num resumo) para o HTML do editor de paginas: titulos ## e ###,
- * listas com "- " ou "* " (2 espacos de recuo por nivel viram sublista), **negrito**, *italico* e paragrafos.
+ * listas com "- " ou "* " (2 espacos de recuo por nivel viram sublista), listas numeradas "1. ", citacoes "> ",
+ * blocos de codigo entre ``` , `codigo`, **negrito**, *italico* e paragrafos. Todo texto e escapado.
  * O resultado ainda passa pelo {@code HtmlSanitizer} ao ser gravado.
  */
 public final class SimpleMarkdown {
@@ -20,13 +21,53 @@ public final class SimpleMarkdown {
         StringBuilder out = new StringBuilder();
         List<String> paragraph = new ArrayList<>();
         int depth = 0;   // listas abertas
+        boolean ordered = false;   // lista numerada aberta (um nivel)
+        StringBuilder code = null;   // bloco ``` aberto
+        List<String> quote = new ArrayList<>();
         for (String raw : markdown.strip().split("\\R")) {
             String line = raw.replace("\t", "  ");
             String trimmed = line.strip();
+            if (trimmed.startsWith("```")) {
+                if (code == null) {
+                    flush(out, paragraph);
+                    closeLists(out, depth, 0);
+                    depth = 0;
+                    ordered = closeOrdered(out, ordered);
+                    flushQuote(out, quote);
+                    code = new StringBuilder();
+                } else {
+                    out.append("<pre><code>").append(escape(code.toString().stripTrailing())).append("</code></pre>");
+                    code = null;
+                }
+                continue;
+            }
+            if (code != null) {
+                code.append(raw).append('\n');
+                continue;
+            }
+            boolean numbered = trimmed.matches("\\d+[.)] .*");
+            if (!numbered) {
+                ordered = closeOrdered(out, ordered);
+            }
+            if (trimmed.startsWith("> ") || trimmed.equals(">")) {
+                flush(out, paragraph);
+                quote.add(inline(trimmed.substring(1).strip()));
+                continue;
+            }
+            flushQuote(out, quote);
             boolean item = trimmed.startsWith("- ") || trimmed.startsWith("* ");
             if (!item && depth > 0) {
                 closeLists(out, depth, 0);
                 depth = 0;
+            }
+            if (numbered) {
+                flush(out, paragraph);
+                if (!ordered) {
+                    out.append("<ol>");
+                    ordered = true;
+                }
+                out.append("<li>").append(inline(trimmed.substring(trimmed.indexOf(' ') + 1).strip())).append("</li>");
+                continue;
             }
             if (trimmed.isEmpty()) {
                 flush(out, paragraph);
@@ -58,6 +99,11 @@ public final class SimpleMarkdown {
         }
         flush(out, paragraph);
         closeLists(out, depth, 0);
+        closeOrdered(out, ordered);
+        flushQuote(out, quote);
+        if (code != null) {
+            out.append("<pre><code>").append(escape(code.toString().stripTrailing())).append("</code></pre>");
+        }
         return out.toString();
     }
 
@@ -78,8 +124,39 @@ public final class SimpleMarkdown {
         }
     }
 
+    private static boolean closeOrdered(StringBuilder out, boolean ordered) {
+        if (ordered) {
+            out.append("</ol>");
+        }
+        return false;
+    }
+
+    private static void flushQuote(StringBuilder out, List<String> quote) {
+        if (!quote.isEmpty()) {
+            out.append("<blockquote><p>").append(String.join("<br>", quote)).append("</p></blockquote>");
+            quote.clear();
+        }
+    }
+
+    private static String escape(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     private static String inline(String text) {
-        String escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        // `codigo` primeiro, sem negrito/italico dentro
+        StringBuilder out = new StringBuilder();
+        String[] parts = text.split("`", -1);
+        for (int i = 0; i < parts.length; i++) {
+            if (i % 2 == 1 && i < parts.length - 1) {
+                out.append("<code>").append(escape(parts[i])).append("</code>");
+            } else {
+                out.append(emphasis(escape(i % 2 == 1 ? "`" + parts[i] : parts[i])));
+            }
+        }
+        return out.toString();
+    }
+
+    private static String emphasis(String escaped) {
         return escaped.replaceAll("\\*\\*(.+?)\\*\\*", "<strong>$1</strong>")
                 .replaceAll("(?<![*\\w])\\*(?!\\s)(.+?)(?<!\\s)\\*(?![*\\w])", "<em>$1</em>");
     }

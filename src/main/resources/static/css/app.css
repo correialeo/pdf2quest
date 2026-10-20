@@ -1529,3 +1529,20 @@ details[open] > .day-header::before { transform: rotate(90deg); }
 /* Discursiva: enunciado com as quebras de linha do texto; area de escrita com fonte de leitura confortavel. */
 .essay-prompt { white-space: pre-wrap; line-height: 1.6; }
 .essay-text { font-size: 1rem; line-height: 1.7; min-height: 28rem; }
+
+/* Aula e quiz: alternativas como botoes; respondida mostra certa (verde), errada (vermelho) e o porque. */
+.lesson-page { max-width: 52rem; }
+.lesson-content pre { background: var(--bs-tertiary-bg); padding: .75rem 1rem; border-radius: 8px; overflow-x: auto; }
+.lesson-content blockquote { border-left: 3px solid var(--bs-primary); padding: .25rem 0 .25rem 1rem; margin: 1rem 0; color: var(--bs-secondary-color); }
+.quiz-statement { white-space: pre-wrap; margin-bottom: 1rem; line-height: 1.6; }
+.quiz-options { display: flex; flex-direction: column; gap: .5rem; }
+.quiz-option { display: flex; gap: .75rem; align-items: flex-start; text-align: left; width: 100%; padding: .75rem 1rem;
+    border: 1px solid var(--bs-border-color); border-radius: 10px; background: var(--bs-body-bg); color: inherit; }
+.quiz-option:hover { border-color: var(--bs-primary); }
+.quiz-option-body { display: flex; flex-direction: column; gap: .35rem; }
+.quiz-why { font-size: .875rem; color: var(--bs-secondary-color); }
+.quiz-question.is-answered .quiz-option:not(.is-correct):not(.is-wrong) { opacity: .75; }
+.quiz-option.is-correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--bs-body-bg)); }
+.quiz-option.is-correct .alt-letter { background: var(--ok); color: #fff; }
+.quiz-option.is-wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--bs-body-bg)); }
+.quiz-option.is-wrong .alt-letter { background: var(--bad); color: #fff; }

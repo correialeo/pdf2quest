@@ -27,4 +27,14 @@ class SimpleMarkdownTest {
                 SimpleMarkdown.toHtml("- a <b>\n  - b\n    - c"));
         assertEquals("<h3>x</h3><p>2 * 3 = 6</p>", SimpleMarkdown.toHtml("### x\n2 * 3 = 6"));
     }
+
+    @Test
+    void codigoCitacaoEListaNumerada() {
+        assertEquals("<p>Use <code>a*b</code> e **x**</p>".replace("**x**", "<strong>x</strong>"),
+                SimpleMarkdown.toHtml("Use `a*b` e **x**"));
+        assertEquals("<pre><code>SELECT *\nFROM t WHERE a &lt; 2</code></pre><p>fim</p>",
+                SimpleMarkdown.toHtml("```sql\nSELECT *\nFROM t WHERE a < 2\n```\nfim"));
+        assertEquals("<blockquote><p>FCC adora <strong>EXCETO</strong></p></blockquote><ol><li>um</li><li>dois</li></ol>",
+                SimpleMarkdown.toHtml("> FCC adora **EXCETO**\n1. um\n2. dois"));
+    }
 }

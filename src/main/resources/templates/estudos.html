@@ -99,6 +99,20 @@
                 <a class="btn btn-outline-secondary btn-sm" href="/import/arquivo#treino"><i class="bi bi-chat-dots me-1"></i>Importar treino do Claude</a>
             </div>
 
+            <th:block th:unless="${lessons.isEmpty()}">
+                <div class="section-title d-flex align-items-center">
+                    <span>Aulas</span><a href="/aulas" class="ms-auto small fw-normal">Todas</a>
+                </div>
+                <div class="card page-list mb-4">
+                    <a class="page-list-row" th:each="l : ${lessons}" th:href="@{/aulas/{id}(id=${l.id})}">
+                        <i class="bi bi-mortarboard text-muted"></i>
+                        <span class="text-truncate" th:text="${l.title}"></span>
+                        <span class="ms-auto small text-nowrap" th:classappend="${l.finishedAt != null} ? 'text-ok' : 'text-guess'"
+                              th:text="${l.finishedAt != null} ? 'quiz feito' : 'estudar'"></span>
+                    </a>
+                </div>
+            </th:block>
+
             <div class="section-title d-flex align-items-center">
                 <span>Anotação rápida</span>
                 <a href="/estudos/caixa-de-entrada" class="ms-auto small fw-normal"
