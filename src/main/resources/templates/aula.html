@@ -100,5 +100,95 @@
     });
     score();
 </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const content = document.querySelector('.lesson-content');
+        if (!content) return;
+    
+        // Seleciona blocos que podem conter a tabela: parágrafos e blocos de código
+        const blocks = Array.from(content.querySelectorAll('p, pre'));
+    
+        blocks.forEach(function(block) {
+            // Evita processar blocos que já estão dentro de uma tabela
+            if (block.closest('table')) return;
+    
+            let rawHtml = block.innerHTML;
+    
+            // Converte <br> em quebras de linha reais para a detecção
+            let textWithBreaks = rawHtml.replace(/<br\s*\/?>/gi, '\n');
+    
+            // Para <pre>, o textContent já preserva as quebras
+            if (block.tagName === 'PRE') {
+                textWithBreaks = block.textContent;
+            }
+    
+            // Remove as tags HTML restantes para analisar o texto puro
+            // (mantém os ** do Markdown, que serão convertidos depois)
+            let plain = textWithBreaks.replace(/<[^>]*>/g, '');
+    
+            const lines = plain.split('\n')
+                .map(function(l) { return l.trim(); })
+                .filter(function(l) { return l.length > 0; });
+    
+            // Precisa de pelo menos: cabeçalho + separador + 1 linha de dados
+            if (lines.length < 3) return;
+    
+            // Verifica se a primeira linha parece uma linha de tabela
+            if (!lines[0].startsWith('|') || !lines[0].endsWith('|')) return;
+    
+            // Verifica a linha separadora (ex.: |---|---| ou |:---|:---:|)
+            const separator = lines[1];
+            if (!separator.includes('|')) return;
+            const sepCells = separator.split('|')
+                .map(function(c) { return c.trim(); })
+                .filter(function(c) { return c.length > 0; });
+            if (!sepCells.every(function(c) { return /^:?-+:?$/.test(c); })) return;
+    
+            // Função para dividir uma linha em células
+            function parseRow(line) {
+                let cells = line.split('|');
+                if (cells[0].trim() === '') cells.shift();
+                if (cells[cells.length - 1].trim() === '') cells.pop();
+                return cells.map(function(c) { return c.trim(); });
+            }
+    
+            // Converte **negrito** em <strong>
+            function formatCell(text) {
+                return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            }
+    
+            // Monta a tabela HTML
+            const table = document.createElement('table');
+            table.className = 'lesson-table';
+    
+            // Cabeçalho
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            parseRow(lines[0]).forEach(function(h) {
+                const th = document.createElement('th');
+                th.innerHTML = formatCell(h);
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+    
+            // Corpo
+            const tbody = document.createElement('tbody');
+            lines.slice(2).forEach(function(line) {
+                const tr = document.createElement('tr');
+                parseRow(line).forEach(function(cell) {
+                    const td = document.createElement('td');
+                    td.innerHTML = formatCell(cell);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+    
+            // Substitui o bloco original pela tabela
+            block.replaceWith(table);
+        });
+    });
+    </script>
 </body>
 </html>

@@ -1546,3 +1546,34 @@ details[open] > .day-header::before { transform: rotate(90deg); }
 .quiz-option.is-correct .alt-letter { background: var(--ok); color: #fff; }
 .quiz-option.is-wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--bs-body-bg)); }
 .quiz-option.is-wrong .alt-letter { background: var(--bad); color: #fff; }
+/* ... css anterior ... */
+
+/* Estilização das tabelas dentro do conteúdo da aula */
+.lesson-content .lesson-table {
+    width: 100%;
+    margin-bottom: 1rem;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.lesson-content .lesson-table th,
+.lesson-content .lesson-table td {
+    padding: .6rem .8rem;
+    border: 1px solid var(--bs-border-color);
+    text-align: left;
+    vertical-align: top;
+}
+
+.lesson-content .lesson-table th {
+    background-color: var(--bs-tertiary-bg);
+    font-weight: 600;
+}
+
+.lesson-content .lesson-table tr:nth-child(even) {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.lesson-content .lesson-table strong {
+    font-weight: 600;
+    color: var(--bs-body-color);
+}
