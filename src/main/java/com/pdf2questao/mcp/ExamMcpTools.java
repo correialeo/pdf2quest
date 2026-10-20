@@ -75,7 +75,8 @@ public class ExamMcpTools {
             @McpArg(name = "provas", description = "Quais provas montar, ex.: P1 e P2 (vazio = todas as objetivas).",
                     required = false) String provas) {
         return """
-                Monte um simulado inédito que pareça uma prova REAL da banca. Isto é demorado de propósito: \
+                Monte um simulado inédito que pareça uma prova REAL da banca. Fidelidade vem de evidência: perfil \
+                tirado de questões reais lidas e revisão registrada no sistema, não de "escrever no estilo FCC". Isto é demorado de propósito: \
                 qualidade e fidelidade à banca importam mais que velocidade. Não pule etapas.
 
                 1. ESTRUTURA. %s Use estrutura_do_edital para ver se o perfil já existe. Se não existir (ou estiver \
@@ -89,26 +90,38 @@ public class ExamMcpTools {
                 professores). Leia pelo menos 2 provas reais inteiras, não só resumos.
                    b) Leia as provas reais que já estão no sistema: provas_da_banca e exemplos_da_banca (com provaId, \
                 página a página, até o fim da prova).
-                   c) Para cada disciplina, registre: formato e tamanho dos enunciados, comandos típicos \
+                   c) Para cada disciplina, registre o que OBSERVOU (separado do que é hipótese sua, e sem inventar \
+                estatísticas): formato e tamanho dos enunciados, contextualização, uso de casos, cálculos, tabelas, \
+                código/SQL, comandos típicos \
                 ("é correto afirmar", "EXCETO", "NÃO", "I, II e III"), tipos de distratores, assuntos mais \
                 cobrados, nível de dificuldade, se usa caso prático/texto base, e as pegadinhas recorrentes.
                    Escreva esse perfil em estiloDaBanca e as provas lidas em fontes ao chamar criar_simulado.
 
                 3. ESCRITA, QUESTÃO A QUESTÃO. Para cada prova (%s), crie o rascunho com criar_simulado e escreva \
-                as questões na quantidade exata do edital por disciplina, distribuindo os assuntos como a banca \
-                distribui. Para CADA questão: baseie-se num padrão real (inspiracao), aplique uma pegadinha típica \
-                (pegadinha), escreva 5 alternativas no estilo da banca com distratores plausíveis, confira que só \
-                existe UMA resposta correta e que o gabarito está certo pela lei/teoria vigente, e escreva o \
-                gabarito comentado (por que a certa está certa e cada distrator errado). Envie no máximo 5 por \
-                chamada de adicionar_questoes e corrija as recusadas.
+                as questões na quantidade exata do edital por disciplina, distribuindo os assuntos pelo conteúdo \
+                programático (grave-o antes com registrar_conteudo_programatico). Para CADA questão: escolha 1 a 3 \
+                questões reais pertinentes (mesma disciplina/assunto; para TI e dados, provas de TI; para direito e \
+                AFO, provas fiscais) e LEIA o conteúdo delas; use-as como modelo de estrutura, profundidade e \
+                distratores, sem copiar nem parafrasear. Envie no máximo 5 por chamada de adicionar_questoes.
 
-                4. REVISÃO. Antes de finalizar, releia o conjunto: distribuição dos gabaritos (sem padrão óbvio, \
-                letras equilibradas), repetição de assuntos, dificuldade parecida com a da banca. Use \
-                status_simulado para ver o que falta.
+                4. REVISÃO EM CAMADAS, A CADA LOTE (o simulado só finaliza com tudo aprovado):
+                   B) revisar_fidelidade: 8 critérios de 0 a 4, cada um com justificativa verificável apoiada nas \
+                referências (ids locais ou link + o que foi lido) e o tópico do edital. Nota alta sem evidência não \
+                vale: sem referência real a nota é limitada a 2.
+                   C) validar_correcao, feita por um revisor INDEPENDENTE: use um subagente que recebe apenas \
+                questao_para_revisao (sem gabarito) e resolve sozinho. Classifique o tipo de conteúdo. Para lei, \
+                norma, jurisprudência, AFO/contabilidade pública e tecnologia com versão, consulte a fonte primária \
+                oficial (Planalto, DOU, tribunal, órgão regulador, documentação oficial) e registre o dispositivo, a \
+                data da consulta e se a redação usada está VIGENTE, ALTERADA ou REVOGADA. Confira emendas e leis \
+                posteriores (ex.: precatórios após a EC 136/2025). Se não conseguir acessar, registre INDISPONIVEL \
+                (fica pendente, nunca aprovado). Refaça cálculos.
+                   Questões reprovadas: corrija com corrigir_questao_simulado (informe o motivo) ou remova e reescreva; \
+                depois revise de novo (a revisão antiga deixa de valer quando a questão muda).
 
-                5. FINALIZAR. finalizar_simulado com os rascunhos (P1 e P2 juntos = dia de prova, com a soma dos \
-                tempos). Passe ao usuário o link do bloco. Não mostre gabaritos nem comentários na conversa: o \
-                usuário vai resolver no sistema.
+                5. AUDITORIA E FINALIZAÇÃO. Rode auditar_simulado: estrutura, fidelidade por disciplina, fontes, \
+                cobertura do edital, duplicatas. Só então finalizar_simulado (P1 e P2 juntos = dia de prova). \
+                Passe ao usuário o link do bloco e um resumo honesto da auditoria (inclusive limitações). Não mostre \
+                gabaritos nem comentários na conversa.
                 """.formatted(
                 has(edital) ? "Edital: " + edital + "." : "Se o usuário não indicou o edital, pergunte o caminho do PDF.",
                 has(cargo) ? cargo : "do usuário",
@@ -404,7 +417,8 @@ public class ExamMcpTools {
             description = "Corrige uma questão já gravada num simulado (número da questão na prova, ver "
                     + "status_simulado): enunciado, alternativas, resposta e/ou gabarito comentado; o que não for "
                     + "enviado fica como está. Funciona também depois de finalizado (respostas já dadas são "
-                    + "recorrigidas). Use quando perceber gabarito ou comentário errado.",
+                    + "recorrigidas). A versão anterior fica no histórico e as revisões da questão deixam de valer: "
+                    + "revise de novo depois.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
     public FixedQuestion fixQuestion(
             @McpToolParam(description = "Id do simulado.") Long simuladoId,
@@ -412,8 +426,10 @@ public class ExamMcpTools {
             @McpToolParam(description = "Novo enunciado.", required = false) String enunciado,
             @McpToolParam(description = "Novas alternativas A–E (todas).", required = false) List<String> alternativas,
             @McpToolParam(description = "Nova letra correta.", required = false) String resposta,
-            @McpToolParam(description = "Novo gabarito comentado.", required = false) String explicacao) {
-        var q = examService.fix(simuladoId, numero, enunciado, alternativas, resposta, explicacao);
+            @McpToolParam(description = "Novo gabarito comentado.", required = false) String explicacao,
+            @McpToolParam(description = "Motivo da correção (fica no histórico), ex.: \"prazo de precatórios "
+                    + "alterado pela EC 136/2025\".") String motivo) {
+        var q = examService.fix(simuladoId, numero, enunciado, alternativas, resposta, explicacao, motivo);
         return new FixedQuestion(q.getQuestionNumber(), q.getSubject(), q.getCorrectAnswer(),
                 baseUrl + "/import/" + q.getImportJobId() + "/questoes");
     }

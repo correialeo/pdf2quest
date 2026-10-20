@@ -47,12 +47,15 @@ public class GeneratedExamService {
     private final ScoringProfileService profileService;
     private final BlockService blockService;
     private final com.pdf2questao.session.StudySessionService sessionService;
+    private final com.pdf2questao.simulado.review.QuestionReviewService reviewService;
 
     public GeneratedExamService(GeneratedExamRepository examRepository, ImportJobRepository importJobRepository,
                                 QuestionRepository questionRepository, StructuredImportService importService,
                                 ScoringProfileService profileService, BlockService blockService,
-                                com.pdf2questao.session.StudySessionService sessionService) {
+                                com.pdf2questao.session.StudySessionService sessionService,
+                                com.pdf2questao.simulado.review.QuestionReviewService reviewService) {
         this.sessionService = sessionService;
+        this.reviewService = reviewService;
         this.examRepository = examRepository;
         this.importJobRepository = importJobRepository;
         this.questionRepository = questionRepository;
@@ -223,6 +226,13 @@ public class GeneratedExamService {
             throw new IllegalArgumentException("Faltam questões do edital: " + String.join("; ", missing)
                     + ". Complete com adicionar_questoes ou finalize com incompleto=true.");
         }
+        // Nenhuma questao entra no simulado final sem aprovacao nas revisoes de fidelidade e de correcao material.
+        List<String> blocking = reviewService.blocking(exams);
+        if (!blocking.isEmpty()) {
+            throw new IllegalArgumentException(blocking.size() + " questões sem aprovação nas duas revisões ("
+                    + String.join("; ", blocking.stream().limit(15).toList()) + (blocking.size() > 15 ? "; …" : "")
+                    + "). Revise com revisar_fidelidade e validar_correcao, corrija as reprovadas e tente de novo.");
+        }
         description.append("\n\nEstilo da banca:\n").append(exams.get(0).getStyleNotes());
         String blockName = name != null && !name.isBlank() ? name.trim() : exams.size() == 1
                 ? importJobRepository.findById(exams.get(0).getImportJobId()).orElseThrow().getDisplayName()
@@ -246,15 +256,17 @@ public class GeneratedExamService {
     }
 
     /**
-     * Corrige uma questao ja gravada (campos nulos ficam como estao). Vale tambem depois de finalizado: as respostas
+     * Corrige uma questao ja gravada (campos nulos ficam como estao), guardando a versao anterior. Vale tambem depois de finalizado: as respostas
      * ja dadas sao recorrigidas pelo novo gabarito.
      */
     @Transactional
     public Question fix(Long examId, int number, String statement, List<String> alternatives, String answer,
-                        String explanation) {
+                        String explanation, String reason) {
         GeneratedExam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new IllegalArgumentException("Simulado " + examId + " não existe."));
         Question q = question(exam, number);
+        // Versao anterior fica guardada; o conteudo novo muda o hash e as revisoes antigas deixam de valer.
+        reviewService.snapshot(q, reason == null || reason.isBlank() ? "correção sem motivo informado" : reason.strip());
         if (statement != null && !statement.isBlank()) {
             q.setStatement(statement.strip());
         }
