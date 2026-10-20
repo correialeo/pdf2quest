@@ -36,10 +36,11 @@
                 <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Adicionar</button>
             </div>
         </div>
+        <textarea name="description" class="form-control form-control-sm mt-2 task-desc-new" rows="1"
+                  placeholder="Descrição (opcional): o que estudar, links, observações…"></textarea>
         <details class="mt-2">
-            <summary class="small text-muted">Mais detalhes (descrição, página de resumo)</summary>
+            <summary class="small text-muted">Página de resumo</summary>
             <div class="row g-2 mt-1">
-                <div class="col-md-7"><textarea name="description" class="form-control form-control-sm" rows="2" placeholder="Descrição"></textarea></div>
                 <div class="col-md-5">
                     <select name="pageId" class="form-select form-select-sm">
                         <option value="">Sem página de resumo</option>
@@ -86,7 +87,8 @@
                         <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                         <a th:if="${t.pageId != null}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
                     </div>
-                    <div class="small text-muted text-truncate" th:if="${t.listDescription != null}" th:text="${t.listDescription}"></div>
+                    <div class="small text-muted text-truncate" th:if="${t.review and t.listDescription != null}" th:text="${t.listDescription}"></div>
+                    <form th:replace="~{fragments/estudos :: taskDescription(${t})}"></form>
                 </div>
                 <div class="dropdown">
                     <button type="button" class="icon-btn border-0" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mais ações"><i class="bi bi-three-dots"></i></button>

@@ -36,6 +36,7 @@
                             <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
                             <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                         </div>
+                        <form th:replace="~{fragments/estudos :: taskDescription(${t})}"></form>
                         <ul class="review-items" th:if="${t.review and !t.done and !dueReviews.isEmpty()}">
                             <li th:each="r : ${dueReviews}">
                                 <a class="text-reset" th:href="${r.pageId != null} ? @{/estudos/paginas/{id}(id=${r.pageId})} : @{/estudos/cronograma/{id}/editar(id=${r.id})}" th:text="${r.title}"></a>

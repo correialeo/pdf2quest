@@ -194,6 +194,17 @@ public class StudyTaskService {
         return taskRepository.save(task);
     }
 
+    /** Troca so a descricao (vazia = sem descricao). A da tarefa de revisao e montada sozinha. */
+    @Transactional
+    public StudyTask setDescription(Long id, String description) {
+        StudyTask task = taskRepository.findById(id).orElseThrow();
+        if (task.isReview()) {
+            throw new IllegalArgumentException("A descrição da revisão é montada com os assuntos do dia.");
+        }
+        task.setDescription(StudyPageService.blankToNull(description));
+        return taskRepository.save(task);
+    }
+
     /** Corrige o tempo dedicado (nulo = nao registrado), sem mudar se esta concluida. */
     @Transactional
     public StudyTask setSpent(Long id, Integer spentMinutes) {

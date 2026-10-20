@@ -1487,3 +1487,13 @@ details[open] > .day-header::before { transform: rotate(90deg); }
 /* Assuntos dentro da tarefa diaria de revisao */
 .review-items { margin: .35rem 0 0; padding-left: 1.1rem; font-size: .875rem; }
 .review-items li + li { margin-top: .15rem; }
+
+/* Descricao da tarefa, editavel na propria linha */
+.task-desc-form { margin-top: .15rem; }
+.task-desc { display: block; max-width: 100%; border: 0; background: none; padding: 0; text-align: left; font-size: .8rem;
+    color: var(--bs-secondary-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
+.task-desc:hover { color: var(--bs-body-color); }
+.task-desc.is-empty { opacity: 0; transition: opacity .15s; }
+.task-row:hover .task-desc.is-empty, .task-desc.is-empty:focus-visible { opacity: 1; }
+.task-desc-form textarea, .task-desc-new { resize: none; overflow: hidden; font-size: .85rem; }
+@media (hover: none) { .task-desc.is-empty { opacity: 1; } }

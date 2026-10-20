@@ -153,8 +153,55 @@
         });
     }
 
+    function autoGrow(area) {
+        area.style.height = 'auto';
+        area.style.height = area.scrollHeight + 'px';
+    }
+
+    // Descricao da tarefa: clicar abre o campo na propria linha. Enter/clicar fora salva, Shift+Enter quebra linha,
+    // Esc cancela. No formulario de nova tarefa o campo so cresce com o texto.
+    function setupTaskDescription() {
+        document.querySelectorAll('.task-desc-new').forEach(function (area) {
+            area.addEventListener('input', function () { autoGrow(area); });
+        });
+        document.querySelectorAll('.task-desc-form').forEach(function (form) {
+            var button = form.querySelector('.task-desc');
+            var area = form.querySelector('textarea');
+            var original = area.value;
+            var sent = false;
+
+            function close() {
+                area.value = original;
+                area.hidden = true;
+                button.hidden = false;
+            }
+
+            function save() {
+                if (sent) return;
+                if (area.value.trim() === original.trim()) { close(); return; }
+                sent = true;
+                form.submit();
+            }
+
+            button.addEventListener('click', function () {
+                button.hidden = true;
+                area.hidden = false;
+                autoGrow(area);
+                area.focus();
+                area.setSelectionRange(area.value.length, area.value.length);
+            });
+            area.addEventListener('input', function () { autoGrow(area); });
+            area.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+                if (e.key === 'Escape') { e.preventDefault(); close(); }
+            });
+            area.addEventListener('blur', save);
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         setupTaskTime();
+        setupTaskDescription();
         setupQuickNote();
         setupThemeToggle();
         highlightActiveNavLink();

@@ -46,6 +46,22 @@ class StudyIntegrationTest {
     SpacedRepetitionService spacedRepetition;
 
     @Test
+    void editaSoADescricaoDaTarefa() {
+        StudyTask task = taskService.create(new StudyTaskService.TaskForm("Lei 8.112", null, "Adm", null, 60, null, null));
+        StudyTask edited = taskService.setDescription(task.getId(), "  arts. 1 a 50\nrevisar prazos ");
+        assertEquals("arts. 1 a 50\nrevisar prazos", edited.getDescription());
+        assertEquals("Lei 8.112", edited.getTitle());
+        assertEquals(60, edited.getEstimatedMinutes());
+        assertNull(taskService.setDescription(task.getId(), "   ").getDescription());
+
+        StudyTask review = new StudyTask();
+        review.setTitle("Revisão · 1 assunto");
+        review.setReviewDate(LocalDate.of(2031, 1, 1));
+        StudyTask savedReview = taskRepository.save(review);
+        assertThrows(IllegalArgumentException.class, () -> taskService.setDescription(savedReview.getId(), "x"));
+    }
+
+    @Test
     void revisoesDoDiaViramUmaTarefaSoEConcluirAvancaTodas() {
         LocalDate today = LocalDate.now();
         StudyTask a = taskService.create(new StudyTaskService.TaskForm("Atos", null, "Adm", today, null, null, null));

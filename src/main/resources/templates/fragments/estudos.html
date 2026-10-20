@@ -53,3 +53,13 @@
         <span th:if="${t.spentMinutes == null and t.estimatedMinutes == null and !t.done}">tempo</span>
     </button>
 </form>
+
+<!-- Descricao da tarefa: clicar edita ali mesmo (Enter ou clicar fora salva, Shift+Enter quebra linha, Esc cancela). -->
+<form th:fragment="taskDescription(t)" th:unless="${t.review}" method="post" th:action="@{/estudos/cronograma/{id}/descricao(id=${t.id})}"
+      class="task-desc-form">
+    <button type="button" class="task-desc" th:classappend="${t.listDescription == null} ? 'is-empty'"
+            th:title="${t.listDescription != null} ? ${t.description} : 'Adicionar uma descrição'"
+            th:text="${t.listDescription != null} ? ${t.listDescription} : '+ descrição'"></button>
+    <textarea name="description" class="form-control form-control-sm" rows="1" hidden aria-label="Descrição da tarefa"
+              th:text="${t.description}"></textarea>
+</form>

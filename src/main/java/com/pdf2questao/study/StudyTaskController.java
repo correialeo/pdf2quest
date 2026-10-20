@@ -118,6 +118,19 @@ public class StudyTaskController {
         return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
     }
 
+    /** Edita a descricao direto na lista. */
+    @PostMapping("/estudos/cronograma/{id}/descricao")
+    public String description(@PathVariable Long id, @RequestParam(required = false) String description,
+                              @RequestHeader(value = "Referer", required = false) String referer,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            taskService.setDescription(id, description);
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
     /** Corrige os minutos dedicados (campo vazio apaga o registro). */
     @PostMapping("/estudos/cronograma/{id}/tempo")
     public String spent(@PathVariable Long id, @RequestParam(required = false) Integer spentMinutes,

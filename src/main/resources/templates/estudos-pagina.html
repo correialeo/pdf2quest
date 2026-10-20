@@ -63,6 +63,7 @@
                             <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                             <a th:if="${t.pageId != null and t.pageId != page.id}" th:href="@{/estudos/paginas/{id}(id=${t.pageId})}"><i class="bi bi-file-earmark-text"></i> material</a>
                         </div>
+                        <form th:replace="~{fragments/estudos :: taskDescription(${t})}"></form>
                     </div>
                 </div>
             </div>
