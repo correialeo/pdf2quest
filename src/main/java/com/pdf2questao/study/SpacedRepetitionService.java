@@ -98,9 +98,29 @@ public class SpacedRepetitionService {
 
     /** Primeira revisao de uma tarefa recem-concluida (se ainda nao tiver uma). */
     void scheduleFirst(StudyTask task, LocalDate today) {
-        if (!task.isReview() && task.getNextReviewDate() == null) {
+        if (!task.isReview() && task.isReviewEnabled() && task.getNextReviewDate() == null) {
             restart(task, today);
         }
+    }
+
+    /**
+     * Liga ou desliga a revisao espacada da tarefa. Desligar tira das revisoes pendentes; religar uma tarefa ja
+     * concluida agenda a primeira revisao.
+     */
+    @Transactional
+    public StudyTask setEnabled(Long id, boolean enabled, LocalDate today) {
+        StudyTask task = taskRepository.findById(id).orElseThrow();
+        if (task.isReview()) {
+            throw new IllegalArgumentException("A tarefa de revisão não entra na própria revisão.");
+        }
+        task.setReviewEnabled(enabled);
+        if (!enabled) {
+            task.setNextReviewDate(null);
+            task.setCurrentStep(0);
+        } else if (task.isDone()) {
+            scheduleFirst(task, today);
+        }
+        return taskRepository.save(task);
     }
 
     /** Revisa em {@code intervalos[0]}; o proximo "lembrei" ja usa o intervalo seguinte. */

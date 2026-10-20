@@ -12,6 +12,7 @@ import com.pdf2questao.dashboard.DashboardData.ProvaGroup;
 import com.pdf2questao.dashboard.DashboardData.ProvaPanel;
 import com.pdf2questao.dashboard.DashboardData.SessionRow;
 import com.pdf2questao.dashboard.DashboardData.SubjectProgress;
+import com.pdf2questao.dashboard.DashboardData.Today;
 import com.pdf2questao.guess.GuessDiagnosticService;
 import com.pdf2questao.importer.Banca;
 import com.pdf2questao.importer.ImportJob;
@@ -119,7 +120,17 @@ public class DashboardService {
         long wrong = attemptRepository.countByCorrect(false);
         return new Overview(cards.size(), questionRepository.count(), attemptRepository.countDistinctQuestionsAnswered(),
                 correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject()),
-                guessService.counts(null), open, questionRepository.findErrorNotebook().size());
+                guessService.counts(null), open, questionRepository.countErrorNotebook());
+    }
+
+    /** O lado "questoes" da tela Hoje, sem as estatisticas pesadas do painel. */
+    public Today today() {
+        List<OpenSession> open = sessionRepository.findTop3ByFinishedAtIsNullOrderByStartedAtDesc().stream()
+                .map(s -> new OpenSession(s, sessionService.resumeIndex(s))).toList();
+        StudySession last = sessionRepository.findFirstByFinishedAtIsNotNullAndScoreReportIsNotNullOrderByFinishedAtDesc()
+                .orElse(null);
+        return new Today(open, questionRepository.countErrorNotebook(), last,
+                last == null ? null : sessionService.scoreResult(last));
     }
 
     private BlockCard blockCard(StudyBlock block, int questions, java.util.Collection<StudySession> allSessions) {

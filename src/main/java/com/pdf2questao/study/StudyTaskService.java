@@ -103,6 +103,27 @@ public class StudyTaskService {
         return new Schedule(groups, hidden);
     }
 
+    /** Muda o dia da tarefa (adiar). A tarefa de revisao e remontada todo dia e nao e adiada. */
+    @Transactional
+    public StudyTask reschedule(Long id, LocalDate date) {
+        StudyTask task = taskRepository.findById(id).orElseThrow();
+        if (task.isReview()) {
+            throw new IllegalArgumentException("A revisão do dia não é adiada: o que não revisar hoje continua amanhã.");
+        }
+        task.setPlannedDate(date);
+        return taskRepository.save(task);
+    }
+
+    /** Traz para hoje as tarefas atrasadas ainda abertas (menos a de revisao). @return quantas mudaram */
+    @Transactional
+    public int moveOverdueTo(LocalDate today) {
+        List<StudyTask> overdue = taskRepository.findAll().stream().filter(t -> !t.isDone() && !t.isReview()
+                && t.getPlannedDate() != null && t.getPlannedDate().isBefore(today)).toList();
+        overdue.forEach(t -> t.setPlannedDate(today));
+        taskRepository.saveAll(overdue);
+        return overdue.size();
+    }
+
     /** Tarefas de hoje e atrasadas, para a visao geral. */
     public List<StudyTask> dueBy(LocalDate today) {
         return taskRepository.findAll().stream()
@@ -183,10 +204,8 @@ public class StudyTaskService {
         if (done && task.isReview()) {
             spacedRepetition.completeReview(LocalDate.now());
         } else if (done) {
+            // Reconcluir uma tarefa reaberta mantem a etapa da revisao (desmarcar sem querer nao zera o progresso).
             spacedRepetition.scheduleFirst(task, LocalDate.now());
-        } else {
-            task.setCurrentStep(0);
-            task.setNextReviewDate(null);
         }
         if (spentMinutes != null && spentMinutes >= 0) {
             task.setSpentMinutes(spentMinutes);

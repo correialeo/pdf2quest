@@ -43,6 +43,15 @@ public class DaySummaryService {
                 .sorted(Comparator.comparing(StudyTask::getId)).toList();
     }
 
+    /** Resumo ja escrito mais proximo antes/depois do dia (navegar nao cria resumos vazios). */
+    public java.util.Optional<StudyPage> previous(LocalDate date) {
+        return pageRepository.findFirstBySummaryDateLessThanOrderBySummaryDateDesc(date);
+    }
+
+    public java.util.Optional<StudyPage> next(LocalDate date) {
+        return pageRepository.findFirstBySummaryDateGreaterThanOrderBySummaryDateAsc(date);
+    }
+
     /** Abre o resumo do dia, criando se ainda nao existe. */
     @Transactional
     public StudyPage open(LocalDate date) {

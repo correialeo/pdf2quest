@@ -1,5 +1,6 @@
 package com.pdf2questao.study;
 
+import com.pdf2questao.dashboard.DashboardService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,10 +22,12 @@ public class StudyController {
     private final SpacedRepetitionService spacedRepetition;
     private final StudySubjects subjects;
     private final DaySummaryService daySummaryService;
+    private final DashboardService dashboardService;
 
     public StudyController(StudyPageService pageService, StudyTaskService taskService, InboxService inboxService,
                            StudySubjects subjects, DaySummaryService daySummaryService,
-                           SpacedRepetitionService spacedRepetition) {
+                           SpacedRepetitionService spacedRepetition, DashboardService dashboardService) {
+        this.dashboardService = dashboardService;
         this.spacedRepetition = spacedRepetition;
         this.pageService = pageService;
         this.taskService = taskService;
@@ -33,7 +36,11 @@ public class StudyController {
         this.daySummaryService = daySummaryService;
     }
 
-    @GetMapping("/estudos")
+    /**
+     * Tela inicial "Hoje": tarefas e revisoes do dia, sessoes para continuar, caderno de erros, ultimo simulado
+     * e anotacao rapida. /estudos e o endereco antigo da mesma tela.
+     */
+    @GetMapping({"/hoje", "/estudos"})
     public String overview(Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
@@ -44,6 +51,7 @@ public class StudyController {
         model.addAttribute("week", taskService.week(today));
         model.addAttribute("recentPages", pageService.recent());
         model.addAttribute("inboxCount", inboxService.count());
+        model.addAttribute("practice", dashboardService.today());
         return "estudos";
     }
 

@@ -128,7 +128,7 @@ public class StudySessionController {
     @PostMapping("/resolver/{id}/descartar")
     public String descartar(@PathVariable Long id) {
         sessionService.discard(id);
-        return "redirect:/dashboard";
+        return "redirect:/hoje";
     }
 
     @GetMapping("/resultado/{id}")

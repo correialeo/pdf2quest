@@ -42,16 +42,19 @@
 
         <section class="day-panel card" th:if="${page.summaryDate != null}" aria-label="Tarefas do dia">
             <div class="day-panel-head">
-                <form method="post" th:action="@{/estudos/cronograma/dia/{d}/resumo(d=${previousDay})}">
-                    <button type="submit" class="icon-btn border-0" title="Resumo do dia anterior" aria-label="Dia anterior"><i class="bi bi-chevron-left"></i></button>
-                </form>
+                <!-- Setas: so entre resumos ja escritos (passar por um dia nao cria resumo vazio). -->
+                <a th:if="${previousSummary != null}" class="icon-btn" th:href="@{/estudos/paginas/{id}(id=${previousSummary.id})}"
+                   th:title="'Resumo anterior (' + ${#temporals.format(previousSummary.summaryDate, 'dd/MM')} + ')'"
+                   aria-label="Resumo anterior"><i class="bi bi-chevron-left"></i></a>
+                <span th:unless="${previousSummary != null}" class="icon-btn invisible" aria-hidden="true"></span>
                 <div class="text-center flex-grow-1">
                     <div class="fw-medium" th:text="${dayLabel}"></div>
                     <div class="small text-muted" th:text="${dayTasks.isEmpty()} ? 'Nenhuma tarefa no cronograma' : (${#lists.size(dayTasks.?[done])} + ' de ' + ${dayTasks.size()} + ' tarefas concluídas')"></div>
                 </div>
-                <form method="post" th:action="@{/estudos/cronograma/dia/{d}/resumo(d=${nextDay})}">
-                    <button type="submit" class="icon-btn border-0" title="Resumo do dia seguinte" aria-label="Dia seguinte"><i class="bi bi-chevron-right"></i></button>
-                </form>
+                <a th:if="${nextSummary != null}" class="icon-btn" th:href="@{/estudos/paginas/{id}(id=${nextSummary.id})}"
+                   th:title="'Próximo resumo (' + ${#temporals.format(nextSummary.summaryDate, 'dd/MM')} + ')'"
+                   aria-label="Próximo resumo"><i class="bi bi-chevron-right"></i></a>
+                <span th:unless="${nextSummary != null}" class="icon-btn invisible" aria-hidden="true"></span>
             </div>
             <div class="task-list" th:unless="${dayTasks.isEmpty()}">
                 <div class="task-row" th:each="t : ${dayTasks}" th:classappend="${t.done} ? 'is-done'">

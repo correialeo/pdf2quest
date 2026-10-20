@@ -13,6 +13,11 @@ public interface StudyPageRepository extends JpaRepository<StudyPage, Long> {
 
     java.util.Optional<StudyPage> findBySummaryDate(java.time.LocalDate date);
 
+    /** Resumo do dia anterior/seguinte que ja existe (as setas do resumo navegam so entre resumos escritos). */
+    java.util.Optional<StudyPage> findFirstBySummaryDateLessThanOrderBySummaryDateDesc(java.time.LocalDate date);
+
+    java.util.Optional<StudyPage> findFirstBySummaryDateGreaterThanOrderBySummaryDateAsc(java.time.LocalDate date);
+
     List<StudyPage> findBySummaryDateBetween(java.time.LocalDate from, java.time.LocalDate to);
 
     /** Pagina-mae dos resumos do dia: a raiz que ja tem algum resumo do dia dentro. */

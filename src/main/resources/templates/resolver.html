@@ -4,7 +4,7 @@
 <body class="focus-mode">
 <!-- Modo foco: sem menu lateral. Barra do topo com saida, progresso, tempo e mapa de questoes. -->
 <header class="focus-bar">
-    <a href="/dashboard" class="icon-btn" title="Sair (a sessão continua aberta)" aria-label="Sair"><i class="bi bi-x-lg"></i></a>
+    <a href="/hoje" class="icon-btn" title="Sair (a sessão continua aberta)" aria-label="Sair"><i class="bi bi-x-lg"></i></a>
     <div class="focus-title">
         <span class="fw-medium text-truncate" th:text="${studySession.blockName} ?: ${studySession.mode.label()}"
               th:title="${studySession.blockName}"></span>

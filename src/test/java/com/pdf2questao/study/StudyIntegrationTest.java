@@ -123,9 +123,42 @@ class StudyIntegrationTest {
         assertEquals(1, forgot.getCurrentStep());
         assertEquals(today.plusDays(1), forgot.getNextReviewDate());
 
+        // Desmarcar sem querer nao zera a revisao: sai das pendentes e, ao concluir de novo, segue de onde estava.
+        spacedRepetition.remembered(task.getId(), today);
         StudyTask reopened = taskService.setDone(task.getId(), false, null);
-        assertNull(reopened.getNextReviewDate());
-        assertEquals(0, reopened.getCurrentStep());
+        assertEquals(2, reopened.getCurrentStep());
+        assertFalse(spacedRepetition.due(today.plusDays(30)).stream().anyMatch(t -> t.getId().equals(task.getId())));
+        StudyTask again = taskService.setDone(task.getId(), true, null);
+        assertEquals(2, again.getCurrentStep());
+        assertEquals(today.plusDays(3), again.getNextReviewDate());
+    }
+
+    @Test
+    void tarefaSemRevisaoNaoEntraNaRevisaoEspacada() {
+        LocalDate today = LocalDate.now();
+        StudyTask rest = taskService.create(new StudyTaskService.TaskForm("Descanso", null, null, today, null, null, null));
+        spacedRepetition.setEnabled(rest.getId(), false, today);
+        StudyTask done = taskService.setDone(rest.getId(), true, null);
+        assertNull(done.getNextReviewDate());
+
+        StudyTask on = spacedRepetition.setEnabled(rest.getId(), true, today);
+        assertEquals(today.plusDays(1), on.getNextReviewDate(), "religar uma concluida agenda a primeira revisao");
+        spacedRepetition.setEnabled(rest.getId(), false, today);
+        assertFalse(spacedRepetition.due(today.plusDays(5)).stream().anyMatch(t -> t.getId().equals(rest.getId())));
+    }
+
+    @Test
+    void adiaETrazAsAtrasadasParaHoje() {
+        LocalDate today = LocalDate.now();
+        StudyTask late = taskService.create(new StudyTaskService.TaskForm("Atrasada", null, null, today.minusDays(3), null, null, null));
+        StudyTask doneLate = taskService.create(new StudyTaskService.TaskForm("Feita", null, null, today.minusDays(3), null, null, null));
+        taskService.setDone(doneLate.getId(), true, null);
+
+        assertTrue(taskService.moveOverdueTo(today) >= 1);
+        assertEquals(today, taskRepository.findById(late.getId()).orElseThrow().getPlannedDate());
+        assertEquals(today.minusDays(3), taskRepository.findById(doneLate.getId()).orElseThrow().getPlannedDate());
+
+        assertEquals(today.plusDays(1), taskService.reschedule(late.getId(), today.plusDays(1)).getPlannedDate());
     }
 
     @Test

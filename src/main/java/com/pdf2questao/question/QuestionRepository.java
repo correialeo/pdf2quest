@@ -63,6 +63,12 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
             ") ORDER BY q.id DESC", nativeQuery = true)
     List<Question> findErrorNotebook();
 
+    /** Quantas questoes estao no caderno de erros (a ultima resposta foi errada), sem carregar as questoes. */
+    @Query(value = "SELECT COUNT(DISTINCT a.question_id) FROM attempt a " +
+            "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +
+            "AND a.correct = 0", nativeQuery = true)
+    long countErrorNotebook();
+
     /** [import_job_id, quantidade de questoes] de cada prova. */
     @Query(value = "SELECT import_job_id, COUNT(*) FROM question WHERE import_job_id IS NOT NULL " +
             "GROUP BY import_job_id", nativeQuery = true)

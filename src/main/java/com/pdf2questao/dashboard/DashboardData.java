@@ -63,6 +63,14 @@ public final class DashboardData {
         }
     }
 
+    /**
+     * O lado "questoes" da tela Hoje: sessoes para continuar, tamanho do caderno de erros e o ultimo simulado
+     * com perfil de pontuacao ({@code lastScored}/{@code lastScore} nulos se ainda nao houve).
+     */
+    public record Today(List<OpenSession> open, long errors, StudySession lastScored,
+                        com.pdf2questao.scoring.ScoringCalculator.ScoreResult lastScore) {
+    }
+
     /** Sessao iniciada e nao finalizada: o "Continuar" do dashboard volta na primeira questao sem resposta. */
     public record OpenSession(StudySession session, int resumeIndex) {
 

@@ -56,6 +56,9 @@ public class StudyTask {
     /** Preenchido so na tarefa diaria de revisao: o dia em que foi montada. Ela nao entra no ciclo de revisao. */
     private LocalDate reviewDate;
 
+    /** Falso: concluir a tarefa nao agenda revisao espacada (descanso, prova, tarefas que nao sao assunto). */
+    private boolean reviewEnabled = true;
+
     public boolean isReview() {
         return reviewDate != null;
     }

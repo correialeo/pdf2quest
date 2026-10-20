@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/head :: head('Dashboard')}"></head>
+<head th:replace="~{fragments/head :: head('Desempenho')}"></head>
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page">
     <div class="page-header">
         <div>
-            <h1>Início</h1>
+            <h1>Desempenho</h1>
             <p class="page-subtitle" th:text="${data.answered} + ' de ' + ${data.totalQuestions} + ' questões já resolvidas em ' + ${data.provas} + (${data.provas == 1} ? ' prova' : ' provas')"></p>
         </div>
         <a class="btn btn-primary" href="/blocos"><i class="bi bi-play-fill me-1"></i>Estudar</a>

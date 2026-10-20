@@ -48,6 +48,9 @@ public class StudyTaskController {
         model.addAttribute("groups", groups);
         model.addAttribute("showAll", showAll);
         model.addAttribute("hiddenDays", schedule.hiddenDays());
+        // O botao "trazer atrasadas para hoje" aparece so no primeiro grupo atrasado.
+        model.addAttribute("overdueFirst", groups.stream().filter(g -> g.kind().equals("overdue"))
+                .map(StudyTaskService.TaskGroup::date).findFirst().orElse(null));
         var dates = groups.stream().map(StudyTaskService.TaskGroup::date).filter(java.util.Objects::nonNull).toList();
         model.addAttribute("summaries", dates.isEmpty() ? java.util.Map.of()
                 : daySummaryService.existing(java.util.Collections.min(dates), java.util.Collections.max(dates)));
@@ -115,6 +118,45 @@ public class StudyTaskController {
                        @RequestParam(required = false) Integer spentMinutes,
                        @RequestHeader(value = "Referer", required = false) String referer) {
         taskService.setDone(id, done, spentMinutes);
+        return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
+    /** Adia a tarefa para outro dia ("para" = AAAA-MM-DD). */
+    @PostMapping("/estudos/cronograma/{id}/adiar")
+    public String postpone(@PathVariable Long id, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate para,
+                           @RequestHeader(value = "Referer", required = false) String referer,
+                           RedirectAttributes redirectAttributes) {
+        try {
+            taskService.reschedule(id, para);
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
+    @PostMapping("/estudos/cronograma/atrasadas/hoje")
+    public String overdueToToday(@RequestHeader(value = "Referer", required = false) String referer,
+                                 RedirectAttributes redirectAttributes) {
+        int moved = taskService.moveOverdueTo(LocalDate.now());
+        redirectAttributes.addFlashAttribute("message", moved == 1 ? "1 tarefa atrasada veio para hoje."
+                : moved + " tarefas atrasadas vieram para hoje.");
+        return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
+    /** Liga/desliga a revisao espacada da tarefa ("ativa" = true/false). */
+    @PostMapping("/estudos/cronograma/{id}/revisao")
+    public String reviewEnabled(@PathVariable Long id, @RequestParam boolean ativa,
+                                @RequestHeader(value = "Referer", required = false) String referer,
+                                RedirectAttributes redirectAttributes) {
+        LocalDate today = LocalDate.now();
+        try {
+            spacedRepetition.setEnabled(id, ativa, today);
+            spacedRepetition.syncReviewTask(today);
+            redirectAttributes.addFlashAttribute("message", ativa ? "A tarefa volta a entrar na revisão espaçada."
+                    : "A tarefa não entra mais na revisão espaçada.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
         return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
     }
 

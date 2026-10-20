@@ -73,6 +73,10 @@
         <summary class="day-header">
             <span class="section-title m-0" th:classappend="${g.kind == 'overdue'} ? 'text-bad' : ''" th:text="${g.label}"></span>
             <span class="text-muted small" th:text="(${g.doneCount() > 0} ? ${g.doneCount()} + ' de ' + ${g.tasks.size()} + (${g.doneCount() == 1} ? ' concluída' : ' concluídas') : ${g.tasks.size()} + (${g.tasks.size() == 1} ? ' tarefa' : ' tarefas')) + (${g.estimatedMinutes() > 0} ? ' · ' + (${g.spentMinutes() > 0} ? ${g.spentMinutes()} + ' de ' : '') + ${g.estimatedMinutes()} + ' min' : (${g.spentMinutes() > 0} ? ' · ' + ${g.spentMinutes()} + ' min' : ''))"></span>
+            <form th:if="${g.kind == 'overdue' and overdueFirst == g.date}" method="post" action="/estudos/cronograma/atrasadas/hoje"
+                  class="ms-2" onclick="event.stopPropagation()">
+                <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Trazer atrasadas para hoje</button>
+            </form>
             <span class="ms-auto" th:if="${g.date != null}">
                 <th:block th:replace="~{fragments/estudos :: dayButton(${g.date}, ${summaries[g.date]}, ${summaries[g.date] != null} ? 'Abrir resumo' : 'Resumo do dia', '')}"></th:block>
             </span>
@@ -94,6 +98,25 @@
                     <button type="button" class="icon-btn border-0" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mais ações"><i class="bi bi-three-dots"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
+                        <th:block th:if="${!t.review and !t.done}">
+                            <li th:if="${t.plannedDate == null or !t.plannedDate.equals(today)}">
+                                <form method="post" th:action="@{/estudos/cronograma/{id}/adiar(id=${t.id}, para=${today})}">
+                                    <button type="submit" class="dropdown-item"><i class="bi bi-calendar-event me-2"></i>Fazer hoje</button>
+                                </form>
+                            </li>
+                            <li>
+                                <form method="post" th:action="@{/estudos/cronograma/{id}/adiar(id=${t.id}, para=${(t.plannedDate != null and t.plannedDate.isAfter(today) ? t.plannedDate : today).plusDays(1)})}">
+                                    <button type="submit" class="dropdown-item"><i class="bi bi-calendar-plus me-2"></i>Adiar 1 dia</button>
+                                </form>
+                            </li>
+                        </th:block>
+                        <li th:unless="${t.review}">
+                            <form method="post" th:action="@{/estudos/cronograma/{id}/revisao(id=${t.id}, ativa=${!t.reviewEnabled})}">
+                                <button type="submit" class="dropdown-item">
+                                    <i class="bi bi-arrow-repeat me-2"></i><span
+                                        th:text="${t.reviewEnabled} ? 'Não revisar este assunto' : 'Revisar este assunto'"></span></button>
+                            </form>
+                        </li>
                         <li><hr class="dropdown-divider"/></li>
                         <li>
                             <form method="post" th:action="@{/estudos/cronograma/{id}/excluir(id=${t.id})}" onsubmit="return confirm('Apagar esta tarefa?')">
