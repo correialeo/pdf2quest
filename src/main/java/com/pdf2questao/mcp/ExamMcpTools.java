@@ -397,6 +397,37 @@ public class ExamMcpTools {
         return new AddResult(result.gravadas(), refused, result.status());
     }
 
+    public record FixedQuestion(int numero, String disciplina, String resposta, String link) {
+    }
+
+    @McpTool(name = "corrigir_questao_simulado",
+            description = "Corrige uma questão já gravada num simulado (número da questão na prova, ver "
+                    + "status_simulado): enunciado, alternativas, resposta e/ou gabarito comentado; o que não for "
+                    + "enviado fica como está. Funciona também depois de finalizado (respostas já dadas são "
+                    + "recorrigidas). Use quando perceber gabarito ou comentário errado.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
+    public FixedQuestion fixQuestion(
+            @McpToolParam(description = "Id do simulado.") Long simuladoId,
+            @McpToolParam(description = "Número da questão na prova (1 = primeira).") Integer numero,
+            @McpToolParam(description = "Novo enunciado.", required = false) String enunciado,
+            @McpToolParam(description = "Novas alternativas A–E (todas).", required = false) List<String> alternativas,
+            @McpToolParam(description = "Nova letra correta.", required = false) String resposta,
+            @McpToolParam(description = "Novo gabarito comentado.", required = false) String explicacao) {
+        var q = examService.fix(simuladoId, numero, enunciado, alternativas, resposta, explicacao);
+        return new FixedQuestion(q.getQuestionNumber(), q.getSubject(), q.getCorrectAnswer(),
+                baseUrl + "/import/" + q.getImportJobId() + "/questoes");
+    }
+
+    @McpTool(name = "remover_questao_simulado",
+            description = "Remove uma questão de um simulado ainda em rascunho (número na prova), para reescrevê-la "
+                    + "com adicionar_questoes. Depois de finalizado, use corrigir_questao_simulado.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true))
+    public ExamStatus removeQuestion(
+            @McpToolParam(description = "Id do simulado.") Long simuladoId,
+            @McpToolParam(description = "Número da questão na prova.") Integer numero) {
+        return examService.remove(simuladoId, numero);
+    }
+
     @McpTool(name = "status_simulado",
             description = "Situação de um rascunho de simulado (questões por disciplina e quanto falta). Sem id, lista "
                     + "os rascunhos em andamento.",

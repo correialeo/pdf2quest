@@ -46,10 +46,13 @@ public class GeneratedExamService {
     private final StructuredImportService importService;
     private final ScoringProfileService profileService;
     private final BlockService blockService;
+    private final com.pdf2questao.session.StudySessionService sessionService;
 
     public GeneratedExamService(GeneratedExamRepository examRepository, ImportJobRepository importJobRepository,
                                 QuestionRepository questionRepository, StructuredImportService importService,
-                                ScoringProfileService profileService, BlockService blockService) {
+                                ScoringProfileService profileService, BlockService blockService,
+                                com.pdf2questao.session.StudySessionService sessionService) {
+        this.sessionService = sessionService;
         this.examRepository = examRepository;
         this.importJobRepository = importJobRepository;
         this.questionRepository = questionRepository;
@@ -66,9 +69,13 @@ public class GeneratedExamService {
         }
     }
 
+    /** Questao gravada, para achar o numero ao corrigir ou remover. */
+    public record QuestionRef(int numero, String disciplina, String assunto, String resposta) {
+    }
+
     public record ExamStatus(Long id, String titulo, String banca, String perfil, String prova,
                              Integer tempoMinutos, int questoes, List<SubjectProgress> disciplinas,
-                             boolean completo, Long blocoId) {
+                             boolean completo, Long blocoId, List<QuestionRef> gravadas) {
     }
 
     public record AddResult(int gravadas, List<String> recusadas, ExamStatus status) {
@@ -230,6 +237,67 @@ public class GeneratedExamService {
         return block;
     }
 
+    /** Questao de um simulado gerado (por numero na prova), para corrigir ou remover. */
+    private Question question(GeneratedExam exam, int number) {
+        return questionRepository.findByImportJobId(exam.getImportJobId()).stream()
+                .filter(q -> Integer.valueOf(number).equals(q.getQuestionNumber())).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("O simulado " + exam.getId() + " não tem a questão "
+                        + number + "."));
+    }
+
+    /**
+     * Corrige uma questao ja gravada (campos nulos ficam como estao). Vale tambem depois de finalizado: as respostas
+     * ja dadas sao recorrigidas pelo novo gabarito.
+     */
+    @Transactional
+    public Question fix(Long examId, int number, String statement, List<String> alternatives, String answer,
+                        String explanation) {
+        GeneratedExam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new IllegalArgumentException("Simulado " + examId + " não existe."));
+        Question q = question(exam, number);
+        if (statement != null && !statement.isBlank()) {
+            q.setStatement(statement.strip());
+        }
+        if (alternatives != null && !alternatives.isEmpty()) {
+            if (alternatives.size() > 5 || alternatives.stream().anyMatch(a -> a == null || a.isBlank())) {
+                throw new IllegalArgumentException("Envie de 2 a 5 alternativas, todas com texto.");
+            }
+            q.setAlternativeA(alternatives.get(0));
+            q.setAlternativeB(alternatives.size() > 1 ? alternatives.get(1) : null);
+            q.setAlternativeC(alternatives.size() > 2 ? alternatives.get(2) : null);
+            q.setAlternativeD(alternatives.size() > 3 ? alternatives.get(3) : null);
+            q.setAlternativeE(alternatives.size() > 4 ? alternatives.get(4) : null);
+        }
+        if (answer != null && !answer.isBlank()) {
+            String letter = answer.strip().toUpperCase(java.util.Locale.ROOT);
+            if (!q.alternatives().containsKey(letter)) {
+                throw new IllegalArgumentException("Resposta \"" + answer + "\" não é uma das alternativas "
+                        + q.alternatives().keySet() + ".");
+            }
+            q.setCorrectAnswer(letter);
+        } else if (!q.alternatives().containsKey(q.getCorrectAnswer())) {
+            throw new IllegalArgumentException("Com as novas alternativas, informe a resposta correta.");
+        }
+        if (explanation != null && !explanation.isBlank()) {
+            q.setExplanation(explanation.strip());
+        }
+        questionRepository.save(q);
+        sessionService.regrade(List.of(q.getId()));
+        return q;
+    }
+
+    /** Tira uma questao do rascunho (so antes de finalizar); a vaga da disciplina volta a ficar livre. */
+    @Transactional
+    public ExamStatus remove(Long examId, int number) {
+        GeneratedExam exam = draft(examId);
+        Question q = question(exam, number);
+        questionRepository.delete(q);
+        ImportJob job = importJobRepository.findById(exam.getImportJobId()).orElseThrow();
+        job.setImportedQuestions(Math.max(0, job.getImportedQuestions() - 1));
+        importJobRepository.save(job);
+        return status(exam);
+    }
+
     public List<ExamStatus> drafts() {
         return examRepository.findByBlockIdIsNullOrderByCreatedAtDesc().stream().map(this::status).toList();
     }
@@ -263,7 +331,10 @@ public class GeneratedExamService {
         boolean complete = subjects.stream().allMatch(s -> s.faltam() == null || s.faltam() == 0);
         return new ExamStatus(exam.getId(), job.getDisplayName(), job.getBanca(), profile.getName(),
                 exam.getGroupName(), exam.getTimeLimitMinutes(), questions.size(), subjects, complete,
-                exam.getBlockId());
+                exam.getBlockId(), questions.stream().filter(q -> q.getQuestionNumber() != null)
+                .sorted(java.util.Comparator.comparing(Question::getQuestionNumber))
+                .map(q -> new QuestionRef(q.getQuestionNumber(), q.getSubject(), q.getTopic(), q.getCorrectAnswer()))
+                .toList());
     }
 
     private List<RuleSpec> rules(GeneratedExam exam) {

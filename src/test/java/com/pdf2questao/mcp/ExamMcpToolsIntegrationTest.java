@@ -89,6 +89,13 @@ class ExamMcpToolsIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> exam.finishExam(List.of(p1.id()), null, false),
                 "falta 1 de AFO");
 
+        // Gabarito errado: corrige; questao ruim: remove e reescreve.
+        var fixed = exam.fixQuestion(p1.id(), 1, null, null, "c", "Na verdade a C, porque a regra mudou em 2024.");
+        assertEquals("C", fixed.resposta());
+        assertThrows(IllegalArgumentException.class, () -> exam.fixQuestion(p1.id(), 1, null, null, "Z", null));
+        var afterRemove = exam.removeQuestion(p1.id(), 3);
+        assertEquals(2, afterRemove.questoes());
+        exam.addQuestions(p1.id(), List.of(q("AFO", "B")));
         exam.addQuestions(p1.id(), List.of(q("AFO", "E")));
         var p2 = exam.createExam(profile.id(), "P2", "Simulado P2", "FCC", 240, STYLE, "a\nb");
         exam.addQuestions(p2.id(), List.of(q("TI", "A"), q("TI", "B")));
@@ -107,9 +114,9 @@ class ExamMcpToolsIntegrationTest {
 
         var result = insight.sessionResult(session.getId());
         assertEquals(6, result.questoes());
-        assertEquals(2, result.acertos());   // Português A, TI A
+        assertEquals(1, result.acertos());   // TI A (a Q1 de Português foi corrigida para C)
         assertTrue(result.notaProjetada() != null);
-        assertEquals(4, result.erradas().size());
+        assertEquals(5, result.erradas().size());
         assertEquals(1, insight.examHistory().size());
         assertTrue(insight.errorSummary().totalDeErros() >= 4);
         var explanation = blockService.questionIds(block.blocoId()).size();
