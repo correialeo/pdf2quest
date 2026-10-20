@@ -45,7 +45,7 @@ public class StudySessionService {
         StudyBlock block = blockService.find(blockId).orElseThrow();
         List<Long> ids = blockService.questionIds(blockId);
         if (ids.isEmpty()) {
-            throw new IllegalStateException("O bloco '" + block.getName() + "' nao tem questoes.");
+            throw new EmptySessionException("O bloco '" + block.getName() + "' não tem questões.");
         }
         StudySession session = createSession(SessionMode.SIMULADO, ids);
         session.setBlockId(block.getId());
@@ -85,16 +85,26 @@ public class StudySessionService {
         return Math.max(0, ids.size() - 1);
     }
 
-    /** Resultado do perfil de pontuacao congelado no fim da sessao (null se a sessao nao usa perfil). */
+    /**
+     * Resultado do perfil de pontuacao congelado no fim da sessao (null se a sessao nao usa perfil). Relatorio
+     * gravado antes da projecao para o edital e recalculado (e gravado de novo) na primeira leitura.
+     */
     public ScoringCalculator.ScoreResult scoreResult(StudySession session) {
         if (session.getScoreReport() == null) {
             return null;
         }
+        ScoringCalculator.ScoreResult result;
         try {
-            return objectMapper.readValue(session.getScoreReport(), ScoringCalculator.ScoreResult.class);
+            result = objectMapper.readValue(session.getScoreReport(), ScoringCalculator.ScoreResult.class);
         } catch (JsonProcessingException e) {
             return null;
         }
+        if (result.coverage() == null && session.getFinishedAt() != null) {
+            recount(session);
+            sessionRepository.save(session);
+            return scoreResult(session).coverage() == null ? result : scoreResult(session);
+        }
+        return result;
     }
 
     public StudySession startPractice(String subject, String topic, Integer year, String organization,
@@ -124,7 +134,7 @@ public class StudySessionService {
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(Question::getId)
                 .toList();
-        return createSession(SessionMode.SIMULADO, ids);
+        return createSession(SessionMode.PROVA, ids);
     }
 
     public StudySession startRefazer(List<Long> questionIds) {
@@ -132,6 +142,9 @@ public class StudySessionService {
     }
 
     private StudySession createSession(SessionMode mode, List<Long> ids) {
+        if (ids.isEmpty()) {
+            throw new EmptySessionException("Nenhuma questão encontrada com esses filtros.");
+        }
         StudySession session = new StudySession();
         session.setMode(mode);
         session.setQuestionIdsOrder(ids.stream().map(String::valueOf).collect(Collectors.joining(",")));
@@ -144,24 +157,51 @@ public class StudySessionService {
         return attemptRepository.findBySessionIdAndQuestionId(sessionId, questionId);
     }
 
+    /** Respostas dadas depois do tempo limite do bloco. */
+    public long overtimeCount(Long sessionId) {
+        return attemptRepository.findBySessionId(sessionId).stream()
+                .filter(a -> Boolean.TRUE.equals(a.getOvertime())).count();
+    }
+
     public StudySession getSession(Long id) {
         return sessionRepository.findById(id).orElseThrow();
     }
 
     public void answer(Long sessionId, Long questionId, String selectedAnswer, Long elapsedMillis) {
-        answer(sessionId, questionId, selectedAnswer, elapsedMillis, null);
+        answer(sessionId, questionId, selectedAnswer, elapsedMillis, null, null);
     }
 
-    /** @param guess "E chute?"; null mantem o que ja estava marcado nesta resposta (ou nao informado). */
     public void answer(Long sessionId, Long questionId, String selectedAnswer, Long elapsedMillis, Boolean guess) {
+        answer(sessionId, questionId, selectedAnswer, elapsedMillis, null, guess);
+    }
+
+    /**
+     * @param elapsedMillis tempo nesta questao desde o ultimo envio (soma ao que ja havia: voltar a questao
+     *                      acumula, nao substitui).
+     * @param sessionMillis tempo de cronometro da sessao desde o ultimo envio (sem pausas).
+     * @param guess "E chute?"; null mantem o que ja estava marcado nesta resposta (ou nao informado).
+     * @throws SessionFinishedException se a sessao ja foi finalizada (a nota dela esta congelada).
+     */
+    @Transactional
+    public void answer(Long sessionId, Long questionId, String selectedAnswer, Long elapsedMillis,
+                       Long sessionMillis, Boolean guess) {
+        StudySession session = getSession(sessionId);
+        if (session.getFinishedAt() != null) {
+            throw new SessionFinishedException();
+        }
+        addSessionTime(session, sessionMillis);
         Question question = questionRepository.findById(questionId).orElseThrow();
         Attempt attempt = attemptRepository.findBySessionIdAndQuestionId(sessionId, questionId)
                 .orElseGet(Attempt::new);
+        LocalDateTime now = LocalDateTime.now();
         attempt.setSessionId(sessionId);
         attempt.setQuestionId(questionId);
         attempt.setSelectedAnswer(selectedAnswer);
-        attempt.setAnsweredAt(LocalDateTime.now());
-        attempt.setElapsedMilliseconds(elapsedMillis);
+        attempt.setAnsweredAt(now);
+        attempt.setElapsedMilliseconds(addMillis(attempt.getElapsedMilliseconds(), elapsedMillis));
+        if (session.getTimeLimitMinutes() != null) {
+            attempt.setOvertime(session.activeMillisOrZero() > session.getTimeLimitMinutes() * 60_000L);
+        }
         // Questao anulada conta ponto para todos, qualquer que seja a resposta.
         Boolean correct = question.isAnnulled() ? Boolean.TRUE
                 : question.getCorrectAnswer() == null ? null
@@ -171,6 +211,38 @@ public class StudySessionService {
             attempt.setGuessed(guess);
         }
         attemptRepository.save(attempt);
+    }
+
+    /**
+     * Soma o tempo contado pelo navegador desde o ultimo envio (ao sair da questao e de tempos em tempos): o da
+     * sessao sempre; o da questao so se ela ja tem resposta.
+     */
+    @Transactional
+    public void addTime(Long sessionId, Long questionId, Long questionMillis, Long sessionMillis) {
+        StudySession session = getSession(sessionId);
+        if (session.getFinishedAt() != null) {
+            return;
+        }
+        addSessionTime(session, sessionMillis);
+        if (questionMillis != null && questionMillis > 0) {
+            attemptRepository.findBySessionIdAndQuestionId(sessionId, questionId).ifPresent(attempt -> {
+                attempt.setElapsedMilliseconds(addMillis(attempt.getElapsedMilliseconds(), questionMillis));
+                attemptRepository.save(attempt);
+            });
+        }
+    }
+
+    private void addSessionTime(StudySession session, Long millis) {
+        if (millis != null && millis > 0) {
+            session.setActiveMillis(addMillis(session.getActiveMillis(), millis));
+            sessionRepository.save(session);
+        }
+    }
+
+    private static Long addMillis(Long current, Long more) {
+        // Mais de 3 h num envio so e aba esquecida aberta, nao resolucao.
+        long add = more == null ? 0 : Math.max(0, Math.min(more, 3 * 3_600_000L));
+        return (current == null ? 0 : current) + add;
     }
 
     /**
@@ -187,9 +259,47 @@ public class StudySessionService {
         sessionRepository.delete(session);
     }
 
+    /** Finaliza a sessao e congela a nota. Finalizar de novo (ex.: botao repetido) nao muda nada. */
     public StudySession finish(Long sessionId) {
         StudySession session = getSession(sessionId);
-        List<Attempt> attempts = attemptRepository.findBySessionId(sessionId);
+        if (session.getFinishedAt() != null) {
+            return session;
+        }
+        session.setFinishedAt(LocalDateTime.now());
+        recount(session);
+        return sessionRepository.save(session);
+    }
+
+    /**
+     * Recalcula a nota de sessoes ja finalizadas que tem resposta nestas questoes, depois de recorrigir as
+     * respostas com o gabarito atual. Chamado quando o gabarito ou as anulacoes mudam.
+     *
+     * @return quantas sessoes foram recalculadas
+     */
+    @Transactional
+    public int regrade(java.util.Collection<Long> questionIds) {
+        if (questionIds.isEmpty()) {
+            return 0;
+        }
+        attemptRepository.regrade(questionIds);
+        List<StudySession> sessions = sessionRepository.findAllById(
+                attemptRepository.sessionIdsWithQuestions(questionIds));
+        int count = 0;
+        for (StudySession session : sessions) {
+            if (session.getFinishedAt() != null) {
+                recount(session);
+                sessionRepository.save(session);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** Contagens, tempo e notas da sessao a partir das respostas gravadas. */
+    private void recount(StudySession session) {
+        List<Attempt> attempts = attemptRepository.findBySessionId(session.getId());
+        Map<Long, Question> sessionQuestions = questionRepository.findAllById(session.questionIds()).stream()
+                .collect(Collectors.toMap(Question::getId, q -> q));
 
         int correctCount = 0;
         int wrongCount = 0;
@@ -198,15 +308,14 @@ public class StudySessionService {
 
         for (Attempt attempt : attempts) {
             totalElapsed += attempt.getElapsedMilliseconds() != null ? attempt.getElapsedMilliseconds() : 0;
+            Question question = sessionQuestions.get(attempt.getQuestionId());
             if (Boolean.TRUE.equals(attempt.getCorrect())) {
                 correctCount++;
-                if (session.getMode() == SessionMode.SIMULADO) {
-                    nota += dataprevWeight(attempt.getQuestionId());
-                }
+                nota += dataprevWeight(question);
             } else if (Boolean.FALSE.equals(attempt.getCorrect())) {
                 wrongCount++;
-                if (session.getMode() == SessionMode.SIMULADO && isCertoErrado(attempt.getQuestionId())) {
-                    nota -= dataprevWeight(attempt.getQuestionId());
+                if (isCertoErrado(question)) {
+                    nota -= dataprevWeight(question);
                 }
             }
         }
@@ -214,8 +323,6 @@ public class StudySessionService {
         // Questao anulada conta ponto para todos, mesmo sem resposta.
         Map<Long, Attempt> answered = attempts.stream()
                 .collect(Collectors.toMap(Attempt::getQuestionId, a -> a, (a, b) -> a));
-        Map<Long, Question> sessionQuestions = questionRepository.findAllById(session.questionIds()).stream()
-                .collect(Collectors.toMap(Question::getId, q -> q));
         for (Question q : sessionQuestions.values()) {
             if (q.isAnnulled() && !answered.containsKey(q.getId())) {
                 correctCount++;
@@ -230,12 +337,12 @@ public class StudySessionService {
         session.setCorrectCount(correctCount);
         session.setWrongCount(wrongCount);
         session.setPercent(total == 0 ? 0.0 : (correctCount * 100.0) / total);
-        session.setTotalElapsedMillis(totalElapsed);
-        // Sessao com perfil de pontuacao usa a nota do perfil; as demais mantem a nota Dataprev de sempre.
-        session.setNotaDataprev(session.getMode() == SessionMode.SIMULADO && session.getScoringProfileId() == null
-                ? nota : null);
-        session.setFinishedAt(LocalDateTime.now());
-        return sessionRepository.save(session);
+        // Tempo da sessao = cronometro (pausas fora); sessoes antigas, sem cronometro, somam o tempo das questoes.
+        session.setTotalElapsedMillis(session.getActiveMillis() != null && session.getActiveMillis() > 0
+                ? session.getActiveMillis() : totalElapsed);
+        // Nota Dataprev so no simulado Dataprev (tela Simulado); sessao de bloco usa o perfil de pontuacao.
+        session.setNotaDataprev(session.getMode() == SessionMode.SIMULADO && session.getBlockId() == null
+                && session.getScoringProfileId() == null ? nota : null);
     }
 
     private void applyScoringProfile(StudySession session, Map<Long, Question> questions,
@@ -269,10 +376,12 @@ public class StudySessionService {
         Map<Long, Attempt> byQuestion = attemptRepository.findBySessionId(sessionId).stream()
                 .collect(Collectors.toMap(Attempt::getQuestionId, a -> a, (a, b) -> a));
 
+        Map<Long, Question> questions = questionRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Question::getId, q -> q));
         List<ReviewItem> items = new ArrayList<>();
         int index = 1;
         for (Long id : ids) {
-            Question question = questionRepository.findById(id).orElse(null);
+            Question question = questions.get(id);
             Attempt attempt = byQuestion.get(id);
             items.add(new ReviewItem(index++, question,
                     attempt != null ? attempt.getSelectedAnswer() : null,
@@ -283,15 +392,12 @@ public class StudySessionService {
     }
 
     /** Na Cebraspe (Certo/Errado) cada item errado anula um certo. */
-    private boolean isCertoErrado(Long questionId) {
-        return questionRepository.findById(questionId)
-                .map(q -> q.getAlternativeA() == null && q.getAlternativeB() == null
-                        && q.getAlternativeC() != null && q.getAlternativeE() != null)
-                .orElse(false);
+    private static boolean isCertoErrado(Question q) {
+        return q != null && q.getAlternativeA() == null && q.getAlternativeB() == null
+                && q.getAlternativeC() != null && q.getAlternativeE() != null;
     }
 
-    private double dataprevWeight(Long questionId) {
-        Question question = questionRepository.findById(questionId).orElse(null);
+    private static double dataprevWeight(Question question) {
         if (question == null || question.getCategory() == null) {
             return 0;
         }

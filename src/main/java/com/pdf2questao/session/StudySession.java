@@ -45,9 +45,17 @@ public class StudySession {
     private Long scoringProfileId;
     private Double scoreTotal;
 
+    /** Cronometro: tempo de resolucao com o resolver aberto e sem pausa (null = sessao anterior ao recurso). */
+    private Long activeMillis;
+
     /** Resultado por disciplina/grupo em JSON, congelado no fim da sessao. */
     @Lob
     private String scoreReport;
+
+    /** Tempo de resolucao contado ate agora (pausas e tempo fora do resolver nao contam). */
+    public long activeMillisOrZero() {
+        return activeMillis == null ? 0 : activeMillis;
+    }
 
     public java.util.List<Long> questionIds() {
         if (questionIdsOrder == null || questionIdsOrder.isBlank()) {

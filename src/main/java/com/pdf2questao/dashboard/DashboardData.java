@@ -49,7 +49,7 @@ public final class DashboardData {
         }
 
         public String label() {
-            return session.getBlockName() != null ? session.getBlockName() : session.getMode().name();
+            return session.getBlockName() != null ? session.getBlockName() : session.getMode().label();
         }
     }
 
@@ -67,7 +67,7 @@ public final class DashboardData {
     public record OpenSession(StudySession session, int resumeIndex) {
 
         public String label() {
-            return session.getBlockName() != null ? session.getBlockName() : session.getMode().name();
+            return session.getBlockName() != null ? session.getBlockName() : session.getMode().label();
         }
 
         public int total() {

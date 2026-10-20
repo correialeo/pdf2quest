@@ -29,4 +29,7 @@ public class Attempt {
 
     /** "E chute?": null = nao informado (resposta anterior ao recurso), true/false = marcado pelo usuario. */
     private Boolean guessed;
+
+    /** Respondida depois do tempo limite do bloco. */
+    private Boolean overtime;
 }

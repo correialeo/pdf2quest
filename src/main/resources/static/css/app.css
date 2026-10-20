@@ -632,11 +632,35 @@ body.focus-mode {
 }
 
 .focus-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    border: 0;
+    background: none;
+    padding: .25rem .5rem;
+    border-radius: 6px;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     font-size: .875rem;
-    color: var(--guess);
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
 }
+.focus-timer:hover { background: var(--bs-tertiary-bg); }
+.focus-timer.is-over { color: var(--bad); }
+.focus-timer.is-paused { color: var(--guess); }
+
+/* Pausa do resolver: cobre a questao (o que esta embaixo nao pode ser lido parado). */
+.pause-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--bs-body-bg) 80%, transparent);
+    backdrop-filter: blur(8px);
+}
+.pause-overlay[hidden] { display: none; }
 
 .focus-progress {
     position: absolute;
@@ -1497,3 +1521,7 @@ details[open] > .day-header::before { transform: rotate(90deg); }
 .task-row:hover .task-desc.is-empty, .task-desc.is-empty:focus-visible { opacity: 1; }
 .task-desc-form textarea, .task-desc-new { resize: none; overflow: hidden; font-size: .85rem; }
 @media (hover: none) { .task-desc.is-empty { opacity: 1; } }
+
+/* Erro global (fragments/nav): por cima do conteudo, no canto superior direito. */
+.global-alert { position: fixed; top: 1rem; right: 1rem; z-index: 1080; max-width: min(28rem, calc(100vw - 2rem)); box-shadow: var(--bs-box-shadow); }
+.score-projection { padding-bottom: .75rem; border-bottom: 1px solid var(--bs-border-color); }

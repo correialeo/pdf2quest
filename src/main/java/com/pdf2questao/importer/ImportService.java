@@ -11,6 +11,7 @@ import com.pdf2questao.importer.parser.support.RichText;
 import com.pdf2questao.question.Passage;
 import com.pdf2questao.question.PassageRepository;
 import com.pdf2questao.question.Question;
+import com.pdf2questao.session.StudySessionService;
 import com.pdf2questao.question.QuestionCategory;
 import com.pdf2questao.question.QuestionImage;
 import com.pdf2questao.question.QuestionImageRepository;
@@ -63,13 +64,16 @@ public class ImportService {
     private final Map<Long, OcrService.Progress> progress = new ConcurrentHashMap<>();
     private final Map<Long, ReprocessResult> reprocessResults = new ConcurrentHashMap<>();
     private final TransactionTemplate transactions;
+    private final StudySessionService sessionService;
 
     public ImportService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
                           ExamParserRegistry examParserRegistry, GabaritoParserRegistry gabaritoParserRegistry,
                           PassageRepository passageRepository, QuestionImageRepository questionImageRepository,
                           PdfStorage pdfStorage, SpecificSubjectClassifier subjectClassifier,
-                          OcrService ocrService, PlatformTransactionManager transactionManager) {
+                          OcrService ocrService, PlatformTransactionManager transactionManager,
+                          StudySessionService sessionService) {
         this.transactions = new TransactionTemplate(transactionManager);
+        this.sessionService = sessionService;
         this.questionRepository = questionRepository;
         this.importJobRepository = importJobRepository;
         this.examParserRegistry = examParserRegistry;
@@ -519,6 +523,8 @@ public class ImportService {
             }
         }
         questionRepository.saveAll(questions);
+        // Respostas dadas antes deste gabarito (ou com o anterior) passam a valer com ele.
+        sessionService.regrade(questions.stream().map(Question::getId).toList());
 
         List<String> report = ImportReport.gabaritoLines(entries, questions.stream()
                 .map(Question::getQuestionNumber).filter(Objects::nonNull).toList());

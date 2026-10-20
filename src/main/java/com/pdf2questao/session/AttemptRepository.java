@@ -1,6 +1,7 @@
 package com.pdf2questao.session;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +15,21 @@ public interface AttemptRepository extends JpaRepository<Attempt, Long> {
     List<Attempt> findBySessionId(Long sessionId);
 
     void deleteBySessionId(Long sessionId);
+
+    /**
+     * Recorrige as respostas das questoes com o gabarito atual (anulada = acerto; sem gabarito = sem correcao).
+     * Usado quando o gabarito ou as anulacoes chegam ou mudam depois de a questao ja ter sido respondida.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE attempt SET correct = (SELECT CASE WHEN q.annulled = 1 THEN 1 " +
+            "WHEN q.correct_answer IS NULL OR attempt.selected_answer IS NULL THEN NULL " +
+            "WHEN upper(q.correct_answer) = upper(attempt.selected_answer) THEN 1 ELSE 0 END " +
+            "FROM question q WHERE q.id = attempt.question_id) WHERE question_id IN (:questionIds)",
+            nativeQuery = true)
+    int regrade(@Param("questionIds") java.util.Collection<Long> questionIds);
+
+    @Query("SELECT DISTINCT a.sessionId FROM Attempt a WHERE a.questionId IN :questionIds")
+    List<Long> sessionIdsWithQuestions(@Param("questionIds") java.util.Collection<Long> questionIds);
 
     @Query(value = "SELECT a.question_id, a.selected_answer FROM attempt a " +
             "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +

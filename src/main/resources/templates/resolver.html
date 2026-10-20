@@ -6,11 +6,16 @@
 <header class="focus-bar">
     <a href="/dashboard" class="icon-btn" title="Sair (a sessão continua aberta)" aria-label="Sair"><i class="bi bi-x-lg"></i></a>
     <div class="focus-title">
-        <span class="fw-medium text-truncate" th:text="${studySession.blockName} ?: ${studySession.mode}"
+        <span class="fw-medium text-truncate" th:text="${studySession.blockName} ?: ${studySession.mode.label()}"
               th:title="${studySession.blockName}"></span>
         <span class="text-muted small text-nowrap" th:text="${index + 1} + ' / ' + ${total}"></span>
     </div>
-    <span class="focus-timer" id="countdown" th:if="${remainingSeconds != null}"></span>
+    <!-- Cronometro: conta com o resolver aberto e visivel; clicar (ou P) pausa. Com tempo limite, conta para tras. -->
+    <button type="button" class="focus-timer" id="timer" title="Pausar (P)" aria-label="Pausar o cronômetro">
+        <i class="bi bi-pause-fill" aria-hidden="true"></i><span id="timerText"></span></button>
+    <form method="post" th:action="@{/resolver/{id}/finalizar(id=${studySession.id})}" id="finishForm" class="d-none d-sm-block">
+        <button type="submit" class="btn btn-sm btn-outline-success" title="Finalizar a sessão agora"><i class="bi bi-check2 me-1"></i>Finalizar</button>
+    </form>
     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#questionMap"
             aria-expanded="false" aria-controls="questionMap" title="Mapa de questões (M)" id="mapToggle">
         <i class="bi bi-grid-3x3-gap me-1"></i>Questões</button>
@@ -97,36 +102,126 @@
        class="btn btn-outline-secondary" id="prevLink"><i class="bi bi-arrow-left me-1"></i>Anterior</a>
     <span th:unless="${hasPrevious}"></span>
     <span class="text-muted small d-none d-md-inline shortcuts">
-        <kbd>A</kbd>–<kbd>E</kbd> responde · <kbd>Shift</kbd>+letra risca · <kbd>X</kbd> chute · <kbd>M</kbd> mapa · <kbd>←</kbd><kbd>→</kbd> navega</span>
+        <kbd>A</kbd>–<kbd>E</kbd> responde · <kbd>Shift</kbd>+letra risca · <kbd>X</kbd> chute · <kbd>M</kbd> mapa · <kbd>P</kbd> pausa · <kbd>←</kbd><kbd>→</kbd> navega</span>
     <a th:if="${hasNext}" th:href="@{/resolver/{id}(id=${studySession.id}, index=${index + 1})}"
        class="btn btn-primary" id="nextLink">Próxima<i class="bi bi-arrow-right ms-1"></i></a>
-    <form th:unless="${hasNext}" method="post" th:action="@{/resolver/{id}/finalizar(id=${studySession.id})}"
-          id="finishForm">
-        <button type="submit" class="btn btn-success"><i class="bi bi-check2 me-1"></i>Finalizar</button>
-    </form>
+    <button th:unless="${hasNext}" type="submit" form="finishForm" class="btn btn-success"><i class="bi bi-check2 me-1"></i>Finalizar</button>
 </footer>
+
+<!-- Pausa: esconde a questao ate continuar (o tempo parado nao conta). -->
+<div class="pause-overlay" id="pauseOverlay" hidden>
+    <div class="text-center">
+        <div class="fs-4 fw-medium mb-1">Pausado</div>
+        <div class="text-muted mb-3">O tempo parado não conta na sessão.</div>
+        <button type="button" class="btn btn-primary" id="resumeButton"><i class="bi bi-play-fill me-1"></i>Continuar <kbd>P</kbd></button>
+    </div>
+</div>
+
+<!-- Tempo limite do bloco acabou: o usuario escolhe; respostas depois disso ficam marcadas como fora do tempo. -->
+<div class="modal fade" id="timeUpModal" tabindex="-1" aria-labelledby="timeUpTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="timeUpTitle">Tempo esgotado</h5></div>
+        <div class="modal-body">Na prova, seria hora de entregar. Se continuar, as respostas daqui em diante ficam
+            marcadas como <strong>fora do tempo</strong> no resultado.</div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Continuar fora do tempo</button>
+            <button type="submit" form="finishForm" class="btn btn-success">Finalizar agora</button>
+        </div>
+    </div></div>
+</div>
 
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script src="/js/passage-highlight.js"></script>
 <script th:inline="javascript">
     const sessionId = /*[[${studySession.id}]]*/ 0;
     const questionId = /*[[${question.id}]]*/ 0;
-    const startTime = Date.now();
+    const limitMillis = /*[[${limitMillis}]]*/ null;
 
-    // Tempo limite do bloco: contagem regressiva; ao zerar apenas avisa (a sessao nao e encerrada sozinha).
-    const remainingSeconds = /*[[${remainingSeconds}]]*/ null;
-    if (remainingSeconds !== null) {
-        const deadline = Date.now() + remainingSeconds * 1000;
-        const badge = document.getElementById('countdown');
-        const tick = function () {
-            const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-            const m = Math.floor(left / 60), s = left % 60;
-            badge.textContent = left === 0 ? 'Tempo esgotado' : m + ':' + String(s).padStart(2, '0');
-            if (left === 0) { clearInterval(timer); }
-        };
-        const timer = setInterval(tick, 1000);
-        tick();
+    // Cronometro: o navegador conta o tempo com a pagina visivel e sem pausa, e manda ao servidor o que contou
+    // desde o ultimo envio (junto com a resposta, a cada 30 s e ao sair da questao). Assim sair do resolver,
+    // trocar de aba ou retomar no dia seguinte nao gasta o tempo do bloco.
+    const clock = {
+        sent: /*[[${elapsedMillis}]]*/ 0,   // tempo da sessao ja gravado
+        session: 0,                         // tempo da sessao ainda nao enviado
+        question: 0,                        // tempo nesta questao ainda nao enviado
+        paused: false,
+        last: Date.now(),
+        warned: false
+    };
+    clock.warned = limitMillis !== null && clock.sent >= limitMillis;   // ja tinha esgotado: nao avisa de novo
+    function tick() {
+        const now = Date.now();
+        if (!clock.paused && document.visibilityState === 'visible') {
+            clock.session += now - clock.last;
+            clock.question += now - clock.last;
+        }
+        clock.last = now;
+        renderClock();
     }
+    /** Tira o tempo pendente para enviar; se o envio falhar, devolve com giveBack. */
+    function takeTime() {
+        tick();
+        const taken = {elapsedMillis: clock.question, sessionMillis: clock.session};
+        clock.sent += clock.session;
+        clock.session = 0;
+        clock.question = 0;
+        return taken;
+    }
+    function giveBack(taken) {
+        clock.sent -= taken.sessionMillis;
+        clock.session += taken.sessionMillis;
+        clock.question += taken.elapsedMillis;
+    }
+    function format(ms) {
+        const total = Math.floor(ms / 1000), h = Math.floor(total / 3600), m = Math.floor(total / 60) % 60;
+        return (h > 0 ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(total % 60).padStart(2, '0');
+    }
+    function renderClock() {
+        const used = clock.sent + clock.session;
+        const text = document.getElementById('timerText');
+        const timer = document.getElementById('timer');
+        if (limitMillis === null) {
+            text.textContent = format(used);
+            return;
+        }
+        const left = limitMillis - used;
+        timer.classList.toggle('is-over', left <= 0);
+        text.textContent = left > 0 ? format(left) : '+' + format(-left) + ' fora do tempo';
+        if (left <= 0 && !clock.warned) {
+            clock.warned = true;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('timeUpModal')).show();
+        }
+    }
+    function sendTime() {
+        const taken = takeTime();
+        if (taken.sessionMillis <= 0 && taken.elapsedMillis <= 0) {
+            return Promise.resolve();
+        }
+        return fetch('/resolver/' + sessionId + '/tempo', {
+            method: 'POST', keepalive: true,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(Object.assign({questionId: questionId}, taken))
+        }).then(function (r) { if (!r.ok) { throw new Error(r.status); } })
+          .catch(function () { giveBack(taken); });
+    }
+    function setPaused(paused) {
+        tick();
+        clock.paused = paused;
+        document.getElementById('pauseOverlay').hidden = !paused;
+        const timer = document.getElementById('timer');
+        timer.classList.toggle('is-paused', paused);
+        timer.querySelector('i').className = 'bi ' + (paused ? 'bi-play-fill' : 'bi-pause-fill');
+        timer.title = paused ? 'Continuar (P)' : 'Pausar (P)';
+        timer.setAttribute('aria-label', paused ? 'Continuar o cronômetro' : 'Pausar o cronômetro');
+        if (paused) { sendTime(); } else { document.getElementById('resumeButton').blur(); }
+    }
+    document.getElementById('timer').addEventListener('click', function () { setPaused(!clock.paused); });
+    document.getElementById('resumeButton').addEventListener('click', function () { setPaused(false); });
+    document.addEventListener('visibilitychange', tick);
+    setInterval(tick, 1000);
+    setInterval(sendTime, 30000);
+    window.addEventListener('pagehide', sendTime);
+    renderClock();
 
     // Texto base ao lado da questao (tablet em diante): lembra se foi ocultado e onde parou de ler,
     // para trocar de questao do mesmo texto sem perder o lugar.
@@ -193,30 +288,49 @@
     });
 
     // Salva a resposta junto com o "E chute?"; marcar o chute depois de responder salva de novo a mesma resposta.
+    // keepalive: a resposta e gravada mesmo que a pagina troque logo depois (responder e apertar a seta).
     const guessCheck = document.getElementById('guessCheck');
+    let pendingSave = Promise.resolve();
     function save() {
         const chosen = document.querySelector('.answer-option:checked');
         if (!chosen) {
             return;   // sem resposta ainda: o estado do chute vai junto com a primeira resposta
         }
-        fetch('/resolver/' + sessionId + '/responder', {
-            method: 'POST',
+        const taken = takeTime();
+        pendingSave = fetch('/resolver/' + sessionId + '/responder', {
+            method: 'POST', keepalive: true,
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
+            body: JSON.stringify(Object.assign({
                 questionId: questionId,
                 selectedAnswer: chosen.value,
-                elapsedMillis: Date.now() - startTime,
                 guess: guessCheck.checked
-            })
+            }, taken))
         }).then(function (response) {
+            if (response.status === 409) {
+                window.location.href = '/resultado/' + sessionId;   // finalizada em outra aba
+                return;
+            }
             if (!response.ok) { throw new Error(response.status); }
             showStatus('Resposta salva.', 'text-ok');
             const current = document.querySelector('.question-map a.current');
             if (current) { current.classList.add('done'); }
         }).catch(function () {
+            giveBack(taken);
             showStatus('Falha ao salvar a resposta. Escolha a alternativa de novo para tentar outra vez.', 'text-bad fw-semibold');
         });
     }
+    /** Espera a resposta em andamento (ate 2 s) antes de sair da questao. */
+    function afterSave() {
+        return Promise.race([pendingSave.catch(function () {}),
+            new Promise(function (resolve) { setTimeout(resolve, 2000); })]);
+    }
+    document.querySelectorAll('#prevLink, #nextLink, .question-map a').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) { return; }
+            e.preventDefault();
+            afterSave().then(function () { window.location.href = link.href; });
+        });
+    });
     function showStatus(text, cls) {
         const status = document.getElementById('saveStatus');
         status.className = 'form-text m-0 ' + cls;
@@ -228,16 +342,20 @@
     guessCheck.addEventListener('change', save);
 
     // Finalizar com questoes em branco pede confirmacao (a desta tela conta se acabou de ser respondida).
+    // Antes de enviar: espera a ultima resposta e o tempo serem gravados, para a nota sair com tudo.
     const finishForm = document.getElementById('finishForm');
-    if (finishForm) {
-        finishForm.addEventListener('submit', function (e) {
-            const pending = document.querySelectorAll('.question-map a:not(.done)').length;
-            if (pending > 0 && !confirm(pending + (pending === 1 ? ' questão sem resposta' : ' questões sem resposta')
-                    + '. Finalizar mesmo assim?')) {
-                e.preventDefault();
-            }
-        });
-    }
+    let finishing = false;
+    finishForm.addEventListener('submit', function (e) {
+        if (finishing) { return; }
+        e.preventDefault();
+        const pending = document.querySelectorAll('.question-map a:not(.done)').length;
+        if (pending > 0 && !confirm(pending + (pending === 1 ? ' questão sem resposta' : ' questões sem resposta')
+                + '. Finalizar mesmo assim?')) {
+            return;
+        }
+        finishing = true;
+        afterSave().then(sendTime).then(function () { finishForm.submit(); });
+    });
 
     // Atalhos: A-E responde, Shift+letra risca, X marca chute, M abre o mapa, setas navegam (e nao trocam o radio focado).
     // Ignorados enquanto se digita (observacao) ou com Ctrl/Cmd/Alt, para nao brigar com o navegador.
@@ -248,6 +366,12 @@
             return;
         }
         const key = e.key.toUpperCase();
+        if (key === 'P') {
+            e.preventDefault();
+            setPaused(!clock.paused);
+            return;
+        }
+        if (clock.paused) { return; }
         const alt = document.querySelector('.alternative[data-letter="' + key + '"]');
         if (alt) {
             e.preventDefault();

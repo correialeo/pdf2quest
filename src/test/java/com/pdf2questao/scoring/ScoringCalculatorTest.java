@@ -98,6 +98,35 @@ class ScoringCalculatorTest {
     }
 
     @Test
+    void projetaOAproveitamentoParaAsQuestoesDoEdital() {
+        // Portugues 2/4 (edital 5 x peso 1) e Contabilidade nao caiu; TI 1/2 (edital 4 x peso 3).
+        List<Item> all = new ArrayList<>();
+        all.addAll(items("Português", 2, 2));
+        all.addAll(items("TI", 1, 1));
+
+        ScoreResult result = ScoringCalculator.calculate(PROFILE, all);
+
+        var p1 = result.groups().get(0);
+        assertEquals(2.5, p1.rules().get(0).projected());
+        assertEquals(null, p1.rules().get(1).projected());
+        assertEquals(5, p1.coveredMaxPoints());
+        assertEquals(7.5, p1.projectedPoints(), 1e-9);   // 50% do maximo do grupo (15)
+        assertTrue(p1.projectedMinMet());
+        assertEquals(6, result.groups().get(1).projectedPoints(), 1e-9);
+        assertEquals(13.5, result.projectedTotal(), 1e-9);
+        assertTrue(result.projectedPassed());
+        assertEquals(17.0 / 27, result.coverage(), 1e-9);
+    }
+
+    @Test
+    void grupoComMinimoQueNaoCaiuNaoDaComoAprovado() {
+        ScoreResult result = ScoringCalculator.calculate(PROFILE, items("TI", 4, 0));
+
+        assertEquals(null, result.groups().get(0).projectedPoints());
+        assertFalse(result.projectedPassed());
+    }
+
+    @Test
     void erroNaoDescontaESemRespostaNaoPontua() {
         ScoreResult result = ScoringCalculator.calculate(PROFILE, List.of(
                 new Item("TI", false, false), new Item("TI", null, false)));

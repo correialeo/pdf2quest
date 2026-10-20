@@ -3,6 +3,7 @@ package com.pdf2questao.importer.structured;
 import com.pdf2questao.importer.ImportJob;
 import com.pdf2questao.importer.ImportJobRepository;
 import com.pdf2questao.question.Question;
+import com.pdf2questao.session.StudySessionService;
 import com.pdf2questao.question.QuestionRepository;
 import com.pdf2questao.question.QuestionType;
 import org.springframework.stereotype.Service;
@@ -38,9 +39,11 @@ public class AnswerKeyService {
     private final ImportJobRepository importJobRepository;
     private final TransactionTemplate transactions;
     private final Map<String, AnswerKeyPreview> previews = new ConcurrentHashMap<>();
+    private final StudySessionService sessionService;
 
     public AnswerKeyService(QuestionRepository questionRepository, ImportJobRepository importJobRepository,
-                            PlatformTransactionManager transactionManager) {
+                            PlatformTransactionManager transactionManager, StudySessionService sessionService) {
+        this.sessionService = sessionService;
         this.questionRepository = questionRepository;
         this.importJobRepository = importJobRepository;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -233,6 +236,8 @@ public class AnswerKeyService {
                 questions.values().stream().map(Question::getImportJobId).filter(Objects::nonNull).distinct()
                         .forEach(jobId -> importJobRepository.findById(jobId).ifPresent(job -> appendReport(job,
                                 "Gabarito " + preview.getFileName() + ": " + report.size() + " respostas aplicadas.")));
+                // Respostas dadas antes deste gabarito (ou com o anterior) passam a valer com ele.
+                sessionService.regrade(questions.keySet());
             });
         } catch (RuntimeException e) {
             return ImportOutcome.failure("Não foi possível gravar o gabarito; nada foi alterado. " + e.getMessage());

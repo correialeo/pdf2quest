@@ -8,7 +8,7 @@
         <div>
             <h1>Resultado</h1>
             <p class="page-subtitle"
-               th:text="(${studySession.blockName} ?: ${studySession.mode}) + ' · ' + ${total} + ' questões'
+               th:text="(${studySession.blockName} ?: ${studySession.mode.label()}) + ' · ' + ${total} + ' questões'
                         + (${studySession.finishedAt != null} ? ' · ' + ${#temporals.format(studySession.finishedAt, 'dd/MM/yyyy HH:mm')} : '')"></p>
         </div>
         <div class="d-flex gap-2">
@@ -34,6 +34,8 @@
             <div class="stat-label">Tempo</div>
             <div class="stat-value" th:text="${secs / 60} + 'min ' + ${secs % 60} + 's'"></div>
             <div class="text-muted small" th:text="'≈ ' + ${#numbers.formatDecimal(avgMillis / 1000.0, 1, 0)} + 's por questão'"></div>
+            <div class="text-bad small" th:if="${overtime > 0}"
+                 th:text="${overtime} + (${overtime == 1} ? ' resposta' : ' respostas') + ' fora do tempo'"></div>
         </div></div>
     </div>
 
@@ -57,6 +59,34 @@
                           th:classappend="${score.minTotalMet} ? 'text-bg-success' : 'text-bg-danger'"
                           th:text="(${score.minTotalMet} ? 'Bateu o mínimo total' : 'Abaixo do mínimo total') + ' (' + ${#numbers.formatDecimal(score.minTotal, 1, 1)} + ')'"></span>
                 </div>
+                <!-- Projecao: o aproveitamento de cada disciplina levado ao numero de questoes do edital. -->
+                <div class="score-projection" th:if="${score.projectedTotal != null}">
+                    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2">
+                        <div>
+                            <div class="stat-label">Projeção para a prova</div>
+                            <div class="fs-4 fw-semibold">
+                                <span th:text="${#numbers.formatDecimal(score.projectedTotal, 1, 1)}"></span>
+                                <span class="text-muted fw-normal fs-6" th:text="'de ' + ${#numbers.formatDecimal(score.maxTotal, 1, 1)}"></span>
+                            </div>
+                        </div>
+                        <span class="badge" th:classappend="${score.projectedPassed} ? 'text-bg-success' : 'text-bg-danger'"
+                              th:text="${score.projectedPassed} ? 'Nesse ritmo, passa' : 'Nesse ritmo, não passa'"></span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3 small mt-1">
+                        <span th:each="g : ${score.groups}">
+                            <span class="fw-medium" th:text="${g.name}"></span>
+                            <span th:if="${g.projectedPoints != null}"
+                                  th:text="'≈ ' + ${#numbers.formatDecimal(g.projectedPoints, 1, 1)} + ' / ' + ${#numbers.formatDecimal(g.maxPoints, 1, 1)}"></span>
+                            <span th:if="${g.projectedPoints == null}" class="text-muted">não caiu</span>
+                            <span th:if="${g.minScore != null and g.projectedPoints != null}"
+                                  th:class="${g.projectedMinMet} ? 'text-ok' : 'text-bad'"
+                                  th:text="'(mín. ' + ${#numbers.formatDecimal(g.minScore, 1, 1)} + ')'"></span>
+                        </span>
+                    </div>
+                    <div class="form-text" th:if="${score.coverage < 0.999}"
+                         th:text="'Estimativa: a sessão cobriu ' + ${#numbers.formatDecimal(score.coverage * 100, 1, 0)} + '% dos pontos da prova; o resto supõe o mesmo aproveitamento.'"></div>
+                </div>
+                <div class="stat-label mt-3 mb-1">Pontos nesta sessão</div>
                 <details th:each="g : ${score.groups}" class="score-group">
                     <summary class="d-flex justify-content-between align-items-center gap-2">
                         <span class="fw-medium" th:text="${g.name}"></span>
@@ -69,13 +99,14 @@
                     </summary>
                     <table class="table table-sm mb-2 mt-1">
                         <thead><tr><th>Disciplina</th><th class="text-end">Acertos</th><th class="text-end">Peso</th>
-                            <th class="text-end">Pontos</th></tr></thead>
+                            <th class="text-end">Pontos</th><th class="text-end" title="Aproveitamento levado às questões do edital">Projeção</th></tr></thead>
                         <tbody>
                         <tr th:each="r : ${g.rules}" th:if="${r.questions > 0 or r.maxPoints > 0}">
                             <td th:text="${r.subject}"></td>
                             <td class="text-end" th:text="${r.correct} + ' / ' + ${r.questions}"></td>
                             <td class="text-end" th:text="${r.weight}"></td>
                             <td class="text-end" th:text="${#numbers.formatDecimal(r.points, 1, 1)} + ' / ' + ${#numbers.formatDecimal(r.maxPoints, 1, 1)}"></td>
+                            <td class="text-end" th:text="${r.projected != null} ? ${#numbers.formatDecimal(r.projected, 1, 1)} : '–'"></td>
                         </tr>
                         </tbody>
                     </table>

@@ -56,6 +56,9 @@ public class StudySessionController {
     @GetMapping("/resolver/{id}")
     public String resolver(@PathVariable Long id, @RequestParam(defaultValue = "0") int index, Model model) {
         StudySession session = sessionService.getSession(id);
+        if (session.getFinishedAt() != null) {
+            return "redirect:/resultado/" + id;   // voltar no navegador depois de finalizar nao reabre a prova
+        }
         List<Long> ids = session.questionIds();
         if (index < 0) {
             index = 0;
@@ -66,9 +69,9 @@ public class StudySessionController {
         Question question = questionRepository.findById(ids.get(index)).orElseThrow();
 
         model.addAttribute("studySession", session);
-        model.addAttribute("remainingSeconds", session.getTimeLimitMinutes() == null || session.getStartedAt() == null
-                ? null : Math.max(0, session.getTimeLimitMinutes() * 60L
-                - java.time.Duration.between(session.getStartedAt(), java.time.LocalDateTime.now()).getSeconds()));
+        model.addAttribute("elapsedMillis", session.activeMillisOrZero());
+        model.addAttribute("limitMillis", session.getTimeLimitMinutes() == null ? null
+                : session.getTimeLimitMinutes() * 60_000L);
         model.addAttribute("question", question);
         model.addAttribute("attempt", sessionService.attemptOf(id, question.getId()).orElse(null));
         model.addAttribute("passage", question.getPassageId() == null ? null
@@ -88,7 +91,14 @@ public class StudySessionController {
     @ResponseBody
     public void responder(@PathVariable Long id, @RequestBody AnswerRequest request) {
         sessionService.answer(id, request.questionId(), request.selectedAnswer(), request.elapsedMillis(),
-                request.guess());
+                request.sessionMillis(), request.guess());
+    }
+
+    /** Tempo contado pelo navegador (ao sair da questao, a cada meio minuto e antes de finalizar). */
+    @PostMapping("/resolver/{id}/tempo")
+    @ResponseBody
+    public void tempo(@PathVariable Long id, @RequestBody TimeRequest request) {
+        sessionService.addTime(id, request.questionId(), request.elapsedMillis(), request.sessionMillis());
     }
 
     @PostMapping("/resolver/{id}/finalizar")
@@ -140,9 +150,14 @@ public class StudySessionController {
         model.addAttribute("score", sessionService.scoreResult(session));
         model.addAttribute("bySubject", bySubject(review));
         model.addAttribute("blank", review.stream().filter(r -> r.selectedAnswer() == null).count());
+        model.addAttribute("overtime", sessionService.overtimeCount(id));
         return "resultado";
     }
 
-    public record AnswerRequest(Long questionId, String selectedAnswer, Long elapsedMillis, Boolean guess) {
+    public record AnswerRequest(Long questionId, String selectedAnswer, Long elapsedMillis, Long sessionMillis,
+                                Boolean guess) {
+    }
+
+    public record TimeRequest(Long questionId, Long elapsedMillis, Long sessionMillis) {
     }
 }

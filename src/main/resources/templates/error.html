@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head(${status == 404} ? 'Não encontrado' : 'Erro')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div th:replace="~{fragments/ui :: empty(${status == 404} ? 'bi-signpost-split' : 'bi-exclamation-triangle',
+            ${status == 404} ? 'Esta página não existe mais. O item pode ter sido apagado ou o link está desatualizado.'
+                             : 'Algo deu errado ao abrir esta página. Tente de novo; se continuar, veja o terminal onde o sistema está rodando.',
+            'Voltar ao início', '/dashboard')}"></div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

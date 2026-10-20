@@ -14,6 +14,10 @@ import java.util.Set;
  * apelido bate com a disciplina da questao, ignorando acentos e caixa. Questao anulada conta como
  * acerto para todos, respondida ou nao. Erro nao desconta. Disciplinas sem regra nao pontuam e
  * saem em {@link ScoreResult#unweightedSubjects()}.
+ *
+ * <p>Alem dos pontos crus, calcula a projecao para a prova do edital: cada disciplina com questoes na
+ * sessao vale (acertos / questoes) x questoes do edital x peso; o grupo soma as disciplinas cobertas e
+ * escala para o maximo do grupo (como se o aproveitamento se mantivesse no que nao caiu na sessao).
  */
 public final class ScoringCalculator {
 
@@ -33,17 +37,28 @@ public final class ScoringCalculator {
     public record Item(String subject, Boolean correct, boolean annulled) {
     }
 
+    /** @param projected pontos projetados para o edital; null se a disciplina nao caiu na sessao. */
     public record RuleResult(String subject, double weight, int questions, int correct, double points,
-                             double maxPoints) {
+                             double maxPoints, Double projected) {
     }
 
+    /**
+     * @param projectedPoints projecao do grupo na prova inteira; null se nenhuma disciplina do grupo caiu.
+     * @param coveredMaxPoints maximo das disciplinas que cairam (base da projecao).
+     */
     public record GroupResult(String name, double points, double maxPoints, Double minScore, boolean minMet,
-                              List<RuleResult> rules) {
+                              List<RuleResult> rules, Double projectedPoints, Double coveredMaxPoints,
+                              Boolean projectedMinMet) {
     }
 
+    /**
+     * @param coverage fracao do maximo da prova coberta pela sessao (0 a 1); null em relatorio antigo,
+     *                 gravado antes de existir a projecao.
+     */
     public record ScoreResult(String profileName, double total, double maxTotal, Double minTotal,
                               boolean minTotalMet, boolean passed, List<GroupResult> groups,
-                              Map<String, Integer> unweightedSubjects) {
+                              Map<String, Integer> unweightedSubjects, Double projectedTotal,
+                              Boolean projectedPassed, Double coverage) {
     }
 
     public static ScoreResult calculate(ProfileSpec profile, List<Item> items) {
@@ -73,28 +88,56 @@ public final class ScoringCalculator {
         double total = 0;
         double maxTotal = 0;
         boolean allGroupsMet = true;
+        double projectedTotal = 0;
+        double projectedBase = 0;
+        double coveredTotal = 0;
+        boolean allProjectedMet = true;
         int index = 0;
         for (GroupSpec group : profile.groups()) {
             List<RuleResult> rules = new ArrayList<>();
             double points = 0;
             double max = 0;
+            double projected = 0;
+            double coveredMax = 0;
             for (RuleSpec rule : group.rules()) {
                 int[] c = counts.get(index++);
                 double rulePoints = c[1] * rule.weight();
                 double ruleMax = (rule.questionCount() != null ? rule.questionCount() : c[0]) * rule.weight();
-                rules.add(new RuleResult(rule.subject(), rule.weight(), c[0], c[1], rulePoints, ruleMax));
+                Double ruleProjected = c[0] == 0 ? null : (double) c[1] / c[0] * ruleMax;
+                if (ruleProjected != null) {
+                    projected += ruleProjected;
+                    coveredMax += ruleMax;
+                }
+                rules.add(new RuleResult(rule.subject(), rule.weight(), c[0], c[1], rulePoints, ruleMax,
+                        ruleProjected));
                 points += rulePoints;
                 max += ruleMax;
             }
             boolean minMet = group.minScore() == null || points >= group.minScore();
             allGroupsMet &= minMet;
-            groups.add(new GroupResult(group.name(), points, max, group.minScore(), minMet, rules));
+            Double groupProjected = coveredMax == 0 ? null : projected / coveredMax * max;
+            Boolean projectedMinMet = groupProjected == null ? null
+                    : group.minScore() == null || groupProjected >= group.minScore();
+            if (groupProjected != null) {
+                projectedTotal += groupProjected;
+                projectedBase += max;
+                allProjectedMet &= projectedMinMet;
+            } else if (group.minScore() != null) {
+                allProjectedMet = false;   // grupo com minimo que nao caiu: nao da para dizer que passou
+            }
+            coveredTotal += coveredMax;
+            groups.add(new GroupResult(group.name(), points, max, group.minScore(), minMet, rules,
+                    groupProjected, coveredMax, projectedMinMet));
             total += points;
             maxTotal += max;
         }
         boolean minTotalMet = profile.minTotal() == null || total >= profile.minTotal();
+        Double projectedScaled = projectedBase == 0 ? null : projectedTotal / projectedBase * maxTotal;
+        Boolean projectedPassed = projectedScaled == null ? null : allProjectedMet
+                && (profile.minTotal() == null || projectedScaled >= profile.minTotal());
         return new ScoreResult(profile.name(), total, maxTotal, profile.minTotal(), minTotalMet,
-                allGroupsMet && minTotalMet, groups, unweighted);
+                allGroupsMet && minTotalMet, groups, unweighted, projectedScaled, projectedPassed,
+                maxTotal == 0 ? 0.0 : coveredTotal / maxTotal);
     }
 
     private static int findRule(List<RuleSpec> rules, String subject) {

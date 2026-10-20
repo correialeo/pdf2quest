@@ -45,4 +45,10 @@
         </div>
     </div>
 </aside>
+
+<!-- Erro vindo de outra tela (ex.: filtros sem questoes): aparece por cima de qualquer pagina. -->
+<div class="alert alert-danger alert-dismissible global-alert" role="alert" th:if="${globalError}">
+    <span th:text="${globalError}"></span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+</div>
 </th:block>
