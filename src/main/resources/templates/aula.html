@@ -11,6 +11,11 @@
         <span th:if="${lesson.editalTopic != null}" th:text="' · Edital: ' + ${lesson.editalTopic}"></span>
     </p>
 
+    <div class="mb-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="copyLesson"><i class="bi bi-clipboard me-1"></i>Copiar aula</button>
+    </div>
+    <textarea id="lessonMarkdown" hidden th:text="${lesson.content}"></textarea>
+
     <article class="card p-4 rich-text lesson-content" th:utext="${contentHtml}"></article>
 
     <!-- Quizzes da aula: cada um em sua tela; peca outro ao Claude (nivel, duvidas; ele retoma os erros). -->
@@ -33,6 +38,15 @@
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script>
+    document.getElementById('copyLesson').addEventListener('click', function () {
+        const btn = this;
+        const label = btn.innerHTML;
+        const text = '# ' + document.querySelector('h1').textContent.trim() + '\n\n' + document.getElementById('lessonMarkdown').value;
+        navigator.clipboard.writeText(text).then(function () {
+            btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiado';
+            setTimeout(function () { btn.innerHTML = label; }, 1500);
+        });
+    });
     document.addEventListener('DOMContentLoaded', function() {
         const content = document.querySelector('.lesson-content');
         if (!content) return;

@@ -1540,6 +1540,10 @@ details[open] > .day-header::before { transform: rotate(90deg); }
     border: 1px solid var(--bs-border-color); border-radius: 10px; background: var(--bs-body-bg); color: inherit; }
 .quiz-option:hover { border-color: var(--bs-primary); }
 .quiz-option-body { display: flex; flex-direction: column; gap: .35rem; }
+.btn-copy { background: none; border: 0; padding: 0 .25rem; color: var(--bs-secondary-color); cursor: pointer; }
+.btn-copy:hover { color: var(--bs-body-color); }
+.quiz-option:not(.is-open) .copy-answer { display: none; }
+.copy-answer { align-self: flex-end; }
 .quiz-why { font-size: .875rem; color: var(--bs-secondary-color); }
 .quiz-question.is-answered .quiz-option:not(.is-correct):not(.is-wrong) { opacity: .75; }
 .quiz-option.is-correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--bs-body-bg)); }

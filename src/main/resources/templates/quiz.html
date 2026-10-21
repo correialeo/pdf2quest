@@ -24,8 +24,11 @@
 
     <!-- Clicar numa alternativa responde: ela fica verde/vermelha com o porque; se errou, a correta aparece.
          Depois de responder, clicar nas outras mostra a explicacao delas. -->
-    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : ''">
-        <div class="small text-muted mb-1" th:text="${q.position} + ' de ' + ${questions.size()} + (${q.topic != null} ? ' · ' + ${q.topic} : '')"></div>
+    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : '',data-answer=${q.correctAnswer}">
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="small text-muted" th:text="${q.position} + ' de ' + ${questions.size()} + (${q.topic != null} ? ' · ' + ${q.topic} : '')"></span>
+            <button type="button" class="btn-copy" data-copy="question" title="Copiar questão" aria-label="Copiar questão"><i class="bi bi-clipboard"></i></button>
+        </div>
         <div class="quiz-statement" th:text="${q.statement}"></div>
         <div class="quiz-options">
             <button type="button" class="quiz-option" th:each="a : ${q.alternativeList()}" th:attr="data-letter=${a.letra}">
@@ -33,6 +36,7 @@
                 <span class="quiz-option-body">
                     <span th:text="${a.texto}"></span>
                     <span class="quiz-why" hidden th:text="${a.explicacao}"></span>
+                    <span class="btn-copy copy-answer" role="button" tabindex="0" data-copy="answer" title="Copiar resposta" aria-label="Copiar resposta"><i class="bi bi-clipboard-check"></i></span>
                 </span>
             </button>
         </div>
@@ -48,6 +52,35 @@
 <script th:inline="javascript">
     const quizId = /*[[${quiz.id}]]*/ 0;
     const cards = Array.from(document.querySelectorAll('.quiz-question'));
+
+    function questionText(card) {
+        const lines = [card.querySelector('.quiz-statement').textContent.trim(), ''];
+        card.querySelectorAll('.quiz-option').forEach(function (opt) {
+            lines.push(opt.dataset.letter + ') ' + opt.querySelector('.quiz-option-body > span').textContent.trim());
+        });
+        return lines.join('\n');
+    }
+
+    function answerText(card, opt) {
+        const correct = opt.dataset.letter === card.dataset.answer;
+        const body = opt.querySelector('.quiz-option-body');
+        const why = body.querySelector('.quiz-why').textContent.trim();
+        return (correct ? 'Gabarito: ' : 'Alternativa incorreta: ') + opt.dataset.letter + ') ' + body.querySelector('span').textContent.trim() + (why ? '\n\n' + why : '');
+    }
+
+    cards.forEach(function (card) {
+        card.querySelectorAll('[data-copy]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const text = btn.dataset.copy === 'question' ? questionText(card) : answerText(card, btn.closest('.quiz-option'));
+                const label = btn.innerHTML;
+                navigator.clipboard.writeText(text).then(function () {
+                    btn.innerHTML = '<i class="bi bi-check2"></i>';
+                    setTimeout(function () { btn.innerHTML = label; }, 1500);
+                });
+            });
+        });
+    });
 
     function score() {
         const done = cards.filter(c => c.dataset.selected);
