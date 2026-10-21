@@ -88,6 +88,16 @@ class LessonMcpToolsIntegrationTest {
                 .andExpect(jsonPath("$.finished").value(false));
         answer(quiz1.quizId(), questions.get(1).getId(), "B");
 
+        // Corrige a correta da pergunta 1 para A: a resposta "a" já dada passa a valer como acerto.
+        var fixed = tools.fixQuizQuestion(quiz1.quizId(), 1, null, null, null, List.of("Certa agora.", "Errada.",
+                "Errada."), "A");
+        assertEquals("A", fixed.correta());
+        assertEquals(2, tools.quizResult(quiz1.quizId()).acertos());
+        assertThrows(IllegalArgumentException.class, () -> tools.fixQuizQuestion(quiz1.quizId(), 1, null, null, null,
+                null, "Z"));
+        tools.fixQuizQuestion(quiz1.quizId(), 1, null, null, null, List.of("Errada: reforça dotação já existente.",
+                "Certa: despesa sem dotação específica.", "Errada: despesa urgente e imprevisível."), "B");
+
         var result = tools.quizResult(null);
         assertEquals(2, result.respondidas());
         assertEquals(1, result.acertos());

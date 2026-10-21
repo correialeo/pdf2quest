@@ -253,6 +253,58 @@ public class LessonService {
         return saved;
     }
 
+    /**
+     * Corrige uma pergunta (campos nulos ficam como estao). Mudando a correta ou as alternativas, as respostas ja
+     * dadas sao recorrigidas pela nova correta (o placar e os erros anteriores acompanham).
+     */
+    @Transactional
+    public QuizQuestion fixQuestion(Long quizId, int number, String statement, String topic, List<String> texts,
+                                    List<String> explanations, String correct) {
+        QuizQuestion q = questions(quizId).stream().filter(x -> Integer.valueOf(number).equals(x.getPosition()))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("O quiz " + quizId + " não tem a pergunta "
+                        + number + "."));
+        if (statement != null && !statement.isBlank()) {
+            q.setStatement(statement.strip());
+        }
+        if (topic != null && !topic.isBlank()) {
+            q.setTopic(topic.strip());
+        }
+        List<Alternative> alternatives = new ArrayList<>(q.alternativeList());
+        if (texts != null && !texts.isEmpty()) {
+            if (texts.size() < 2 || texts.size() > 5 || explanations == null || explanations.size() != texts.size()
+                    || texts.stream().anyMatch(t -> t == null || t.isBlank())
+                    || explanations.stream().anyMatch(e -> e == null || e.isBlank())) {
+                throw new IllegalArgumentException("Envie de 2 a 5 alternativas, cada uma com texto e explicação.");
+            }
+            alternatives.clear();
+            for (int a = 0; a < texts.size(); a++) {
+                alternatives.add(new Alternative(String.valueOf((char) ('A' + a)), texts.get(a).strip(),
+                        explanations.get(a).strip()));
+            }
+        } else if (explanations != null && !explanations.isEmpty()) {
+            if (explanations.size() != alternatives.size() || explanations.stream().anyMatch(e -> e == null || e.isBlank())) {
+                throw new IllegalArgumentException("Envie uma explicação para cada uma das " + alternatives.size()
+                        + " alternativas.");
+            }
+            for (int a = 0; a < alternatives.size(); a++) {
+                Alternative old = alternatives.get(a);
+                alternatives.set(a, new Alternative(old.letra(), old.texto(), explanations.get(a).strip()));
+            }
+        }
+        String letter = correct == null || correct.isBlank() ? q.getCorrectAnswer()
+                : correct.strip().toUpperCase(Locale.ROOT);
+        if (alternatives.stream().noneMatch(a -> a.letra().equals(letter))) {
+            throw new IllegalArgumentException("A correta (\"" + letter + "\") não é uma das alternativas.");
+        }
+        q.setAlternativeList(alternatives);
+        q.setCorrectAnswer(letter);
+        questionRepository.save(q);
+        List<QuizAttempt> attempts = attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(List.of(q.getId()));
+        attempts.forEach(a -> a.setCorrect(letter.equals(a.getSelectedAnswer())));
+        attemptRepository.saveAll(attempts);
+        return q;
+    }
+
     public record AnswerResult(boolean correct, String correctAnswer, boolean finished, int correctCount, int total) {
     }
 

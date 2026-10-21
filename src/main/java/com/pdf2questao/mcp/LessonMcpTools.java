@@ -182,6 +182,34 @@ public class LessonMcpTools {
         return new QuizAdded(quizId, lessonService.questions(quizId).size(), baseUrl + "/quizzes/" + quizId);
     }
 
+    public record QuizFixed(Long quizId, int numero, String correta, int respostasRecorrigidas, String link) {
+    }
+
+    @McpTool(name = "corrigir_pergunta_quiz",
+            description = "Corrige uma pergunta de quiz (número da pergunta no quiz; veja resultado_quiz): enunciado, "
+                    + "tópico, alternativas com explicações e/ou a correta. O que não for enviado fica como está. Para "
+                    + "trocar só as explicações, envie 'explicacoes' na ordem das alternativas. As respostas já dadas "
+                    + "são recorrigidas pela nova correta.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
+    public QuizFixed fixQuizQuestion(
+            @McpToolParam(description = "Id do quiz.") Long quizId,
+            @McpToolParam(description = "Número da pergunta no quiz (1 = primeira).") Integer numero,
+            @McpToolParam(description = "Novo enunciado.", required = false) String enunciado,
+            @McpToolParam(description = "Novo tópico.", required = false) String topico,
+            @McpToolParam(description = "Novas alternativas (texto + explicação), substituindo todas.", required = false)
+            List<QuizAlternative> alternativas,
+            @McpToolParam(description = "Só as explicações novas, na ordem das alternativas atuais.", required = false)
+            List<String> explicacoes,
+            @McpToolParam(description = "Nova letra correta.", required = false) String correta) {
+        var q = lessonService.fixQuestion(quizId, numero, enunciado, topico,
+                alternativas == null ? null : alternativas.stream().map(QuizAlternative::texto).toList(),
+                alternativas != null ? alternativas.stream().map(QuizAlternative::explicacao).toList() : explicacoes,
+                correta);
+        int answered = (int) lessonService.result(quizId).questoes().stream()
+                .filter(r -> r.perguntaId().equals(q.getId()) && r.suaResposta() != null).count();
+        return new QuizFixed(quizId, q.getPosition(), q.getCorrectAnswer(), answered, baseUrl + "/quizzes/" + quizId);
+    }
+
     @McpTool(name = "resultado_quiz",
             description = "Resultado de um quiz (o que o usuário respondeu, acertos e a explicação da alternativa que "
                     + "ele marcou). Sem id, o quiz mais recente.",
