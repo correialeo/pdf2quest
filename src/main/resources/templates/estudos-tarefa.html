@@ -13,6 +13,11 @@
     </div>
     <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
+    <div class="card p-4 form-narrow mb-3" th:unless="${linked.isEmpty()}">
+        <h2 class="h6 mb-2">Aulas e quizzes desta tarefa</h2>
+        <div th:replace="~{fragments/estudos :: taskLinked(${linked})}"></div>
+    </div>
+
     <form method="post" th:action="@{/estudos/cronograma/{id}/editar(id=${task.id})}" class="card p-4 form-narrow">
         <div class="mb-3">
             <label class="form-label">Título</label>

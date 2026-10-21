@@ -1,5 +1,6 @@
 package com.pdf2questao.mcp;
 
+import com.pdf2questao.aula.LessonService;
 import com.pdf2questao.dashboard.DashboardService;
 import com.pdf2questao.dashboard.SubjectStat;
 import com.pdf2questao.importer.structured.ImportOptions;
@@ -56,6 +57,7 @@ public class StudyMcpTools {
     private final SpacedRepetitionService spacedRepetition;
     private final DaySummaryService daySummaryService;
     private final StudyPageService pageService;
+    private final LessonService lessonService;
     private final String baseUrl;
 
     public StudyMcpTools(DashboardService dashboardService, AttemptRepository attemptRepository,
@@ -63,7 +65,7 @@ public class StudyMcpTools {
                          StructuredImportService importService, StudySessionService sessionService,
                          StudyTaskService taskService, SpacedRepetitionService spacedRepetition,
                          DaySummaryService daySummaryService, StudyPageService pageService,
-                         @Value("${server.port:8080}") int port) {
+                         LessonService lessonService, @Value("${server.port:8080}") int port) {
         this.dashboardService = dashboardService;
         this.attemptRepository = attemptRepository;
         this.questionRepository = questionRepository;
@@ -74,6 +76,7 @@ public class StudyMcpTools {
         this.spacedRepetition = spacedRepetition;
         this.daySummaryService = daySummaryService;
         this.pageService = pageService;
+        this.lessonService = lessonService;
         this.baseUrl = "http://localhost:" + port;
     }
 
@@ -242,7 +245,8 @@ public class StudyMcpTools {
     // ---- rotina do dia ----
 
     public record TaskView(Long id, String titulo, String disciplina, LocalDate dia, boolean atrasada,
-                           Integer minutosPlanejados, String descricao, String link) {
+                           Integer minutosPlanejados, String descricao, String link,
+                           List<LessonService.Linked> aulasEQuizzes) {
     }
 
     @McpTool(name = "tarefas_de_hoje",
@@ -251,9 +255,14 @@ public class StudyMcpTools {
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
     public List<TaskView> todayTasks() {
         LocalDate today = LocalDate.now();
-        return taskService.dueBy(today).stream().filter(t -> !t.isReview())
+        List<StudyTask> tasks = taskService.dueBy(today).stream().filter(t -> !t.isReview()).toList();
+        var linked = lessonService.forTasks(tasks.stream().map(StudyTask::getId).toList());
+        return tasks.stream()
                 .map(t -> new TaskView(t.getId(), t.getTitle(), t.getSubject(), t.getPlannedDate(), t.isOverdue(),
-                        t.getEstimatedMinutes(), t.getDescription(), baseUrl + "/estudos/cronograma/" + t.getId() + "/editar"))
+                        t.getEstimatedMinutes(), t.getDescription(), baseUrl + "/estudos/cronograma/" + t.getId() + "/editar",
+                        linked.getOrDefault(t.getId(), List.of()).stream()
+                                .map(l -> new LessonService.Linked(l.tipo(), l.id(), l.titulo(), l.andamento(),
+                                        l.concluido(), baseUrl + l.link())).toList()))
                 .toList();
     }
 

@@ -1581,3 +1581,6 @@ details[open] > .day-header::before { transform: rotate(90deg); }
     font-weight: 600;
     color: var(--bs-body-color);
 }
+/* Aulas e quizzes ligados a uma tarefa */
+.task-linked { list-style: none; padding: 0; margin: .25rem 0 0; font-size: .85rem; }
+.task-linked li { display: flex; gap: .35rem; align-items: baseline; }

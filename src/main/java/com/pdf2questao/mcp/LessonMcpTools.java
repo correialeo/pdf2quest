@@ -49,12 +49,13 @@ public class LessonMcpTools {
                 3 a 5 linhas, o plano do dia e por quê.
 
                 2. AULA. Antes de escrever, veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
-                banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula, no nível dele (use o \\
+                banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
+                hoje que ela cobre), no nível dele (use o \\
                 desempenho): explicação direta, exemplos, "como a FCC cobra" (formatos e pegadinhas observados nas \\
                 questões reais), quadro de diferenças entre conceitos que se confundem e um resumo final. Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
 
-                3. QUIZ. Veja erros_quiz_anteriores do assunto e, com criar_quiz (aulaId da aula), crie de 6 a 10 \
+                3. QUIZ. Veja erros_quiz_anteriores do assunto e, com criar_quiz (aulaId da aula; o quiz herda a tarefa), crie de 6 a 10 \
                 perguntas baseadas no que a aula ensinou (não em outra \\
                 coisa), da mais simples à aplicada, com 4 ou 5 alternativas. Para CADA alternativa, a explicação de \\
                 por que está certa ou errada (ela aparece quando o usuário clica). Informe o tópico de cada uma. \\
@@ -161,11 +162,29 @@ public class LessonMcpTools {
             @McpToolParam(description = "Dúvidas do usuário que o quiz trabalha.", required = false) String duvidas,
             @McpToolParam(description = "Ids das perguntas erradas (erros_quiz_anteriores) que este quiz retoma.",
                     required = false) List<Long> errosRetomados,
-            @McpToolParam(description = "Perguntas.") List<QuizItem> perguntas) {
+            @McpToolParam(description = "Perguntas.") List<QuizItem> perguntas,
+            @McpToolParam(description = "Id da tarefa do cronograma que o quiz cobre (vazio = a da aula, se houver).",
+                    required = false) Long tarefaId) {
         Quiz quiz = lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel, duvidas, errosRetomados,
-                perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList());
+                perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(), tarefaId);
         return new QuizCreated(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), lessonService.questions(quiz.getId()).size(),
                 errosRetomados == null ? 0 : errosRetomados.size(), baseUrl + "/quizzes/" + quiz.getId());
+    }
+
+    public record TaskLinked(Long tarefaId, Long aulaId, Long quizId, String link) {
+    }
+
+    @McpTool(name = "vincular_tarefa",
+            description = "Liga uma aula e/ou um quiz já criados a uma tarefa do cronograma (id de tarefas_de_hoje). "
+                    + "Sem tarefaId, desfaz a ligação. A tarefa passa a mostrar a aula/quiz e o andamento.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
+    public TaskLinked linkTask(
+            @McpToolParam(description = "Id da tarefa (vazio = desvincular).", required = false) Long tarefaId,
+            @McpToolParam(description = "Id da aula.", required = false) Long aulaId,
+            @McpToolParam(description = "Id do quiz.", required = false) Long quizId) {
+        lessonService.linkTask(tarefaId, aulaId, quizId);
+        return new TaskLinked(tarefaId, aulaId, quizId,
+                tarefaId == null ? null : baseUrl + "/estudos/cronograma/" + tarefaId + "/editar");
     }
 
     public record QuizAdded(Long quizId, int perguntasNoQuiz, String link) {

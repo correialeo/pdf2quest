@@ -37,6 +37,7 @@ public class LessonController {
     public String lesson(@PathVariable Long id, Model model) {
         Lesson lesson = lessonService.find(id);
         model.addAttribute("lesson", lesson);
+        model.addAttribute("task", lessonService.task(lesson.getTaskId()));
         model.addAttribute("contentHtml", SimpleMarkdown.toHtml(lesson.getContent()));
         model.addAttribute("quizzes", lessonService.quizzes(id));
         Map<Long, LessonService.QuizResult> results = lessonService.quizzes(id).stream()
@@ -49,6 +50,7 @@ public class LessonController {
     public String quiz(@PathVariable Long id, Model model) {
         Quiz quiz = lessonService.quiz(id);
         model.addAttribute("quiz", quiz);
+        model.addAttribute("task", lessonService.task(lessonService.effectiveTaskId(quiz)));
         model.addAttribute("lesson", quiz.getLessonId() == null ? null : lessonService.find(quiz.getLessonId()));
         model.addAttribute("questions", lessonService.questions(id));
         model.addAttribute("answers", lessonService.latest(id));

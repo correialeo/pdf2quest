@@ -9,6 +9,7 @@
     <p class="page-subtitle">
         <span th:if="${lesson.subject != null}" th:text="${lesson.subject}"></span>
         <span th:if="${lesson.editalTopic != null}" th:text="' · Edital: ' + ${lesson.editalTopic}"></span>
+        <span th:if="${task != null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
     </p>
 
     <div class="mb-2">

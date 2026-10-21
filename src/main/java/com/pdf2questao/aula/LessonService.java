@@ -2,11 +2,14 @@ package com.pdf2questao.aula;
 
 import com.pdf2questao.aula.QuizQuestion.Alternative;
 import com.pdf2questao.scoring.ScoringCalculator;
+import com.pdf2questao.study.StudyTask;
+import com.pdf2questao.study.StudyTaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,9 +32,12 @@ public class LessonService {
     private final QuizRepository quizRepository;
     private final QuizQuestionRepository questionRepository;
     private final QuizAttemptRepository attemptRepository;
+    private final StudyTaskRepository taskRepository;
 
     public LessonService(LessonRepository lessonRepository, QuizRepository quizRepository,
-                         QuizQuestionRepository questionRepository, QuizAttemptRepository attemptRepository) {
+                         QuizQuestionRepository questionRepository, QuizAttemptRepository attemptRepository,
+                         StudyTaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
         this.lessonRepository = lessonRepository;
         this.quizRepository = quizRepository;
         this.questionRepository = questionRepository;
@@ -58,8 +64,83 @@ public class LessonService {
         lesson.setSubject(blank(subject));
         lesson.setEditalTopic(blank(editalTopic));
         lesson.setContent(content.strip());
-        lesson.setTaskId(taskId);
+        lesson.setTaskId(checkTask(taskId));
         return lessonRepository.save(lesson);
+    }
+
+    // ---- ligacao com o cronograma ----
+
+    /** Aula ou quiz ligado a uma tarefa, com o andamento para mostrar na tarefa. */
+    public record Linked(String tipo, Long id, String titulo, String andamento, boolean concluido, String link) {
+    }
+
+    /** Aulas e quizzes de cada tarefa. O quiz sem tarefa propria herda a da aula (aparece dentro dela). */
+    public Map<Long, List<Linked>> forTasks(Collection<Long> taskIds) {
+        Map<Long, List<Linked>> out = new LinkedHashMap<>();
+        if (taskIds == null || taskIds.isEmpty()) {
+            return out;
+        }
+        for (Lesson lesson : lessonRepository.findByTaskIdInOrderByCreatedAt(taskIds)) {
+            List<Quiz> qs = quizzes(lesson.getId());
+            long answered = qs.stream().filter(q -> q.getFinishedAt() != null).count();
+            boolean done = !qs.isEmpty() && answered == qs.size();
+            String progress = qs.isEmpty() ? "sem quiz" : answered + " de " + qs.size() + " quizzes respondidos";
+            out.computeIfAbsent(lesson.getTaskId(), k -> new ArrayList<>())
+                    .add(new Linked("Aula", lesson.getId(), lesson.getTitle(), progress, done, "/aulas/" + lesson.getId()));
+        }
+        for (Quiz quiz : quizRepository.findByTaskIdInOrderByCreatedAt(taskIds)) {
+            Long lessonTask = quiz.getLessonId() == null ? null : find(quiz.getLessonId()).getTaskId();
+            if (quiz.getTaskId().equals(lessonTask)) {
+                continue;   // ja aparece pela aula
+            }
+            QuizResult r = result(quiz.getId());
+            String progress = r.respondidas() == 0 ? "a responder"
+                    : r.acertos() + "/" + r.respondidas() + " acertos" + (r.concluido() ? "" : " (em andamento)");
+            out.computeIfAbsent(quiz.getTaskId(), k -> new ArrayList<>())
+                    .add(new Linked("Quiz", quiz.getId(), quiz.getTitle(), progress, r.concluido(), "/quizzes/" + quiz.getId()));
+        }
+        return out;
+    }
+
+    public List<Linked> forTask(Long taskId) {
+        return forTasks(List.of(taskId)).getOrDefault(taskId, List.of());
+    }
+
+    /** Tarefa de uma aula ou quiz (a do quiz ou, sem ela, a da aula), para o link de volta. */
+    public StudyTask task(Long taskId) {
+        return taskId == null ? null : taskRepository.findById(taskId).orElse(null);
+    }
+
+    public Long effectiveTaskId(Quiz quiz) {
+        return quiz.getTaskId() != null || quiz.getLessonId() == null ? quiz.getTaskId()
+                : find(quiz.getLessonId()).getTaskId();
+    }
+
+    /** Liga (ou desliga, com tarefa null) uma aula e/ou um quiz a uma tarefa do cronograma. */
+    @Transactional
+    public void linkTask(Long taskId, Long lessonId, Long quizId) {
+        if (lessonId == null && quizId == null) {
+            throw new IllegalArgumentException("Informe a aula e/ou o quiz.");
+        }
+        Long task = checkTask(taskId);
+        if (lessonId != null) {
+            Lesson lesson = lessonRepository.findById(lessonId)
+                    .orElseThrow(() -> new IllegalArgumentException("Aula " + lessonId + " não existe."));
+            lesson.setTaskId(task);
+            lessonRepository.save(lesson);
+        }
+        if (quizId != null) {
+            Quiz quiz = quiz(quizId);
+            quiz.setTaskId(task);
+            quizRepository.save(quiz);
+        }
+    }
+
+    private Long checkTask(Long taskId) {
+        if (taskId != null && !taskRepository.existsById(taskId)) {
+            throw new IllegalArgumentException("Tarefa " + taskId + " não existe.");
+        }
+        return taskId;
     }
 
     public List<Quiz> quizzes(Long lessonId) {
@@ -165,7 +246,7 @@ public class LessonService {
      */
     @Transactional
     public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
-                           List<Long> reviewedErrors, List<NewQuestion> questions) {
+                           List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId) {
         Lesson lesson = lessonId == null ? null : find(lessonId);
         String subj = lesson != null && blank(subject) == null ? lesson.getSubject() : blank(subject);
         String top = lesson != null && blank(topic) == null ? lesson.getEditalTopic() : blank(topic);
@@ -187,6 +268,7 @@ public class LessonService {
         }
         Quiz quiz = new Quiz();
         quiz.setLessonId(lessonId);
+        quiz.setTaskId(checkTask(taskId));
         quiz.setSubject(subj);
         quiz.setTopic(top);
         quiz.setLevel(lvl);

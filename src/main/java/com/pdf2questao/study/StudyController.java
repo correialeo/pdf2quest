@@ -48,7 +48,9 @@ public class StudyController {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
         spacedRepetition.syncReviewTask(today);
-        model.addAttribute("dueTasks", taskService.dueBy(today));
+        var dueTasks = taskService.dueBy(today);
+        model.addAttribute("dueTasks", dueTasks);
+        model.addAttribute("linked", lessonService.forTasks(dueTasks.stream().map(StudyTask::getId).toList()));
         model.addAttribute("dueReviews", spacedRepetition.due(today));
         model.addAttribute("todaySummary", daySummaryService.existing(today, today).get(today));
         model.addAttribute("week", taskService.week(today));

@@ -55,6 +55,15 @@
 </form>
 
 <!-- Descricao da tarefa: clicar edita ali mesmo (Enter ou clicar fora salva, Shift+Enter quebra linha, Esc cancela). -->
+<!-- Aulas e quizzes ligados a tarefa, com andamento (items: List<LessonService.Linked>, pode ser null). -->
+<ul th:fragment="taskLinked(items)" th:if="${items != null and !items.isEmpty()}" class="task-linked">
+    <li th:each="l : ${items}">
+        <i class="bi" th:classappend="${l.concluido} ? 'bi-check-circle-fill text-ok' : (${l.tipo == 'Aula'} ? 'bi-journal-text' : 'bi-patch-question')"></i>
+        <a th:href="${l.link}" th:text="${l.tipo} + ': ' + ${l.titulo}"></a>
+        <span class="text-muted" th:text="'· ' + ${l.andamento}"></span>
+    </li>
+</ul>
+
 <form th:fragment="taskDescription(t)" th:unless="${t.review}" method="post" th:action="@{/estudos/cronograma/{id}/descricao(id=${t.id})}"
       class="task-desc-form">
     <button type="button" class="task-desc" th:classappend="${t.listDescription == null} ? 'is-empty'"

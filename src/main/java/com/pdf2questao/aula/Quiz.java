@@ -24,6 +24,8 @@ public class Quiz {
 
     /** Aula de origem; null = quiz avulso. */
     private Long lessonId;
+    /** Tarefa do cronograma que o quiz cobre (opcional; sem ela vale a tarefa da aula). */
+    private Long taskId;
     private String title;
     private String subject;
     private String topic;

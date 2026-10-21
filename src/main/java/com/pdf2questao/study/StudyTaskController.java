@@ -21,9 +21,12 @@ public class StudyTaskController {
     private final StudySubjects subjects;
     private final DaySummaryService daySummaryService;
     private final SpacedRepetitionService spacedRepetition;
+    private final com.pdf2questao.aula.LessonService lessonService;
 
     public StudyTaskController(StudyTaskService taskService, StudyPageService pageService, StudySubjects subjects,
-                               DaySummaryService daySummaryService, SpacedRepetitionService spacedRepetition) {
+                               DaySummaryService daySummaryService, SpacedRepetitionService spacedRepetition,
+                               com.pdf2questao.aula.LessonService lessonService) {
+        this.lessonService = lessonService;
         this.spacedRepetition = spacedRepetition;
         this.taskService = taskService;
         this.pageService = pageService;
@@ -87,6 +90,7 @@ public class StudyTaskController {
             return "redirect:/estudos/cronograma";
         }
         model.addAttribute("task", task.get());
+        model.addAttribute("linked", lessonService.forTask(id));
         model.addAttribute("pages", pageService.flatTree());
         model.addAttribute("subjects", subjects.all());
         return "estudos-tarefa";

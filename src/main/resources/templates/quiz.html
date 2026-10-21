@@ -15,6 +15,7 @@
         <span th:if="${quiz.subject != null}" th:text="${quiz.subject}"></span>
         <span th:if="${quiz.topic != null}" th:text="' · ' + ${quiz.topic}"></span>
         <span th:if="${quiz.level != null}" th:text="' · nível ' + ${quiz.level}"></span>
+        <span th:if="${task != null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
     </p>
     <div class="card p-3 mb-3 small" th:if="${quiz.doubts != null or (quiz.previousErrors != null and !quiz.previousErrors.isEmpty())}">
         <div th:if="${quiz.doubts != null}"><span class="fw-medium">Suas dúvidas:</span> <span th:text="${quiz.doubts}"></span></div>
