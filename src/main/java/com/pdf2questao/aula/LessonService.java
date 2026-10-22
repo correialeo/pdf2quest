@@ -213,6 +213,50 @@ public class LessonService {
         return out;
     }
 
+    /** Erro em aberto para a caixa de erros: a pergunta inteira, para responder de novo na tela. */
+    public record OpenError(QuizQuestion pergunta, String quiz, String disciplina, String suaResposta,
+                            LocalDateTime respondidaEm) {
+    }
+
+    /**
+     * Caixa de erros: perguntas de quiz cuja ultima resposta foi errada (e que nenhum quiz posterior resolveu), de
+     * todas as disciplinas ou de uma. Responder certo de novo tira a pergunta da caixa.
+     */
+    public List<OpenError> openErrors(String subject) {
+        String s = blank(subject) == null ? null : ScoringCalculator.normalize(subject);
+        Map<Long, Quiz> quizzes = allQuizzes().stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
+        List<QuizQuestion> candidates = questionRepository.findAll().stream()
+                .filter(q -> s == null || ScoringCalculator.normalize(subjectName(q.getSubject())).equals(s))
+                .toList();
+        Map<Long, QuizAttempt> last = new LinkedHashMap<>();
+        attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(candidates.stream().map(QuizQuestion::getId).toList())
+                .forEach(a -> last.put(a.getQuizQuestionId(), a));
+        List<OpenError> out = new ArrayList<>();
+        for (QuizQuestion q : candidates) {
+            QuizAttempt a = last.get(q.getId());
+            if (a == null || Boolean.TRUE.equals(a.getCorrect()) || resolved(q, quizzes.values())) {
+                continue;
+            }
+            Quiz quiz = quizzes.get(q.getQuizId());
+            out.add(new OpenError(q, quiz == null ? null : quiz.getTitle(), subjectName(q.getSubject()),
+                    a.getSelectedAnswer(), a.getAnsweredAt()));
+        }
+        out.sort(Comparator.comparing(OpenError::respondidaEm).reversed());
+        return out;
+    }
+
+    /** Erros em aberto por disciplina (mais erros primeiro), para os atalhos da caixa de erros. */
+    public Map<String, Long> openErrorsBySubject() {
+        Map<String, Long> out = openErrors(null).stream()
+                .collect(Collectors.groupingBy(OpenError::disciplina, LinkedHashMap::new, Collectors.counting()));
+        return out.entrySet().stream().sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+    }
+
+    private static String subjectName(String subject) {
+        return blank(subject) == null ? "Sem disciplina" : subject.strip();
+    }
+
     /** Retomado por um quiz posterior, ja respondido, em que todas as perguntas do mesmo topico foram acertadas. */
     private boolean resolved(QuizQuestion error, java.util.Collection<Quiz> quizzes) {
         for (Quiz later : quizzes) {

@@ -1674,3 +1674,12 @@ a.lesson-item-main:hover { background: var(--bs-tertiary-bg); }
     font-size: .8rem;
     color: var(--accent);
 }
+
+/* Caixa de erros (chamada no topo de /aulas) */
+.error-box {
+    padding: 1rem 1.1rem;
+    border-color: color-mix(in srgb, var(--bad) 35%, var(--bs-border-color));
+    background: color-mix(in srgb, var(--bad) 5%, var(--bs-card-bg));
+}
+
+.error-box-icon { font-size: 1.4rem; color: var(--bad); }

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Caixa de erros')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page lesson-page">
+    <a href="/aulas" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Aulas</a>
+    <div class="d-flex align-items-baseline justify-content-between gap-2 mt-1">
+        <h1 class="m-0">Caixa de erros</h1>
+        <span class="small text-muted text-nowrap" id="quizScore"></span>
+    </div>
+    <p class="page-subtitle">O que você errou nos quizzes e ainda não acertou de novo. Acertou aqui, sai da caixa.</p>
+    </div>
+
+    <div class="chip-row" th:if="${errorsBySubject.size() > 1}">
+        <a href="/aulas/erros" class="chip" th:classappend="${disciplina == null} ? 'active'">Todas</a>
+        <a th:each="e : ${errorsBySubject}" th:href="@{/aulas/erros(disciplina=${e.key})}" class="chip"
+           th:classappend="${e.key == disciplina} ? 'active'" th:text="${e.key} + ' · ' + ${e.value}"></a>
+    </div>
+
+    <div class="empty-state" th:if="${errors.isEmpty()}"><i class="bi bi-trophy"></i>
+        <span>Nenhum erro em aberto. Mandou bem!</span> <a href="/aulas" class="ms-1">Voltar às aulas</a></div>
+
+    <!-- Mesmo jeito do quiz: clicar responde na hora, com o porque; a tentativa vale para a pergunta original. -->
+    <div class="card p-4 mb-3 quiz-question" th:each="e, it : ${errors}"
+         th:attr="data-id=${e.pergunta.id},data-quiz=${e.pergunta.quizId},data-selected='',data-correct=''">
+        <div class="d-flex align-items-center gap-2 mb-1 small text-muted">
+            <span th:text="${it.count} + ' de ' + ${errors.size()} + ' · ' + ${e.disciplina} + (${e.pergunta.topic != null} ? ' · ' + ${e.pergunta.topic} : '')"></span>
+            <a class="ms-auto text-muted text-nowrap" th:href="@{/quizzes/{id}(id=${e.pergunta.quizId})}" th:text="${e.quiz}"></a>
+        </div>
+        <div class="small text-bad mb-2" th:if="${e.suaResposta != null}"
+             th:text="'Da última vez você marcou ' + ${e.suaResposta} + ' (' + ${#temporals.format(e.respondidaEm, 'dd/MM')} + ')'"></div>
+        <div class="quiz-statement" th:text="${e.pergunta.statement}"></div>
+        <div class="quiz-options">
+            <button type="button" class="quiz-option" th:each="a : ${e.pergunta.alternativeList()}" th:attr="data-letter=${a.letra}">
+                <span class="alt-letter" th:text="${a.letra}"></span>
+                <span class="quiz-option-body">
+                    <span th:text="${a.texto}"></span>
+                    <span class="quiz-why" hidden th:text="${a.explicacao}"></span>
+                </span>
+            </button>
+        </div>
+    </div>
+    <div class="d-flex justify-content-end" th:unless="${errors.isEmpty()}">
+        <a th:href="@{/aulas/erros(disciplina=${disciplina})}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-repeat me-1"></i>Atualizar caixa</a>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    const cards = Array.from(document.querySelectorAll('.quiz-question'));
+
+    function score() {
+        const done = cards.filter(c => c.dataset.selected);
+        const right = done.filter(c => c.dataset.selected === c.dataset.correct).length;
+        document.getElementById('quizScore').textContent = done.length === 0 ? cards.length + ' em aberto'
+            : right + ' resolvidos · ' + (cards.length - right) + ' na caixa';
+    }
+
+    function reveal(card) {
+        const selected = card.dataset.selected, correct = card.dataset.correct;
+        card.classList.add('is-answered');
+        card.querySelectorAll('.quiz-option').forEach(function (opt) {
+            const letter = opt.dataset.letter;
+            opt.classList.toggle('is-correct', letter === correct);
+            opt.classList.toggle('is-wrong', letter === selected && selected !== correct);
+            opt.classList.toggle('is-open', letter === selected || letter === correct);
+            opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
+        });
+    }
+
+    cards.forEach(function (card) {
+        card.querySelectorAll('.quiz-option').forEach(function (opt) {
+            opt.addEventListener('click', function () {
+                if (card.dataset.selected) {
+                    opt.classList.toggle('is-open');
+                    opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
+                    return;
+                }
+                if (card.dataset.sending) { return; }
+                card.dataset.sending = '1';
+                fetch('/quizzes/' + card.dataset.quiz + '/responder', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({questionId: Number(card.dataset.id), selected: opt.dataset.letter})
+                }).then(function (r) {
+                    if (!r.ok) { throw new Error(r.status); }
+                    return r.json();
+                }).then(function (res) {
+                    card.dataset.selected = opt.dataset.letter;
+                    card.dataset.correct = res.correctAnswer;
+                    reveal(card);
+                    score();
+                }).catch(function () {
+                    alert('Não foi possível salvar a resposta. Tente de novo.');
+                }).finally(function () { delete card.dataset.sending; });
+            });
+        });
+    });
+    score();
+</script>
+</body>
+</html>

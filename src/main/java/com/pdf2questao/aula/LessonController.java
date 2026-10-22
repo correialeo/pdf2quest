@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.Map;
@@ -25,12 +26,21 @@ public class LessonController {
     @GetMapping("/aulas")
     public String list(Model model) {
         model.addAttribute("overview", lessonService.overview());
+        model.addAttribute("errorsBySubject", lessonService.openErrorsBySubject());
         model.addAttribute("stats", lessonService.stats());
         model.addAttribute("totals", lessonService.totals());
         return "aulas";
     }
 
-    @GetMapping("/aulas/{id}")
+    @GetMapping("/aulas/erros")
+    public String errors(@RequestParam(required = false) String disciplina, Model model) {
+        model.addAttribute("errors", lessonService.openErrors(disciplina));
+        model.addAttribute("errorsBySubject", lessonService.openErrorsBySubject());
+        model.addAttribute("disciplina", disciplina);
+        return "aulas-erros";
+    }
+
+    @GetMapping("/aulas/{id:\\d+}")
     public String lesson(@PathVariable Long id, Model model) {
         Lesson lesson = lessonService.find(id);
         model.addAttribute("lesson", lesson);

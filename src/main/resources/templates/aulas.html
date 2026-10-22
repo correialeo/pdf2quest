@@ -22,6 +22,23 @@
 
     <div class="row g-4">
         <div class="col-lg-8">
+            <!-- Caixa de erros: o que errou e ainda nao acertou de novo, para treinar direto na tela. -->
+            <div class="card error-box mb-4" th:unless="${errorsBySubject.isEmpty()}">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-arrow-repeat error-box-icon"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-medium" th:with="n=${#aggregates.sum(errorsBySubject.values())}"
+                             th:text="${n} + (${n == 1} ? ' erro em aberto' : ' erros em aberto')"></div>
+                        <div class="small text-muted">Refaça o que errou nos quizzes; acertou, sai da caixa.</div>
+                    </div>
+                    <a href="/aulas/erros" class="btn btn-primary btn-sm text-nowrap">Treinar erros</a>
+                </div>
+                <div class="chip-row mb-0 mt-3" th:if="${errorsBySubject.size() > 1}">
+                    <a th:each="e : ${errorsBySubject}" th:href="@{/aulas/erros(disciplina=${e.key})}" class="chip"
+                       th:text="${e.key} + ' · ' + ${e.value}"></a>
+                </div>
+            </div>
+
             <!-- O que falta fazer vem primeiro: quizzes nao concluidos, de aula ou avulsos. -->
             <th:block th:unless="${overview.pendentes.isEmpty()}">
                 <div class="section-title mt-0">Para responder</div>
