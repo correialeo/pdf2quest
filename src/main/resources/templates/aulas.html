@@ -121,6 +121,30 @@
         </div>
 
         <div class="col-lg-4">
+            <!-- Constancia: dias seguidos respondendo quiz e a meta do dia (a meta fica salva no navegador). -->
+            <div class="section-title mt-0">Constância</div>
+            <div class="card p-3 mb-4 streak-card">
+                <div class="d-flex align-items-baseline gap-2">
+                    <i class="bi bi-fire" th:classappend="${streak.hoje > 0} ? 'text-guess' : 'text-muted'"></i>
+                    <span class="stat-value" th:text="${streak.diasSeguidos}"></span>
+                    <span class="small text-muted" th:text="${streak.diasSeguidos == 1} ? 'dia seguido' : 'dias seguidos'"></span>
+                    <span class="ms-auto small text-muted" th:text="'recorde ' + ${streak.recorde}"></span>
+                </div>
+                <div class="small text-guess mt-1" th:if="${streak.hoje == 0 and streak.diasSeguidos > 0}">
+                    Responda algo hoje para não perder a sequência.</div>
+                <div class="d-flex justify-content-between small mt-3 mb-1">
+                    <span>Hoje: <strong th:text="${streak.hoje}" id="goal-done"></strong> de
+                        <button type="button" class="goal-edit" id="goal-value" title="Mudar a meta diária">20</button> respostas</span>
+                    <span id="goal-pct" class="text-muted"></span>
+                </div>
+                <div class="progress" style="height: 6px"><div class="progress-bar" id="goal-bar"></div></div>
+                <div class="streak-grid mt-3" aria-label="Respostas nos últimos 28 dias">
+                    <span th:each="d : ${streak.ultimosDias}" class="streak-day"
+                          th:classappend="${d.respostas == 0} ? '' : (${d.respostas < 10} ? 'lvl-1' : (${d.respostas < 30} ? 'lvl-2' : 'lvl-3'))"
+                          th:title="${#temporals.format(d.dia, 'dd/MM')} + ': ' + ${d.respostas} + ' respostas'"></span>
+                </div>
+            </div>
+
             <!-- Desempenho dos quizzes, separado do das provas e simulados: so os piores a vista. -->
             <div class="section-title mt-0">Pontos fracos <span class="fw-normal">(quiz por tópico)</span></div>
             <div class="empty-state" th:if="${stats.isEmpty()}"><i class="bi bi-bar-chart"></i><span>Responda um quiz para ver aqui.</span></div>
@@ -145,6 +169,23 @@
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <script>
     (function () {
+        // Meta diaria: fica no navegador; clicar no numero muda.
+        var GOAL = 'aulas-meta';
+        function paintGoal() {
+            var goal = Number(localStorage.getItem(GOAL)) || 20;
+            var done = Number(document.getElementById('goal-done').textContent);
+            var pct = Math.min(100, Math.round(done * 100 / goal));
+            document.getElementById('goal-value').textContent = goal;
+            document.getElementById('goal-bar').style.width = pct + '%';
+            document.getElementById('goal-bar').classList.toggle('bg-success', pct >= 100);
+            document.getElementById('goal-pct').textContent = pct >= 100 ? 'meta batida!' : pct + '%';
+        }
+        document.getElementById('goal-value').addEventListener('click', function () {
+            var v = prompt('Meta diária de respostas nos quizzes:', localStorage.getItem(GOAL) || 20);
+            if (v && Number(v) > 0) { localStorage.setItem(GOAL, String(Math.round(Number(v)))); paintGoal(); }
+        });
+        paintGoal();
+
         // "Mostrar mais": revela as linhas escondidas da lista e some.
         document.querySelectorAll('[data-show]').forEach(function (btn) {
             btn.addEventListener('click', function () {

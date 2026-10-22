@@ -27,6 +27,7 @@ public class LessonController {
     public String list(Model model) {
         model.addAttribute("overview", lessonService.overview());
         model.addAttribute("errorsBySubject", lessonService.openErrorsBySubject());
+        model.addAttribute("streak", lessonService.streak());
         model.addAttribute("stats", lessonService.stats());
         model.addAttribute("totals", lessonService.totals());
         return "aulas";

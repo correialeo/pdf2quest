@@ -7,6 +7,7 @@ import com.pdf2questao.study.StudyTaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -627,6 +628,42 @@ public class LessonService {
         return Stream.concat(all().stream().map(Lesson::getSubject), allQuizzes().stream().map(Quiz::getSubject))
                 .filter(Objects::nonNull).filter(x -> ScoringCalculator.normalize(x).equals(key))
                 .findFirst().orElse(name);
+    }
+
+    // ---- constancia: dias seguidos respondendo quiz ----
+
+    public record DayCount(LocalDate dia, long respostas) {
+    }
+
+    /** Respostas de hoje, dias seguidos (conta ate ontem se hoje ainda nao respondeu) e os ultimos 28 dias. */
+    public record Streak(long hoje, int diasSeguidos, int recorde, List<DayCount> ultimosDias) {
+    }
+
+    public Streak streak() {
+        Map<LocalDate, Long> perDay = attemptRepository.findAll().stream()
+                .filter(a -> a.getAnsweredAt() != null)
+                .collect(Collectors.groupingBy(a -> a.getAnsweredAt().toLocalDate(), Collectors.counting()));
+        LocalDate today = LocalDate.now();
+        LocalDate day = perDay.containsKey(today) ? today : today.minusDays(1);
+        int current = 0;
+        while (perDay.containsKey(day)) {
+            current++;
+            day = day.minusDays(1);
+        }
+        int best = 0;
+        int run = 0;
+        LocalDate prev = null;
+        for (LocalDate d : perDay.keySet().stream().sorted().toList()) {
+            run = prev != null && prev.plusDays(1).equals(d) ? run + 1 : 1;
+            best = Math.max(best, run);
+            prev = d;
+        }
+        List<DayCount> last = new ArrayList<>();
+        for (int i = 27; i >= 0; i--) {
+            LocalDate d = today.minusDays(i);
+            last.add(new DayCount(d, perDay.getOrDefault(d, 0L)));
+        }
+        return new Streak(perDay.getOrDefault(today, 0L), current, best, last);
     }
 
     private static String blank(String s) {
