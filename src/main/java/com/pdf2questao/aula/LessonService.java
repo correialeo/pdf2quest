@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -461,6 +462,86 @@ public class LessonService {
         int right = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.acertou())).count();
         return new QuizResult(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), quiz.getSubject(), quiz.getTopic(),
                 quiz.getLevel(), qs.size(), answered, right, quiz.getFinishedAt() != null, items);
+    }
+
+    // ---- tela /aulas: tudo agrupado por disciplina ----
+
+    /** Resumo de um quiz para as listas. */
+    public record QuizCard(Long id, String titulo, String nivel, int perguntas, int respondidas, int acertos,
+                           boolean concluido, LocalDateTime criadoEm, Long aulaId, String aula) {
+        public String status() {
+            return concluido ? "feito" : respondidas > 0 ? "andamento" : "novo";
+        }
+    }
+
+    public record LessonCard(Lesson aula, List<QuizCard> quizzes, int feitos, int acertos, int respondidas) {
+        public boolean concluida() {
+            return !quizzes.isEmpty() && feitos == quizzes.size();
+        }
+    }
+
+    public record SubjectGroup(String disciplina, List<LessonCard> aulas, List<QuizCard> avulsos, int pendentes,
+                               int acertos, int respondidas, LocalDateTime ultimaAtividade) {
+        public double percentual() {
+            return respondidas == 0 ? 0 : Math.round(acertos * 1000.0 / respondidas) / 10.0;
+        }
+    }
+
+    public record Overview(List<QuizCard> pendentes, List<SubjectGroup> disciplinas) {
+    }
+
+    /** Quizzes a responder (mais recentes primeiro) e aulas/quizzes avulsos por disciplina (mais mexida primeiro). */
+    public Overview overview() {
+        Map<Long, Lesson> lessons = all().stream().collect(Collectors.toMap(Lesson::getId, Function.identity()));
+        List<QuizCard> cards = allQuizzes().stream().map(q -> {
+            QuizResult r = result(q.getId());
+            Lesson l = q.getLessonId() == null ? null : lessons.get(q.getLessonId());
+            return new QuizCard(q.getId(), q.getTitle(), q.getLevel(), r.perguntas(), r.respondidas(), r.acertos(),
+                    r.concluido(), q.getCreatedAt(), l == null ? null : l.getId(), l == null ? null : l.getTitle());
+        }).toList();
+        Map<Long, List<QuizCard>> byLesson = cards.stream().filter(c -> c.aulaId() != null)
+                .collect(Collectors.groupingBy(QuizCard::aulaId));
+        Map<Long, Quiz> quizzes = allQuizzes().stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
+
+        Map<String, String> names = new LinkedHashMap<>();
+        Map<String, List<LessonCard>> lessonsBy = new LinkedHashMap<>();
+        Map<String, List<QuizCard>> looseBy = new LinkedHashMap<>();
+        for (Lesson l : lessons.values()) {
+            List<QuizCard> qs = new ArrayList<>(byLesson.getOrDefault(l.getId(), List.of()));
+            qs.sort(Comparator.comparing(QuizCard::criadoEm));
+            LessonCard card = new LessonCard(l, qs, (int) qs.stream().filter(QuizCard::concluido).count(),
+                    qs.stream().mapToInt(QuizCard::acertos).sum(), qs.stream().mapToInt(QuizCard::respondidas).sum());
+            lessonsBy.computeIfAbsent(subjectKey(l.getSubject(), names), k -> new ArrayList<>()).add(card);
+        }
+        for (QuizCard c : cards) {
+            if (c.aulaId() == null) {
+                looseBy.computeIfAbsent(subjectKey(quizzes.get(c.id()).getSubject(), names), k -> new ArrayList<>()).add(c);
+            }
+        }
+        List<SubjectGroup> groups = new ArrayList<>();
+        for (Map.Entry<String, String> e : names.entrySet()) {
+            List<LessonCard> ls = lessonsBy.getOrDefault(e.getKey(), List.of());
+            List<QuizCard> loose = looseBy.getOrDefault(e.getKey(), List.of());
+            List<QuizCard> every = new ArrayList<>(loose);
+            ls.forEach(l -> every.addAll(l.quizzes()));
+            LocalDateTime last = every.stream().map(QuizCard::criadoEm).filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder()).orElse(ls.stream().map(l -> l.aula().getCreatedAt())
+                            .filter(Objects::nonNull).max(Comparator.naturalOrder()).orElse(null));
+            groups.add(new SubjectGroup(e.getValue(), ls, loose, (int) every.stream().filter(c -> !c.concluido()).count(),
+                    every.stream().mapToInt(QuizCard::acertos).sum(), every.stream().mapToInt(QuizCard::respondidas).sum(),
+                    last));
+        }
+        groups.sort(Comparator.comparing(SubjectGroup::ultimaAtividade,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return new Overview(cards.stream().filter(c -> !c.concluido()).toList(), groups);
+    }
+
+    /** Chave da disciplina sem acento/caixa; guarda o primeiro nome visto para exibir. */
+    private static String subjectKey(String subject, Map<String, String> names) {
+        String name = blank(subject) == null ? "Sem disciplina" : subject.strip();
+        String key = ScoringCalculator.normalize(name);
+        names.putIfAbsent(key, name);
+        return key;
     }
 
     // ---- desempenho (separado do das provas e simulados) ----

@@ -24,10 +24,7 @@ public class LessonController {
 
     @GetMapping("/aulas")
     public String list(Model model) {
-        model.addAttribute("lessons", lessonService.all());
-        model.addAttribute("done", lessonService.all().stream()
-                .collect(Collectors.toMap(Lesson::getId, l -> lessonService.lessonDone(l.getId()))));
-        model.addAttribute("loose", lessonService.allQuizzes().stream().filter(q -> q.getLessonId() == null).toList());
+        model.addAttribute("overview", lessonService.overview());
         model.addAttribute("stats", lessonService.stats());
         model.addAttribute("totals", lessonService.totals());
         return "aulas";

@@ -17,57 +17,174 @@
         <div class="col"><div th:replace="~{fragments/ui :: stat('Acertos', ${totals.acertos}, 'text-ok')}"></div></div>
         <div class="col"><div th:replace="~{fragments/ui :: stat('Erros', ${totals.erros}, 'text-bad')}"></div></div>
         <div class="col"><div th:replace="~{fragments/ui :: stat('Aproveitamento', ${totals.respondidas == 0} ? '–' : ${#numbers.formatDecimal(totals.percentual, 1, 1)} + '%', '')}"></div></div>
-        <div class="col"><div th:replace="~{fragments/ui :: stat('Quizzes', ${totals.quizzes}, '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('A responder', ${overview.pendentes.size()}, ${overview.pendentes.isEmpty()} ? 'text-ok' : 'text-guess')}"></div></div>
     </div>
 
     <div class="row g-4">
-        <div class="col-lg-7">
-            <th:block th:if="${lessons.isEmpty()}">
-                <div class="empty-state"><i class="bi bi-mortarboard"></i><span>Nenhuma aula ainda.</span></div>
+        <div class="col-lg-8">
+            <!-- O que falta fazer vem primeiro: quizzes nao concluidos, de aula ou avulsos. -->
+            <th:block th:unless="${overview.pendentes.isEmpty()}">
+                <div class="section-title mt-0">Para responder</div>
+                <div class="card page-list mb-4">
+                    <a class="page-list-row" th:each="q, it : ${overview.pendentes}" th:href="@{/quizzes/{id}(id=${q.id})}"
+                       th:hidden="${it.index >= 5}" th:classappend="${it.index >= 5} ? 'pending-extra'">
+                        <i class="bi" th:classappend="${q.status() == 'andamento'} ? 'bi-hourglass-split text-guess' : 'bi-play-circle text-muted'"></i>
+                        <span class="text-truncate">
+                            <span th:text="${q.titulo}"></span>
+                            <span class="text-muted small" th:text="${q.aula != null} ? ' · ' + ${q.aula} : ' · avulso'"></span>
+                        </span>
+                        <span class="ms-auto small text-nowrap" th:classappend="${q.status() == 'andamento'} ? 'text-guess' : 'text-muted'"
+                              th:text="${q.status() == 'andamento'} ? ${q.respondidas} + '/' + ${q.perguntas} : ${q.perguntas} + ' perguntas'"></span>
+                    </a>
+                    <button type="button" class="page-list-row btn-show-more" th:if="${overview.pendentes.size() > 5}"
+                            data-show="pending-extra" th:text="'Mostrar mais ' + ${overview.pendentes.size() - 5}"></button>
+                </div>
             </th:block>
-            <div class="card page-list" th:unless="${lessons.isEmpty()}">
-                <a class="page-list-row" th:each="l : ${lessons}" th:href="@{/aulas/{id}(id=${l.id})}">
-                    <i class="bi bi-mortarboard text-muted"></i>
-                    <span class="text-truncate">
-                        <span th:text="${l.title}"></span>
-                        <span class="text-muted small" th:if="${l.subject != null}" th:text="' · ' + ${l.subject}"></span>
-                    </span>
-                    <span class="ms-auto small text-nowrap" th:classappend="${done[l.id]} ? 'text-ok' : 'text-muted'"
-                          th:text="${done[l.id]} ? 'quizzes feitos' : ${#temporals.format(l.createdAt, 'dd/MM')}"></span>
-                </a>
+
+            <div class="lesson-toolbar">
+                <input type="search" class="form-control form-control-sm" id="lesson-search"
+                       placeholder="Buscar aula, quiz ou disciplina…" autocomplete="off">
+                <div class="chip-row mb-0">
+                    <button type="button" class="chip active" data-filter="todos">Tudo</button>
+                    <button type="button" class="chip" data-filter="pendente">Com pendência</button>
+                    <button type="button" class="chip" data-filter="feito">Concluídos</button>
+                </div>
             </div>
 
-            <div class="section-title">Quizzes avulsos</div>
-            <div class="empty-state" th:if="${loose.isEmpty()}"><i class="bi bi-ui-checks"></i>
-                <span>No Claude Code: <em>"cria um quiz de AFO sobre créditos adicionais, nível prova"</em>.</span></div>
-            <div class="card page-list" th:unless="${loose.isEmpty()}">
-                <a class="page-list-row" th:each="q : ${loose}" th:href="@{/quizzes/{id}(id=${q.id})}">
-                    <i class="bi bi-ui-checks text-muted"></i>
-                    <span class="text-truncate"><span th:text="${q.title}"></span>
-                        <span class="text-muted small" th:if="${q.level != null}" th:text="' · ' + ${q.level}"></span></span>
-                    <span class="ms-auto small text-nowrap" th:classappend="${q.finishedAt != null} ? 'text-ok' : 'text-guess'"
-                          th:text="${q.finishedAt != null} ? 'feito' : 'responder'"></span>
-                </a>
-            </div>
+            <div class="empty-state" th:if="${overview.disciplinas.isEmpty()}"><i class="bi bi-mortarboard"></i>
+                <span>Nenhuma aula ainda. No Claude Code: <em>"cria um quiz de AFO sobre créditos adicionais, nível prova"</em>.</span></div>
+
+            <!-- Uma secao recolhivel por disciplina (a mais mexida primeiro); aulas com seus quizzes e os avulsos. -->
+            <details class="card subject-group" th:each="g, it : ${overview.disciplinas}" th:open="${it.index < 2}"
+                     th:attr="data-key=${g.disciplina}">
+                <summary class="subject-group-head">
+                    <i class="bi bi-chevron-right subject-group-caret"></i>
+                    <span class="fw-medium text-truncate" th:text="${g.disciplina}"></span>
+                    <span class="text-muted small text-nowrap"
+                          th:text="${g.aulas.size()} + (${g.aulas.size() == 1} ? ' aula' : ' aulas') + (${g.avulsos.isEmpty()} ? '' : ' · ' + ${g.avulsos.size()} + ' avulsos')"></span>
+                    <span class="badge rounded-pill text-bg-warning" th:if="${g.pendentes > 0}" th:text="${g.pendentes}"
+                          title="Quizzes a responder"></span>
+                    <span class="ms-auto small text-nowrap" th:if="${g.respondidas > 0}"
+                          th:classappend="${g.percentual() >= 70} ? 'text-ok' : (${g.percentual() >= 50} ? 'text-guess' : 'text-bad')"
+                          th:text="${#numbers.formatDecimal(g.percentual(), 1, 0)} + '%'" th:title="${g.acertos} + '/' + ${g.respondidas} + ' acertos'"></span>
+                </summary>
+
+                <div class="lesson-item" th:each="l : ${g.aulas}"
+                     th:attr="data-status=${l.concluida()} ? 'feito' : 'pendente',data-text=${l.aula.title} + ' ' + ${l.aula.editalTopic != null ? l.aula.editalTopic : ''}">
+                    <a class="lesson-item-main" th:href="@{/aulas/{id}(id=${l.aula.id})}">
+                        <i class="bi" th:classappend="${l.concluida()} ? 'bi-check-circle-fill text-ok' : 'bi-mortarboard text-muted'"></i>
+                        <span class="text-truncate">
+                            <span th:text="${l.aula.title}"></span>
+                            <span class="text-muted small" th:if="${l.aula.editalTopic != null}" th:text="' · ' + ${l.aula.editalTopic}"></span>
+                        </span>
+                        <span class="ms-auto small text-muted text-nowrap" th:text="${#temporals.format(l.aula.createdAt, 'dd/MM')}"></span>
+                    </a>
+                    <div class="quiz-pills" th:unless="${l.quizzes.isEmpty()}">
+                        <a th:each="q : ${l.quizzes}" th:href="@{/quizzes/{id}(id=${q.id})}" class="quiz-pill"
+                           th:classappend="'is-' + ${q.status()}"
+                           th:title="${q.titulo} + (${q.nivel != null} ? ' · ' + ${q.nivel} : '')"
+                           th:text="${q.titulo} + (${q.respondidas > 0} ? ' · ' + ${q.acertos} + '/' + ${q.perguntas} : '')"></a>
+                    </div>
+                </div>
+
+                <th:block th:unless="${g.avulsos.isEmpty()}">
+                    <div class="subject-group-sub">Quizzes avulsos</div>
+                    <a class="lesson-item lesson-item-main" th:each="q : ${g.avulsos}" th:href="@{/quizzes/{id}(id=${q.id})}"
+                       th:attr="data-status=${q.concluido} ? 'feito' : 'pendente',data-text=${q.titulo}">
+                        <i class="bi bi-ui-checks text-muted"></i>
+                        <span class="text-truncate"><span th:text="${q.titulo}"></span>
+                            <span class="text-muted small" th:if="${q.nivel != null}" th:text="' · ' + ${q.nivel}"></span></span>
+                        <span class="ms-auto small text-nowrap"
+                              th:classappend="${q.concluido} ? 'text-ok' : (${q.status() == 'andamento'} ? 'text-guess' : 'text-muted')"
+                              th:text="${q.concluido} ? ${q.acertos} + '/' + ${q.perguntas} : (${q.status() == 'andamento'} ? ${q.respondidas} + '/' + ${q.perguntas} + ' feitas' : 'responder')"></span>
+                    </a>
+                </th:block>
+            </details>
+            <div class="empty-state" id="lesson-no-match" hidden><i class="bi bi-search"></i><span>Nada encontrado.</span></div>
         </div>
-        <div class="col-lg-5">
-            <!-- Desempenho dos quizzes, separado do das provas e simulados. -->
-            <div class="section-title mt-0">Quiz por tópico <span class="fw-normal">(piores primeiro)</span></div>
+
+        <div class="col-lg-4">
+            <!-- Desempenho dos quizzes, separado do das provas e simulados: so os piores a vista. -->
+            <div class="section-title mt-0">Pontos fracos <span class="fw-normal">(quiz por tópico)</span></div>
             <div class="empty-state" th:if="${stats.isEmpty()}"><i class="bi bi-bar-chart"></i><span>Responda um quiz para ver aqui.</span></div>
             <div class="card p-3" th:unless="${stats.isEmpty()}">
-                <div th:each="s : ${stats}" class="subject-row">
+                <div th:each="s, it : ${stats}" class="subject-row" th:hidden="${it.index >= 6}"
+                     th:classappend="${it.index >= 6} ? 'stat-extra'">
                     <div class="d-flex justify-content-between small mb-1 gap-2">
-                        <span class="text-truncate" th:title="${s.disciplina}" th:text="${s.topico}"></span>
+                        <span class="text-truncate" th:title="${s.disciplina} + ' · ' + ${s.topico}" th:text="${s.topico}"></span>
                         <span class="text-nowrap" th:text="${s.acertos} + '/' + ${s.respondidas}"></span>
                     </div>
+                    <div class="text-muted" style="font-size: .72rem" th:text="${s.disciplina}"></div>
                     <div class="progress" style="height: 6px"><div class="progress-bar"
                          th:classappend="${s.percentual >= 70} ? 'bg-success' : (${s.percentual >= 50} ? 'bg-warning' : 'bg-danger')"
                          th:style="'width: ' + ${s.percentual} + '%'"></div></div>
                 </div>
+                <button type="button" class="btn btn-link btn-sm px-0 mt-2" th:if="${stats.size() > 6}" data-show="stat-extra"
+                        th:text="'Ver todos os ' + ${stats.size()} + ' tópicos'"></button>
             </div>
         </div>
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<script>
+    (function () {
+        // "Mostrar mais": revela as linhas escondidas da lista e some.
+        document.querySelectorAll('[data-show]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.' + btn.dataset.show).forEach(function (el) { el.hidden = false; });
+                btn.remove();
+            });
+        });
+
+        var search = document.getElementById('lesson-search');
+        var filter = 'todos';
+        function filtering() { return search.value.trim() !== '' || filter !== 'todos'; }
+
+        // Disciplinas abertas/fechadas ficam salvas.
+        var KEY = 'aulas-open';
+        var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+        var groups = document.querySelectorAll('.subject-group');
+        groups.forEach(function (g) {
+            if (saved) { g.open = saved.indexOf(g.dataset.key) >= 0; }
+            g.addEventListener('toggle', function () {
+                if (filtering()) { return; }   // aberta pela busca nao conta
+                localStorage.setItem(KEY, JSON.stringify(Array.prototype.filter.call(groups, function (x) { return x.open; })
+                    .map(function (x) { return x.dataset.key; })));
+            });
+        });
+
+        // Busca + filtro de status: esconde itens, abre as disciplinas com resultado e some com as vazias.
+        function norm(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+        function apply() {
+            var q = norm(search.value.trim());
+            var active = filtering();
+            var any = false;
+            groups.forEach(function (g) {
+                var subjectHit = q && norm(g.dataset.key).indexOf(q) >= 0;
+                var shown = 0;
+                g.querySelectorAll('.lesson-item').forEach(function (it) {
+                    var ok = (filter === 'todos' || it.dataset.status === filter)
+                        && (!q || subjectHit || norm(it.dataset.text).indexOf(q) >= 0);
+                    it.hidden = !ok;
+                    if (ok) { shown++; }
+                });
+                var sub = g.querySelector('.subject-group-sub');
+                if (sub) { sub.hidden = !Array.prototype.some.call(sub.parentNode.querySelectorAll('a.lesson-item'), function (a) { return !a.hidden; }); }
+                g.hidden = shown === 0;
+                if (active && shown > 0) { g.open = true; }
+                any = any || shown > 0;
+            });
+            document.getElementById('lesson-no-match').hidden = any || groups.length === 0;
+        }
+        search.addEventListener('input', apply);
+        document.querySelectorAll('[data-filter]').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                document.querySelectorAll('[data-filter]').forEach(function (c) { c.classList.toggle('active', c === chip); });
+                filter = chip.dataset.filter;
+                apply();
+            });
+        });
+    })();
+</script>
 </body>
 </html>
