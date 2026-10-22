@@ -9,7 +9,11 @@
         <h1 class="m-0">Caixa de erros</h1>
         <span class="small text-muted text-nowrap" id="quizScore"></span>
     </div>
-    <p class="page-subtitle">O que você errou nos quizzes e ainda não acertou de novo. Acertou aqui, sai da caixa.</p>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <p class="page-subtitle m-0">O que você errou nos quizzes e ainda não acertou de novo. Acertou aqui, sai da caixa.</p>
+        <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" id="copy-reinforce" th:unless="${errors.isEmpty()}"
+                title="Copia um pedido pronto para colar no Claude Code: um quiz novo que retoma estes erros">
+            <i class="bi bi-clipboard me-1"></i>Pedir quiz de reforço</button>
     </div>
 
     <div class="chip-row" th:if="${errorsBySubject.size() > 1}">
@@ -23,7 +27,7 @@
 
     <!-- Mesmo jeito do quiz: clicar responde na hora, com o porque; a tentativa vale para a pergunta original. -->
     <div class="card p-4 mb-3 quiz-question" th:each="e, it : ${errors}"
-         th:attr="data-id=${e.pergunta.id},data-quiz=${e.pergunta.quizId},data-selected='',data-correct=''">
+         th:attr="data-id=${e.pergunta.id},data-quiz=${e.pergunta.quizId},data-selected='',data-correct='',data-subject=${e.disciplina},data-topic=${e.pergunta.topic}">
         <div class="d-flex align-items-center gap-2 mb-1 small text-muted">
             <span th:text="${it.count} + ' de ' + ${errors.size()} + ' · ' + ${e.disciplina} + (${e.pergunta.topic != null} ? ' · ' + ${e.pergunta.topic} : '')"></span>
             <a class="ms-auto text-muted text-nowrap" th:href="@{/quizzes/{id}(id=${e.pergunta.quizId})}" th:text="${e.quiz}"></a>
@@ -97,6 +101,33 @@
         });
     });
     score();
+
+    // Pedido de quiz de reforco para colar no Claude Code: perguntas novas sobre os erros que ainda estao na caixa.
+    const reinforce = document.getElementById('copy-reinforce');
+    if (reinforce) {
+        reinforce.addEventListener('click', function () {
+            const open = cards.filter(c => !c.dataset.selected || c.dataset.selected !== c.dataset.correct);
+            const bySubject = {};
+            open.forEach(function (c) {
+                const statement = c.querySelector('.quiz-statement').textContent.trim().replace(/\s+/g, ' ');
+                (bySubject[c.dataset.subject] = bySubject[c.dataset.subject] || []).push('#' + c.dataset.id
+                    + (c.dataset.topic ? ' (' + c.dataset.topic + ')' : '') + ': '
+                    + (statement.length > 110 ? statement.slice(0, 110) + '…' : statement));
+            });
+            const subjects = Object.keys(bySubject);
+            const text = (subjects.length === 1
+                ? 'Cria um quiz de reforço de ' + subjects[0] + ', nível prova, sobre os pontos que eu ainda erro.'
+                : 'Cria um quiz de reforço por disciplina, nível prova, sobre os pontos que eu ainda erro.')
+                + ' Leia erros_quiz_anteriores, faça perguntas NOVAS (não repita as mesmas) que trabalhem o porquê de'
+                + ' cada erro, e informe estes ids em errosRetomados.\n\n'
+                + subjects.map(s => s + ':\n' + bySubject[s].join('\n')).join('\n\n');
+            const label = reinforce.innerHTML;
+            navigator.clipboard.writeText(text).then(function () {
+                reinforce.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiado! Cole no Claude Code';
+                setTimeout(function () { reinforce.innerHTML = label; }, 2500);
+            });
+        });
+    }
 </script>
 </body>
 </html>
