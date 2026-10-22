@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Aulas e quizzes. Uma aula pode ter varios quizzes; um quiz pode ser avulso (so disciplina/topico). Criar e pelo
@@ -62,7 +63,7 @@ public class LessonService {
         }
         Lesson lesson = new Lesson();
         lesson.setTitle(title.strip());
-        lesson.setSubject(blank(subject));
+        lesson.setSubject(canonicalSubject(subject));
         lesson.setEditalTopic(blank(editalTopic));
         lesson.setContent(content.strip());
         lesson.setTaskId(checkTask(taskId));
@@ -293,7 +294,7 @@ public class LessonService {
     public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
                            List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId) {
         Lesson lesson = lessonId == null ? null : find(lessonId);
-        String subj = lesson != null && blank(subject) == null ? lesson.getSubject() : blank(subject);
+        String subj = lesson != null && blank(subject) == null ? lesson.getSubject() : canonicalSubject(subject);
         String top = lesson != null && blank(topic) == null ? lesson.getEditalTopic() : blank(topic);
         if (lesson == null && subj == null && top == null) {
             throw new IllegalArgumentException("Quiz avulso precisa de disciplina ou tópico.");
@@ -614,6 +615,18 @@ public class LessonService {
         long total = ((Number) r[1]).longValue();
         return new Totals(right, total - right, total, total == 0 ? 0 : Math.round(right * 1000.0 / total) / 10.0,
                 quizRepository.count());
+    }
+
+    /** Reaproveita o nome de disciplina ja usado (sem acento/caixa), para nao dividir a mesma materia em dois grupos. */
+    private String canonicalSubject(String subject) {
+        String name = blank(subject);
+        if (name == null) {
+            return null;
+        }
+        String key = ScoringCalculator.normalize(name);
+        return Stream.concat(all().stream().map(Lesson::getSubject), allQuizzes().stream().map(Quiz::getSubject))
+                .filter(Objects::nonNull).filter(x -> ScoringCalculator.normalize(x).equals(key))
+                .findFirst().orElse(name);
     }
 
     private static String blank(String s) {

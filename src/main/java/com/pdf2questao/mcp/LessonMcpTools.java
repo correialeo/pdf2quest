@@ -80,7 +80,7 @@ public class LessonMcpTools {
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public LessonCreated createLesson(
             @McpToolParam(description = "Título da aula.") String titulo,
-            @McpToolParam(description = "Disciplina (como no perfil do edital).") String disciplina,
+            @McpToolParam(description = "Disciplina (como no perfil do edital; use o mesmo nome das aulas já existentes, veja listar_aulas).") String disciplina,
             @McpToolParam(description = "Tópico do conteúdo programático do edital.") String topicoEdital,
             @McpToolParam(description = "Conteúdo da aula em Markdown.") String conteudo,
             @McpToolParam(description = "Id da tarefa do cronograma que a aula cobre.", required = false) Long tarefaId) {
