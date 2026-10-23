@@ -1692,3 +1692,33 @@ a.lesson-item-main:hover { background: var(--bs-tertiary-bg); }
 .streak-day.lvl-1 { background: color-mix(in srgb, var(--ok) 35%, var(--bs-tertiary-bg)); }
 .streak-day.lvl-2 { background: color-mix(in srgb, var(--ok) 65%, var(--bs-tertiary-bg)); }
 .streak-day.lvl-3 { background: var(--ok); }
+
+/* ---- Paginas e resumos no celular: nada passa da largura da tela ---- */
+.study-main { min-width: 0; }
+
+@media (max-width: 767.98px) {
+    .study-page-layout { gap: 1rem; }
+    .study-page-layout.page { padding-top: 1rem; }
+
+    /* Tabela larga rola de lado dentro dela, sem empurrar a pagina. */
+    .rich-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: max-content; max-width: 100%; }
+    .rich-content th, .rich-content td { min-width: 7rem; font-size: .875rem; }
+
+    .page-title-input { font-size: 1.45rem; }
+    .rich-content { font-size: 1.0625rem; line-height: 1.7; min-height: 30vh; }
+    .rich-content h1 { font-size: 1.35rem; }
+    .rich-content h2 { font-size: 1.2rem; }
+    .rich-content h3 { font-size: 1.05rem; }
+    .rich-content ul, .rich-content ol { padding-left: 1.25rem; }
+
+    /* Barra de formatacao numa linha so, rolando de lado (antes ocupava duas linhas fixas no topo). */
+    .editor-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .editor-toolbar::-webkit-scrollbar { display: none; }
+    .editor-toolbar button { flex: 0 0 auto; min-width: 2.25rem; height: 2.25rem; }
+
+    .study-breadcrumbs { white-space: nowrap; }
+    .page .form-select.w-auto { max-width: 100%; min-width: 0; }
+    .day-panel-head { padding: .5rem; }
+    .day-panel .task-row { padding: .55rem .75rem; }
+    .day-panel .task-row .task-info > a { overflow-wrap: anywhere; }
+}
