@@ -45,11 +45,21 @@ public class StudyTaskController {
 
     @GetMapping("/estudos/cronograma")
     public String list(@RequestParam(defaultValue = "") String ver,
-                       @RequestParam(name = "cronograma", required = false) Long cronogramaId, Model model) {
+                       @RequestParam(name = "cronograma", required = false) Long cronogramaId,
+                       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate semana,
+                       Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
         boolean showAll = ver.equals("todas");
         spacedRepetition.syncReviewTask(today);
+        boolean weekView = ver.equals("semana");
+        model.addAttribute("weekView", weekView);
+        if (weekView) {
+            LocalDate base = semana == null ? today : semana;
+            model.addAttribute("weekDays", taskService.weekView(base, today, cronogramaId));
+            model.addAttribute("prevWeek", base.minusWeeks(1));
+            model.addAttribute("nextWeek", base.plusWeeks(1));
+        }
         var schedule = taskService.schedule(today, showAll, cronogramaId);
         model.addAttribute("cronogramaId", cronogramaId);
         var names = new java.util.HashMap<Long, String>();
@@ -150,6 +160,23 @@ public class StudyTaskController {
                            RedirectAttributes redirectAttributes) {
         try {
             taskService.reschedule(id, para);
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
+    }
+
+    /** Lote: muda o dia e/ou o cronograma das tarefas marcadas ({@code cronograma} = "manter", "" = avulsas, ou o id). */
+    @PostMapping("/estudos/cronograma/lote")
+    public String bulk(@RequestParam(name = "ids", required = false) java.util.List<Long> ids,
+                       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate para,
+                       @RequestParam(defaultValue = "manter") String cronograma,
+                       @RequestHeader(value = "Referer", required = false) String referer,
+                       RedirectAttributes redirectAttributes) {
+        try {
+            boolean change = !cronograma.equals("manter");
+            int n = taskService.bulk(ids, para, change, change && !cronograma.isBlank() ? Long.valueOf(cronograma) : null);
+            redirectAttributes.addFlashAttribute("message", n == 1 ? "1 tarefa atualizada." : n + " tarefas atualizadas.");
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }

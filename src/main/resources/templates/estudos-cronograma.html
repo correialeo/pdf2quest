@@ -13,13 +13,21 @@
     <nav th:replace="~{fragments/estudos :: tabs('schedule')}"></nav>
     <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Visão">
+            <a class="btn" th:classappend="${!weekView} ? 'btn-secondary' : 'btn-outline-secondary'"
+               th:href="@{/estudos/cronograma(cronograma=${cronogramaId})}"><i class="bi bi-list-ul me-1"></i>Lista</a>
+            <a class="btn" th:classappend="${weekView} ? 'btn-secondary' : 'btn-outline-secondary'"
+               th:href="@{/estudos/cronograma(ver='semana', cronograma=${cronogramaId})}"><i class="bi bi-calendar-week me-1"></i>Semana</a>
+        </div>
+    </div>
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3" th:unless="${cronogramasMenu.isEmpty()}">
         <span class="small text-muted">Cronograma:</span>
         <a class="btn btn-sm" th:classappend="${cronogramaId == null} ? 'btn-primary' : 'btn-outline-secondary'"
-           href="/estudos/cronograma" th:text="${concursoAtivo != null} ? 'Todos de ' + ${concursoAtivo.nome} : 'Todos'"></a>
+           th:href="@{/estudos/cronograma(ver=${weekView ? 'semana' : null})}" th:text="${concursoAtivo != null} ? 'Todos de ' + ${concursoAtivo.nome} : 'Todos'"></a>
         <a th:each="c : ${cronogramasMenu}" class="btn btn-sm"
            th:classappend="${cronogramaId == c.id} ? 'btn-primary' : 'btn-outline-secondary'"
-           th:href="@{/estudos/cronograma(cronograma=${c.id})}">
+           th:href="@{/estudos/cronograma(cronograma=${c.id}, ver=${weekView ? 'semana' : null})}">
             <span th:text="${c.nome}"></span><span class="ms-1 opacity-75" th:if="${!c.ativo}">(inativo)</span>
         </a>
         <a class="small ms-1" href="/estudos/cronogramas"><i class="bi bi-gear"></i> Gerenciar</a>
@@ -71,12 +79,40 @@
     </form>
     <datalist th:replace="~{fragments/estudos :: subjects}"></datalist>
 
-    <div class="row row-cols-3 g-3 mb-4" th:unless="${groups.isEmpty()}">
+    <div class="row row-cols-1 row-cols-sm-3 g-3 mb-4" th:unless="${groups.isEmpty()}">
         <div class="col"><div th:replace="~{fragments/ui :: stat('Tarefas da semana', ${week.done} + ' de ' + ${week.planned}, '')}"></div></div>
         <div class="col"><div th:replace="~{fragments/ui :: stat('Planejado na semana', ${week.estimatedMinutes} + ' min', '')}"></div></div>
         <div class="col"><div th:replace="~{fragments/ui :: stat('Estudado na semana', ${week.spentMinutes} + ' min', 'text-ok')}"></div></div>
     </div>
 
+    <!-- Visao semanal: arraste uma tarefa para outro dia. -->
+    <section th:if="${weekView}" class="mb-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <a class="btn btn-sm btn-outline-secondary" th:href="@{/estudos/cronograma(ver='semana', semana=${prevWeek}, cronograma=${cronogramaId})}" aria-label="Semana anterior"><i class="bi bi-chevron-left"></i></a>
+            <a class="btn btn-sm btn-outline-secondary" th:href="@{/estudos/cronograma(ver='semana', cronograma=${cronogramaId})}">Esta semana</a>
+            <a class="btn btn-sm btn-outline-secondary" th:href="@{/estudos/cronograma(ver='semana', semana=${nextWeek}, cronograma=${cronogramaId})}" aria-label="Próxima semana"><i class="bi bi-chevron-right"></i></a>
+            <span class="small text-muted ms-2">Arraste uma tarefa para outro dia.</span>
+        </div>
+        <div class="week-grid">
+            <div class="week-day" th:each="d : ${weekDays}" th:classappend="${d.today} ? 'is-today'" th:attr="data-date=${d.date}">
+                <div class="week-day-head">
+                    <span th:text="${d.label}"></span>
+                    <span class="text-muted" th:unless="${d.tasks.isEmpty()}"
+                          th:text="${d.tasks.?[done].size()} + '/' + ${d.tasks.size()}"></span>
+                </div>
+                <a class="week-task" th:each="t : ${d.tasks}" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}"
+                   th:classappend="${t.done} ? 'is-done' : (${t.overdue} ? 'is-overdue' : '')"
+                   th:attr="draggable=${!t.review and !t.done},data-id=${t.id}">
+                    <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill text-ok' : 'bi-circle'"></i>
+                    <span th:text="${t.title}"></span>
+                    <small class="d-block text-muted" th:if="${t.subject != null or t.estimatedMinutes != null}"
+                           th:text="${t.subject} + (${t.estimatedMinutes != null} ? ' · ' + ${t.estimatedMinutes} + ' min' : '')"></small>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <th:block th:unless="${weekView}">
     <div th:if="${groups.isEmpty()}" class="empty-state">
         <i class="bi bi-calendar-check"></i>
         <span>Nenhuma tarefa ainda. Escreva o que vai estudar acima, escolha o dia e clique em <strong>Adicionar</strong>.</span>
@@ -102,6 +138,8 @@
         </summary>
         <div class="card task-list mt-2">
             <div class="task-row" th:each="t : ${g.tasks}" th:classappend="${t.done} ? 'is-done'">
+                <input type="checkbox" class="form-check-input task-select mt-2" form="bulkForm" name="ids"
+                       th:value="${t.id}" th:unless="${t.review}" th:attr="aria-label='Selecionar ' + ${t.title}"/>
                 <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
                 <div class="task-info">
                     <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
@@ -140,7 +178,7 @@
                         </li>
                         <li><hr class="dropdown-divider"/></li>
                         <li>
-                            <form method="post" th:action="@{/estudos/cronograma/{id}/excluir(id=${t.id})}" onsubmit="return confirm('Apagar esta tarefa?')">
+                            <form method="post" th:action="@{/estudos/cronograma/{id}/excluir(id=${t.id})}" data-confirm="Apagar esta tarefa?">
                                 <button type="submit" class="dropdown-item text-bad"><i class="bi bi-trash me-2"></i>Apagar</button>
                             </form>
                         </li>
@@ -149,6 +187,22 @@
             </div>
         </div>
     </details>
+    </th:block>
+
+    <!-- Acoes em lote: aparece ao marcar tarefas. -->
+    <form id="bulkForm" method="post" action="/estudos/cronograma/lote" class="bulk-bar card p-2 shadow" hidden>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="small fw-medium" id="bulkCount"></span>
+            <input type="date" name="para" class="form-control form-control-sm w-auto" aria-label="Novo dia"/>
+            <select name="cronograma" class="form-select form-select-sm w-auto" aria-label="Cronograma">
+                <option value="manter">Manter cronograma</option>
+                <option value="">Sem cronograma (avulsas)</option>
+                <option th:each="c : ${cronogramasMenu}" th:value="${c.id}" th:text="'Mover para ' + ${c.nome}"></option>
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">Aplicar</button>
+            <button type="button" class="btn btn-link btn-sm" id="bulkClear">Limpar</button>
+        </div>
+    </form>
     </th:block>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

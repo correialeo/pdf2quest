@@ -234,6 +234,54 @@ public class StudyTaskService {
         }
     }
 
+    /** Um dia da visao semanal do cronograma. */
+    public record WeekDay(LocalDate date, String label, boolean today, List<StudyTask> tasks) {
+    }
+
+    /** Semana (segunda a domingo) que contem {@code anyDay}, com as tarefas de cada dia. */
+    public List<WeekDay> weekView(LocalDate anyDay, LocalDate today, Long cronogramaId) {
+        LocalDate start = anyDay.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        Map<LocalDate, List<StudyTask>> byDate = new java.util.HashMap<>();
+        visible(cronogramaId).stream().filter(t -> t.getPlannedDate() != null
+                        && !t.getPlannedDate().isBefore(start) && t.getPlannedDate().isBefore(start.plusDays(7)))
+                .sorted(Comparator.comparing(StudyTask::isDone).thenComparing(StudyTask::getId))
+                .forEach(t -> byDate.computeIfAbsent(t.getPlannedDate(), d -> new ArrayList<>()).add(t));
+        List<WeekDay> days = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = start.plusDays(i);
+            days.add(new WeekDay(d, DAY.format(d).replace(".,", ","), d.equals(today), byDate.getOrDefault(d, List.of())));
+        }
+        return days;
+    }
+
+    /**
+     * Acao em lote: muda o dia ({@code date} nao nulo) e/ou o cronograma ({@code changeCronograma}; nulo = avulsas)
+     * das tarefas escolhidas. A tarefa de revisao fica de fora. @return quantas mudaram
+     */
+    @Transactional
+    public int bulk(java.util.Collection<Long> ids, LocalDate date, boolean changeCronograma, Long cronogramaId) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("Escolha ao menos uma tarefa.");
+        }
+        if (date == null && !changeCronograma) {
+            throw new IllegalArgumentException("Escolha o novo dia ou o cronograma.");
+        }
+        if (changeCronograma && cronogramaId != null && concursoService.cronograma(cronogramaId).isEmpty()) {
+            throw new IllegalArgumentException("O cronograma escolhido não existe mais.");
+        }
+        List<StudyTask> tasks = taskRepository.findAllById(ids).stream().filter(t -> !t.isReview()).toList();
+        tasks.forEach(t -> {
+            if (date != null) {
+                t.setPlannedDate(date);
+            }
+            if (changeCronograma) {
+                t.setCronogramaId(cronogramaId);
+            }
+        });
+        taskRepository.saveAll(tasks);
+        return tasks.size();
+    }
+
     /** Move tarefas para outro cronograma (nulo = avulsas). @return quantas mudaram */
     @Transactional
     public int move(java.util.Collection<Long> ids, Long cronogramaId) {
