@@ -21,6 +21,9 @@ public class ImportJob {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     private String fileName;
     private int importedQuestions;
     private int failedQuestions;

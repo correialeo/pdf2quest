@@ -23,6 +23,9 @@ public class StudyPage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     /** Pagina-mae; nulo = pagina raiz. */
     private Long parentId;
 

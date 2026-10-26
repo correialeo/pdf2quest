@@ -24,6 +24,9 @@ public class GeneratedExam {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     private Long importJobId;
     private Long scoringProfileId;
     /** Prova do perfil que o simulado imita (ex.: "P1"); null = todas as provas do perfil. */

@@ -22,6 +22,9 @@ public class StudyBlock {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     private String name;
 
     @Lob

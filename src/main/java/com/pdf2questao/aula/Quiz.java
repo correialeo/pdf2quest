@@ -22,6 +22,9 @@ public class Quiz {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     /** Aula de origem; null = quiz avulso. */
     private Long lessonId;
     /** Tarefa do cronograma que o quiz cobre (opcional; sem ela vale a tarefa da aula). */

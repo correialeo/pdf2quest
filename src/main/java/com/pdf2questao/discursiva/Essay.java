@@ -22,6 +22,9 @@ public class Essay {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     private String title;
     @Lob
     private String prompt;

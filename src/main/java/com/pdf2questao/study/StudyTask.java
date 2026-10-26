@@ -44,6 +44,9 @@ public class StudyTask {
     /** Pagina de resumo ligada a tarefa (opcional). Apagar a pagina so desfaz o vinculo. */
     private Long pageId;
 
+    /** Cronograma da tarefa; nulo = tarefa avulsa. O concurso vem do cronograma. */
+    private Long cronogramaId;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     /** Revisao espacada: indice em {@link SpacedRepetitionService#intervals()} da proxima revisao bem-sucedida. */

@@ -23,6 +23,9 @@ public class StudySession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Concurso (workspace) a que pertence; nulo = sem concurso. */
+    private Long concursoId;
+
     @Enumerated(EnumType.STRING)
     private SessionMode mode;
 
