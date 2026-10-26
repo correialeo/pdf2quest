@@ -76,6 +76,46 @@ public class ConcursoHomeService {
         public int editalEstudados() {
             return edital.stream().mapToInt(Coverage::estudados).sum();
         }
+
+        /** Topicos do edital ainda sem aula/quiz por dia ate a prova (nulo sem data ou sem edital). */
+        public Double topicosPorDia() {
+            int faltam = editalTopicos() - editalEstudados();
+            return diasParaProva == null || diasParaProva <= 0 || editalTopicos() == 0 ? null
+                    : Math.round(faltam * 10.0 / diasParaProva) / 10.0;
+        }
+
+        /** Grafico da evolucao: so com 2 ou mais simulados com nota. */
+        public Chart grafico() {
+            return Chart.of(simulados);
+        }
+    }
+
+    /** Linha das notas (SVG 600x160) com a linha do minimo; coordenadas ja calculadas para o template. */
+    public record Chart(String linha, List<double[]> pontos, Double minimoY, double maximo, Double minimo) {
+        static final double W = 600;
+        static final double H = 160;
+        static final double PAD = 12;
+
+        static Chart of(List<SimuladoPoint> sims) {
+            List<SimuladoPoint> scored = sims.stream().filter(s -> s.nota() != null).toList();
+            if (scored.size() < 2) {
+                return null;
+            }
+            double max = scored.stream().mapToDouble(SimuladoPoint::maximo).max().orElse(1);
+            Double min = scored.get(scored.size() - 1).minimo();
+            List<double[]> pts = new ArrayList<>();
+            for (int i = 0; i < scored.size(); i++) {
+                double x = PAD + i * (W - 2 * PAD) / (scored.size() - 1);
+                pts.add(new double[]{Math.round(x), Math.round(y(scored.get(i).nota(), max)), scored.get(i).nota()});
+            }
+            String line = pts.stream().map(p -> (long) p[0] + "," + (long) p[1])
+                    .collect(java.util.stream.Collectors.joining(" "));
+            return new Chart(line, pts, min == null ? null : (double) Math.round(y(min, max)), max, min);
+        }
+
+        private static double y(double value, double max) {
+            return H - PAD - (Math.max(0, Math.min(value, max)) / max) * (H - 2 * PAD);
+        }
     }
 
     public Home home(Long concursoId) {

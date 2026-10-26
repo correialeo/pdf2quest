@@ -46,6 +46,20 @@
             <p class="text-muted small" th:if="${home.hoje.isEmpty()}">Nada pendente para hoje.</p>
 
             <h2 class="section-title mt-4">Simulados</h2>
+            <div class="card p-3 mb-2" th:if="${home.grafico() != null}" th:with="g=${home.grafico()}">
+                <svg viewBox="0 0 600 160" class="w-100" role="img" aria-label="Evolução da nota projetada nos simulados">
+                    <line th:if="${g.minimoY != null}" x1="12" x2="588" th:attr="y1=${g.minimoY},y2=${g.minimoY}"
+                          stroke="var(--bs-danger)" stroke-dasharray="4 4" stroke-width="1"/>
+                    <polyline th:attr="points=${g.linha}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+                    <circle th:each="p : ${g.pontos}" th:attr="cx=${p[0]},cy=${p[1]}" r="4" fill="var(--accent)">
+                        <title th:text="${p[2]} + ' pts'"></title>
+                    </circle>
+                </svg>
+                <div class="small text-muted d-flex justify-content-between">
+                    <span>Nota projetada (máx. <span th:text="${#numbers.formatDecimal(g.maximo, 1, 0)}"></span>)</span>
+                    <span th:if="${g.minimo != null}" class="text-bad">--- mínimo <span th:text="${#numbers.formatDecimal(g.minimo, 1, 0)}"></span></span>
+                </div>
+            </div>
             <p class="text-muted small" th:if="${home.simulados.isEmpty()}">Nenhum simulado com perfil de pontuação ainda.</p>
             <div class="card page-list" th:unless="${home.simulados.isEmpty()}">
                 <a class="page-list-row" th:each="s : ${home.simulados}" th:href="@{/resultado/{id}(id=${s.sessaoId})}">
@@ -85,6 +99,12 @@
             <h2 class="section-title mt-4">Cobertura do edital</h2>
             <p class="text-muted small" th:if="${home.edital.isEmpty()}">
                 Ligue um perfil de pontuação com o conteúdo programático para ver quanto do edital já tem aula ou quiz.</p>
+            <p class="small mb-2" th:if="${home.topicosPorDia() != null}">
+                <strong th:text="${home.editalTopicos() - home.editalEstudados()}"></strong> tópicos sem aula em
+                <strong th:text="${home.diasParaProva}"></strong> dias: ritmo de
+                <strong th:text="${home.topicosPorDia()} + ' por dia'"></strong>.
+                <button th:replace="~{fragments/ui :: askClaude('planeje no cronograma do concurso ' + ${home.concurso.nome} + ' os tópicos do edital que ainda não têm aula, até a prova', 'Copiar pedido de planejamento')}"></button>
+            </p>
             <div class="card p-3" th:unless="${home.edital.isEmpty()}">
                 <details class="mb-2" th:each="e : ${home.edital}">
                     <summary class="d-flex justify-content-between small">
