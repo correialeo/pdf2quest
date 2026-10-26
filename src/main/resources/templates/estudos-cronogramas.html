@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Cronogramas')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page">
+    <div class="page-header">
+        <div>
+            <h1>Cronogramas</h1>
+            <p class="page-subtitle">Separe as tarefas em cronogramas (ex.: pré-edital, pós-edital, reta final). Cada um
+                pode ser de um concurso; tarefa nova entra no cronograma ativo mais recente do concurso.</p>
+        </div>
+    </div>
+    <nav th:replace="~{fragments/estudos :: tabs('schedules')}"></nav>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="post" action="/estudos/cronogramas" class="card p-3 mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small">Novo cronograma</label>
+                <input type="text" name="nome" class="form-control" required maxlength="255" placeholder="Ex.: Reta final"/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Concurso</label>
+                <select name="concursoId" class="form-select">
+                    <option value="">Nenhum (avulso)</option>
+                    <option th:each="c : ${concursosMenu}" th:value="${c.id}" th:text="${c.nome}"
+                            th:selected="${concursoAtivo != null and concursoAtivo.id == c.id}"></option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Início</label>
+                <input type="date" name="inicio" class="form-control"/>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Fim</label>
+                <input type="date" name="fim" class="form-control"/>
+            </div>
+            <input type="hidden" name="ativo" value="true"/>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100" aria-label="Criar"><i class="bi bi-plus-lg"></i></button>
+            </div>
+        </div>
+    </form>
+
+    <th:block th:if="${cronogramas.isEmpty()}">
+        <div th:replace="~{fragments/ui :: empty('bi-calendar-range', 'Nenhum cronograma ainda.', null, null)}"></div>
+    </th:block>
+    <div class="card p-3 mb-2" th:each="cr : ${cronogramas}">
+        <form method="post" th:action="@{/estudos/cronogramas/{id}/editar(id=${cr.id})}" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Nome</label>
+                <input type="text" name="nome" class="form-control form-control-sm" th:value="${cr.nome}" required/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Concurso</label>
+                <select name="concursoId" class="form-select form-select-sm">
+                    <option value="">Nenhum (avulso)</option>
+                    <option th:each="c : ${concursos.values()}" th:value="${c.id}" th:text="${c.nome}"
+                            th:selected="${c.id == cr.concursoId}"></option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Início</label>
+                <input type="date" name="inicio" class="form-control form-control-sm" th:value="${cr.inicio}"/>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small">Fim</label>
+                <input type="date" name="fim" class="form-control form-control-sm" th:value="${cr.fim}"/>
+            </div>
+            <div class="col-md-2 d-flex align-items-center gap-2">
+                <div class="form-check m-0">
+                    <input class="form-check-input" type="checkbox" name="ativo" value="true" th:id="'ativo' + ${cr.id}" th:checked="${cr.ativo}"/>
+                    <label class="form-check-label small" th:for="'ativo' + ${cr.id}">Ativo</label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-outline-primary">Salvar</button>
+            </div>
+        </form>
+        <div class="d-flex gap-3 align-items-center mt-2 small">
+            <a th:href="@{/estudos/cronograma(cronograma=${cr.id})}"
+               th:text="${counts[cr.id] == null} ? 'Sem tarefas' : ${counts[cr.id][1]} + ' de ' + ${counts[cr.id][0]} + ' tarefas concluídas'"></a>
+            <form method="post" th:action="@{/estudos/cronogramas/{id}/excluir(id=${cr.id})}" class="ms-auto"
+                  onsubmit="return confirm('Apagar o cronograma? As tarefas dele continuam, como avulsas.')">
+                <button type="submit" class="btn btn-sm btn-link text-danger p-0">Apagar</button>
+            </form>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

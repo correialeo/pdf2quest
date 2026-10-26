@@ -1722,3 +1722,42 @@ a.lesson-item-main:hover { background: var(--bs-tertiary-bg); }
     .day-panel .task-row { padding: .55rem .75rem; }
     .day-panel .task-row .task-info > a { overflow-wrap: anywhere; }
 }
+
+/* ---- workspace (concurso ativo) ---- */
+.workspace-switch {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: 0 .55rem .6rem;
+}
+
+.workspace-dot {
+    flex: 0 0 auto;
+    width: .7rem;
+    height: .7rem;
+    border-radius: 50%;
+    border: 1px solid var(--bs-border-color);
+}
+
+html.sidebar-collapsed .workspace-switch {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.concurso-card {
+    border-left: 4px solid var(--concurso-cor, var(--bs-border-color));
+}
+
+.coverage-bar {
+    height: .4rem;
+    border-radius: .2rem;
+    background: var(--bs-tertiary-bg);
+    overflow: hidden;
+}
+
+.coverage-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+}

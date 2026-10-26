@@ -14,6 +14,21 @@
                     title="Recolher/expandir menu (\)"><i class="bi bi-layout-sidebar"></i></button>
         </div>
 
+        <!-- Workspace: o concurso escolhido filtra cronograma, aulas, simulados e metricas em todas as telas. -->
+        <form method="post" action="/workspace" class="workspace-switch">
+            <span class="workspace-dot" th:style="'background:' + (${concursoAtivo != null} ? ${concursoAtivo.corOuPadrao} : 'transparent')"
+                  th:title="${concursoAtivo != null} ? ${concursoAtivo.nome} : 'Todos os concursos'"></span>
+            <select name="concurso" class="form-select form-select-sm sidebar-label" aria-label="Concurso ativo"
+                    onchange="this.form.submit()">
+                <option value="" th:selected="${concursoAtivo == null}">Todos os concursos</option>
+                <option th:each="c : ${concursosMenu}" th:value="${c.id}" th:text="${c.nome}"
+                        th:selected="${concursoAtivo != null and concursoAtivo.id == c.id}"></option>
+            </select>
+        </form>
+        <a class="sidebar-link" th:if="${concursoAtivo != null}" th:href="@{/concursos/{id}(id=${concursoAtivo.id})}"
+           th:title="${concursoAtivo.nome}"><i class="bi bi-trophy"></i><span class="sidebar-label">Painel do concurso</span></a>
+        <a class="sidebar-link" href="/concursos" title="Concursos"><i class="bi bi-briefcase"></i><span class="sidebar-label">Concursos</span></a>
+
         <a class="sidebar-link" href="/hoje" title="Hoje"><i class="bi bi-sun"></i><span class="sidebar-label">Hoje</span></a>
         <a class="sidebar-link" href="/dashboard" title="Desempenho"><i class="bi bi-graph-up"></i><span class="sidebar-label">Desempenho</span></a>
 
@@ -27,6 +42,7 @@
         <div class="sidebar-section">Estudos</div>
         <a class="sidebar-link" href="/estudos/paginas" title="Páginas e resumos"><i class="bi bi-file-earmark-text"></i><span class="sidebar-label">Páginas e resumos</span></a>
         <a class="sidebar-link" href="/estudos/cronograma" title="Cronograma"><i class="bi bi-calendar-check"></i><span class="sidebar-label">Cronograma</span></a>
+        <a class="sidebar-link" href="/estudos/cronogramas" title="Cronogramas"><i class="bi bi-calendar-range"></i><span class="sidebar-label">Cronogramas</span></a>
         <a class="sidebar-link" href="/estudos/caixa-de-entrada" title="Caixa de entrada"><i class="bi bi-inbox"></i><span class="sidebar-label">Caixa de entrada</span></a>
 
         <div class="sidebar-section">Revisar</div>

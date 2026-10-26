@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head(${concurso.id == null} ? 'Novo concurso' : 'Editar concurso')}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page" style="max-width: 52rem">
+    <div class="page-header">
+        <div>
+            <h1 th:text="${concurso.id == null} ? 'Novo concurso' : 'Editar concurso'"></h1>
+            <p class="page-subtitle">O perfil de pontuação liga o concurso ao edital: pesos, mínimos e o conteúdo programático.</p>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <form method="post" th:action="${concurso.id == null} ? '/concursos' : @{/concursos/{id}/editar(id=${concurso.id})}" class="card p-3">
+        <div class="row g-3">
+            <div class="col-md-8">
+                <label class="form-label" for="nome">Nome</label>
+                <input type="text" id="nome" name="nome" class="form-control" required maxlength="255"
+                       th:value="${concurso.nome}" placeholder="Ex.: SEFAZ-SP 2026 – AFR"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Situação</label>
+                <select name="status" class="form-select">
+                    <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}" th:selected="${s == concurso.status}"></option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Órgão</label>
+                <input type="text" name="orgao" class="form-control" th:value="${concurso.orgao}" placeholder="SEFAZ-SP"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Cargo</label>
+                <input type="text" name="cargo" class="form-control" th:value="${concurso.cargo}"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Banca</label>
+                <input type="text" name="banca" class="form-control" th:value="${concurso.banca}" placeholder="FCC"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Data da prova</label>
+                <input type="date" name="dataProva" class="form-control" th:value="${concurso.dataProva}"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Fim das inscrições</label>
+                <input type="date" name="dataInscricaoFim" class="form-control" th:value="${concurso.dataInscricaoFim}"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Cor</label>
+                <input type="color" name="cor" class="form-control form-control-color" th:value="${concurso.corOuPadrao}"/>
+            </div>
+            <div class="col-md-8">
+                <label class="form-label">Link do edital</label>
+                <input type="url" name="linkEdital" class="form-control" th:value="${concurso.linkEdital}"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Perfil de pontuação</label>
+                <select name="scoringProfileId" class="form-select">
+                    <option value="">Nenhum</option>
+                    <option th:each="p : ${profiles}" th:value="${p.id}" th:text="${p.name}"
+                            th:selected="${p.id == concurso.scoringProfileId}"></option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Anotações</label>
+                <textarea name="notas" class="form-control" rows="3" th:text="${concurso.notas}"></textarea>
+            </div>
+            <div class="col-12 form-check ms-1">
+                <input class="form-check-input" type="checkbox" name="ativar" value="true" id="ativar"
+                       th:checked="${concurso.id == null}"/>
+                <label class="form-check-label" for="ativar">Usar como concurso ativo</label>
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button type="submit" class="btn btn-primary">Salvar</button>
+            <a th:href="${concurso.id == null} ? '/concursos' : @{/concursos/{id}(id=${concurso.id})}" class="btn btn-outline-secondary">Voltar</a>
+        </div>
+    </form>
+
+    <form th:if="${concurso.id != null}" method="post" th:action="@{/concursos/{id}/excluir(id=${concurso.id})}" class="mt-4"
+          onsubmit="return confirm('Apagar o concurso? Cronogramas, aulas e simulados dele continuam, sem concurso.')">
+        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Apagar concurso</button>
+    </form>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>

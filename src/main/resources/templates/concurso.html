@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head(${home.concurso.nome})}"></head>
+<body>
+<div th:replace="~{fragments/nav :: nav}"></div>
+<main class="container page" th:with="c=${home.concurso}">
+    <div class="page-header">
+        <div>
+            <h1><span class="workspace-dot d-inline-block me-2" th:style="'background:' + ${c.corOuPadrao}"></span><span th:text="${c.nome}"></span></h1>
+            <p class="page-subtitle">
+                <span th:text="${#strings.listJoin(#lists.toList({c.orgao, c.cargo, c.banca}).?[#this != null], ' · ')}"></span>
+                <span th:if="${profile != null}"> · perfil <strong th:text="${profile.name}"></strong></span>
+                <a th:if="${c.linkEdital != null}" th:href="${c.linkEdital}" target="_blank" rel="noopener" class="ms-2">edital <i class="bi bi-box-arrow-up-right"></i></a>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <form method="post" action="/workspace" th:unless="${concursoAtivo != null and concursoAtivo.id == c.id}">
+                <input type="hidden" name="concurso" th:value="${c.id}"/>
+                <button type="submit" class="btn btn-primary">Usar este concurso</button>
+            </form>
+            <a class="btn btn-outline-secondary" th:href="@{/concursos/{id}/editar(id=${c.id})}">Editar</a>
+        </div>
+    </div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
+
+    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Prova', ${home.diasParaProva == null} ? 'sem data' : (${home.diasParaProva > 0} ? ${home.diasParaProva} + ' dias' : (${home.diasParaProva == 0} ? 'hoje' : 'já foi')), '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Tarefas da semana', ${home.semana.done} + ' de ' + ${home.semana.planned}, '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Quizzes', ${home.quizzes.percentual} + '% de acerto', '')}"></div></div>
+        <div class="col"><div th:replace="~{fragments/ui :: stat('Caderno de erros', ${home.cadernoDeErros} + ' questões', ${home.cadernoDeErros > 0} ? 'text-bad' : '')}"></div></div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="d-flex justify-content-between align-items-baseline">
+                <h2 class="section-title">Hoje e atrasadas</h2>
+                <a href="/estudos/cronograma" class="small">cronograma</a>
+            </div>
+            <div class="card page-list" th:unless="${home.hoje.isEmpty()}">
+                <a class="page-list-row" th:each="t : ${home.hoje}" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}">
+                    <i class="bi" th:classappend="${t.overdue} ? 'bi-exclamation-circle text-bad' : 'bi-circle text-muted'"></i>
+                    <span class="text-truncate" th:text="${t.title}"></span>
+                    <span class="ms-auto small text-muted text-nowrap" th:text="${t.subject}"></span>
+                </a>
+            </div>
+            <p class="text-muted small" th:if="${home.hoje.isEmpty()}">Nada pendente para hoje.</p>
+
+            <h2 class="section-title mt-4">Simulados</h2>
+            <p class="text-muted small" th:if="${home.simulados.isEmpty()}">Nenhum simulado com perfil de pontuação ainda.</p>
+            <div class="card page-list" th:unless="${home.simulados.isEmpty()}">
+                <a class="page-list-row" th:each="s : ${home.simulados}" th:href="@{/resultado/{id}(id=${s.sessaoId})}">
+                    <span class="text-muted small text-nowrap" th:text="${#temporals.format(s.data, 'dd/MM')}"></span>
+                    <span class="text-truncate" th:text="${s.nome}"></span>
+                    <span class="ms-auto small text-nowrap" th:classappend="${s.passaria == null} ? '' : (${s.passaria} ? 'text-ok' : 'text-bad')"
+                          th:text="(${s.nota} ?: '–') + ' / ' + ${#numbers.formatDecimal(s.maximo, 1, 0)} + (${s.minimo != null} ? ' (mín. ' + ${#numbers.formatDecimal(s.minimo, 1, 0)} + ')' : '')"></span>
+                </a>
+            </div>
+
+            <h2 class="section-title mt-4">Cronogramas</h2>
+            <div class="card page-list">
+                <a class="page-list-row" th:each="cr : ${home.cronogramas}" th:href="@{/estudos/cronograma(cronograma=${cr.id})}">
+                    <i class="bi bi-calendar-range text-muted"></i>
+                    <span th:text="${cr.nome}"></span>
+                    <span class="small text-muted" th:if="${!cr.ativo}">(inativo)</span>
+                    <span class="ms-auto small text-muted" th:with="n=${home.tarefasPorCronograma[cr.id]}"
+                          th:text="${n == null} ? 'sem tarefas' : ${n[1]} + ' de ' + ${n[0]} + ' concluídas'"></span>
+                </a>
+                <a class="page-list-row small" href="/estudos/cronogramas"><i class="bi bi-plus-lg text-muted"></i>Novo cronograma</a>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <h2 class="section-title">Desempenho por disciplina</h2>
+            <p class="text-muted small" th:if="${home.disciplinas.isEmpty()}">Nenhuma questão respondida neste concurso ainda.</p>
+            <div class="card p-3" th:unless="${home.disciplinas.isEmpty()}">
+                <div class="mb-2" th:each="d : ${home.disciplinas}">
+                    <div class="d-flex justify-content-between small">
+                        <span th:text="${d.label}"></span>
+                        <span class="text-muted" th:text="${d.correct} + '/' + ${d.total} + ' · ' + ${#numbers.formatDecimal(d.percent(), 1, 0)} + '%'"></span>
+                    </div>
+                    <div class="coverage-bar"><span th:style="'width:' + ${d.percent()} + '%'"></span></div>
+                </div>
+            </div>
+
+            <h2 class="section-title mt-4">Cobertura do edital</h2>
+            <p class="text-muted small" th:if="${home.edital.isEmpty()}">
+                Ligue um perfil de pontuação com o conteúdo programático para ver quanto do edital já tem aula ou quiz.</p>
+            <div class="card p-3" th:unless="${home.edital.isEmpty()}">
+                <details class="mb-2" th:each="e : ${home.edital}">
+                    <summary class="d-flex justify-content-between small">
+                        <span th:text="${e.disciplina}"></span>
+                        <span class="text-muted" th:text="${e.estudados} + '/' + ${e.topicos} + ' tópicos'"></span>
+                    </summary>
+                    <div class="coverage-bar my-1"><span th:style="'width:' + ${e.percentual()} + '%'"></span></div>
+                    <ul class="small text-muted mb-0" th:unless="${e.faltam.isEmpty()}">
+                        <li th:each="f : ${e.faltam}" th:text="${f}"></li>
+                    </ul>
+                </details>
+            </div>
+            <p class="small text-muted mt-3" th:if="${c.notas != null}" th:text="${c.notas}"></p>
+        </div>
+    </div>
+</main>
+<div th:replace="~{fragments/scripts :: scripts}"></div>
+</body>
+</html>
