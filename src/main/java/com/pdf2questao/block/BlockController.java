@@ -46,7 +46,7 @@ public class BlockController {
 
     @GetMapping("/blocos")
     public String list(Model model) {
-        List<StudyBlock> blocks = blockService.findAll();
+        List<StudyBlock> blocks = blockService.visible();
         Map<Long, Integer> totals = blockService.questionCounts(blocks);
         Map<Long, String> profileNames = new LinkedHashMap<>();
         profileService.findAll().forEach(p -> profileNames.put(p.getId(), p.getName()));

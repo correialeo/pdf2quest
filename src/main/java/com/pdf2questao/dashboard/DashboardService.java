@@ -56,11 +56,14 @@ public class DashboardService {
     private final StudySessionService sessionService;
     private final ScoringProfileService profileService;
     private final GuessDiagnosticService guessService;
+    private final com.pdf2questao.concurso.Workspace workspace;
 
     public DashboardService(QuestionRepository questionRepository, AttemptRepository attemptRepository,
                             StudySessionRepository sessionRepository, ImportJobRepository importJobRepository,
                             BlockService blockService, StudySessionService sessionService,
-                            ScoringProfileService profileService, GuessDiagnosticService guessService) {
+                            ScoringProfileService profileService, GuessDiagnosticService guessService,
+                            com.pdf2questao.concurso.Workspace workspace) {
+        this.workspace = workspace;
         this.guessService = guessService;
         this.questionRepository = questionRepository;
         this.attemptRepository = attemptRepository;
@@ -104,33 +107,66 @@ public class DashboardService {
                 .forEach(c -> byBanca.computeIfAbsent(bancaLabel(c.job()), k -> new ArrayList<>()).add(c));
         List<ProvaGroup> groups = byBanca.entrySet().stream().map(e -> new ProvaGroup(e.getKey(), e.getValue())).toList();
 
-        List<StudyBlock> allBlocks = blockService.findAll();
+        List<StudyBlock> allBlocks = blockService.visible();
         Map<Long, Integer> blockCounts = blockService.questionCounts(allBlocks);
         List<BlockCard> blocks = allBlocks.stream()
                 .map(b -> blockCard(b, blockCounts.getOrDefault(b.getId(), 0), sessions.values())).toList();
 
         List<SessionRow> recent = sessionRepository.findByFinishedAtIsNotNullOrderByStartedAtDesc().stream()
-                .limit(RECENT_SESSIONS)
+                .filter(s -> workspace.matches(s.getConcursoId())).limit(RECENT_SESSIONS)
                 .map(s -> new SessionRow(s, s.getCorrectCount(), s.getWrongCount())).toList();
 
-        List<OpenSession> open = sessionRepository.findTop3ByFinishedAtIsNullOrderByStartedAtDesc().stream()
-                .map(s -> new OpenSession(s, sessionService.resumeIndex(s))).toList();
+        List<OpenSession> open = openSessions();
 
-        long correct = attemptRepository.countByCorrect(true);
-        long wrong = attemptRepository.countByCorrect(false);
+        Long concurso = workspace.currentId();
+        Object[] answers = attemptRepository.totals(concurso).get(0);
+        long correct = num(answers[0]);
+        long wrong = num(answers[1]);
         return new Overview(cards.size(), questionRepository.count(), attemptRepository.countDistinctQuestionsAnswered(),
-                correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject()),
-                guessService.counts(null), open, questionRepository.countErrorNotebook());
+                correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject(concurso)),
+                guessService.counts(null), open, errorNotebookCount());
     }
 
     /** O lado "questoes" da tela Hoje, sem as estatisticas pesadas do painel. */
     public Today today() {
-        List<OpenSession> open = sessionRepository.findTop3ByFinishedAtIsNullOrderByStartedAtDesc().stream()
-                .map(s -> new OpenSession(s, sessionService.resumeIndex(s))).toList();
-        StudySession last = sessionRepository.findFirstByFinishedAtIsNotNullAndScoreReportIsNotNullOrderByFinishedAtDesc()
-                .orElse(null);
-        return new Today(open, questionRepository.countErrorNotebook(), last,
+        List<OpenSession> open = openSessions();
+        StudySession last = lastScored();
+        return new Today(open, errorNotebookCount(), last,
                 last == null ? null : sessionService.scoreResult(last));
+    }
+
+    /** Ate 3 sessoes em aberto do concurso em vigor. */
+    private List<OpenSession> openSessions() {
+        if (workspace.currentId() == null) {
+            return sessionRepository.findTop3ByFinishedAtIsNullOrderByStartedAtDesc().stream()
+                    .map(s -> new OpenSession(s, sessionService.resumeIndex(s))).toList();
+        }
+        return sessionRepository.findAll().stream()
+                .filter(s -> s.getFinishedAt() == null && workspace.matches(s.getConcursoId()))
+                .sorted(Comparator.comparing(StudySession::getStartedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(3).map(s -> new OpenSession(s, sessionService.resumeIndex(s))).toList();
+    }
+
+    /** Ultimo simulado finalizado com nota do perfil, no concurso em vigor. */
+    public StudySession lastScored() {
+        if (workspace.currentId() == null) {
+            return sessionRepository.findFirstByFinishedAtIsNotNullAndScoreReportIsNotNullOrderByFinishedAtDesc()
+                    .orElse(null);
+        }
+        return sessionRepository.findByFinishedAtIsNotNullOrderByStartedAtDesc().stream()
+                .filter(s -> s.getScoreReport() != null && workspace.matches(s.getConcursoId()))
+                .max(Comparator.comparing(StudySession::getFinishedAt)).orElse(null);
+    }
+
+    /** Questoes no caderno de erros do concurso em vigor. */
+    public long errorNotebookCount() {
+        return workspace.currentId() == null ? questionRepository.countErrorNotebook()
+                : questionRepository.findErrorNotebook(workspace.currentId()).size();
+    }
+
+    /** Desempenho por disciplina nas sessoes do concurso em vigor. */
+    public List<SubjectStat> subjectStats() {
+        return mapStats(attemptRepository.statsBySubject(workspace.currentId()));
     }
 
     private BlockCard blockCard(StudyBlock block, int questions, java.util.Collection<StudySession> allSessions) {

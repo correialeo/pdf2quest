@@ -63,6 +63,21 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
             ") ORDER BY q.id DESC", nativeQuery = true)
     List<Question> findErrorNotebook();
 
+    /**
+     * Caderno de erros do concurso: a ultima resposta errada foi numa sessao dele, ou a questao e de uma prova
+     * ligada a ele. Nulo = todos.
+     */
+    @Query(value = "SELECT q.* FROM question q WHERE q.id IN (" +
+            "  SELECT a.question_id FROM attempt a " +
+            "  WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +
+            "  AND a.correct = 0 AND (:c IS NULL" +
+            "    OR a.session_id IN (SELECT s.id FROM study_session s WHERE s.concurso_id = :c))" +
+            ") OR (:c IS NOT NULL AND q.import_job_id IN (SELECT j.id FROM import_job j WHERE j.concurso_id = :c)" +
+            "  AND q.id IN (SELECT a.question_id FROM attempt a WHERE a.answered_at = (SELECT MAX(a2.answered_at) " +
+            "  FROM attempt a2 WHERE a2.question_id = a.question_id) AND a.correct = 0))" +
+            " ORDER BY q.id DESC", nativeQuery = true)
+    List<Question> findErrorNotebook(@Param("c") Long concursoId);
+
     /** Quantas questoes estao no caderno de erros (a ultima resposta foi errada), sem carregar as questoes. */
     @Query(value = "SELECT COUNT(DISTINCT a.question_id) FROM attempt a " +
             "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM attempt a2 WHERE a2.question_id = a.question_id) " +

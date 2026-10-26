@@ -18,12 +18,16 @@ public class EssayService {
 
     private final EssayRepository repository;
 
-    public EssayService(EssayRepository repository) {
+    private final com.pdf2questao.concurso.Workspace workspace;
+
+    public EssayService(EssayRepository repository, com.pdf2questao.concurso.Workspace workspace) {
+        this.workspace = workspace;
         this.repository = repository;
     }
 
     public List<Essay> all() {
-        return repository.findAllByOrderByCreatedAtDesc();
+        return repository.findAllByOrderByCreatedAtDesc().stream().filter(e -> workspace.matches(e.getConcursoId()))
+                .toList();
     }
 
     public Essay find(Long id) {
@@ -44,6 +48,7 @@ public class EssayService {
         essay.setTimeLimitMinutes(timeLimit);
         essay.setMaxLines(maxLines);
         essay.setMaxScore(maxScore);
+        essay.setConcursoId(workspace.currentId());
         return repository.save(essay);
     }
 

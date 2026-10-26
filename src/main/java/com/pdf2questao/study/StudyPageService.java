@@ -22,7 +22,11 @@ public class StudyPageService {
     private final StudyPageRepository pageRepository;
     private final StudyTaskRepository taskRepository;
 
-    public StudyPageService(StudyPageRepository pageRepository, StudyTaskRepository taskRepository) {
+    private final com.pdf2questao.concurso.Workspace workspace;
+
+    public StudyPageService(StudyPageRepository pageRepository, StudyTaskRepository taskRepository,
+                            com.pdf2questao.concurso.Workspace workspace) {
+        this.workspace = workspace;
         this.pageRepository = pageRepository;
         this.taskRepository = taskRepository;
     }
@@ -59,8 +63,10 @@ public class StudyPageService {
         return children(0L, 0, byParent);
     }
 
+    /** Paginas de raiz do concurso em vigor ou sem concurso; as subpaginas acompanham a mae. */
     private List<PageNode> children(Long parentId, int depth, Map<Long, List<StudyPage>> byParent) {
-        return byParent.getOrDefault(parentId, List.of()).stream().sorted(ORDER)
+        return byParent.getOrDefault(parentId, List.of()).stream()
+                .filter(p -> depth > 0 || workspace.matchesOrShared(p.getConcursoId())).sorted(ORDER)
                 .map(p -> new PageNode(p, depth, children(p.getId(), depth + 1, byParent))).toList();
     }
 
@@ -109,6 +115,8 @@ public class StudyPageService {
         }
         StudyPage page = new StudyPage();
         page.setParentId(parentId);
+        page.setConcursoId(parentId == null ? workspace.currentId()
+                : pageRepository.findById(parentId).map(StudyPage::getConcursoId).orElse(null));
         page.setTitle(title(title));
         page.setSubject(blankToNull(subject));
         page.setContent(HtmlSanitizer.sanitize(content));

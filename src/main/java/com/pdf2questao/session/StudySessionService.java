@@ -28,11 +28,13 @@ public class StudySessionService {
     private final QuestionRepository questionRepository;
     private final BlockService blockService;
     private final ScoringProfileService profileService;
+    private final com.pdf2questao.concurso.Workspace workspace;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public StudySessionService(StudySessionRepository sessionRepository, AttemptRepository attemptRepository,
                                 QuestionRepository questionRepository, BlockService blockService,
-                                ScoringProfileService profileService) {
+                                ScoringProfileService profileService, com.pdf2questao.concurso.Workspace workspace) {
+        this.workspace = workspace;
         this.sessionRepository = sessionRepository;
         this.attemptRepository = attemptRepository;
         this.questionRepository = questionRepository;
@@ -64,6 +66,9 @@ public class StudySessionService {
         session.setBlockId(block.getId());
         session.setBlockName(block.getName());
         session.setScoringProfileId(block.getScoringProfileId());
+        if (block.getConcursoId() != null) {
+            session.setConcursoId(block.getConcursoId());
+        }
         session.setTimeLimitMinutes(timeLimit == null || timeLimit <= 0 ? null : timeLimit);
         return sessionRepository.save(session);
     }
@@ -159,6 +164,7 @@ public class StudySessionService {
         session.setMode(mode);
         session.setQuestionIdsOrder(ids.stream().map(String::valueOf).collect(Collectors.joining(",")));
         session.setStartedAt(LocalDateTime.now());
+        session.setConcursoId(workspace.currentId());
         return sessionRepository.save(session);
     }
 

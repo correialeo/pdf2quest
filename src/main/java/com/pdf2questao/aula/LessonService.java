@@ -36,10 +36,15 @@ public class LessonService {
     private final QuizQuestionRepository questionRepository;
     private final QuizAttemptRepository attemptRepository;
     private final StudyTaskRepository taskRepository;
+    private final com.pdf2questao.concurso.Workspace workspace;
+    private final com.pdf2questao.concurso.ConcursoService concursoService;
 
     public LessonService(LessonRepository lessonRepository, QuizRepository quizRepository,
                          QuizQuestionRepository questionRepository, QuizAttemptRepository attemptRepository,
-                         StudyTaskRepository taskRepository) {
+                         StudyTaskRepository taskRepository, com.pdf2questao.concurso.Workspace workspace,
+                         com.pdf2questao.concurso.ConcursoService concursoService) {
+        this.workspace = workspace;
+        this.concursoService = concursoService;
         this.taskRepository = taskRepository;
         this.lessonRepository = lessonRepository;
         this.quizRepository = quizRepository;
@@ -51,6 +56,22 @@ public class LessonService {
 
     public List<Lesson> all() {
         return lessonRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    /** Aulas do concurso em vigor (em "Todos", todas). */
+    public List<Lesson> visible() {
+        return all().stream().filter(l -> workspace.matches(l.getConcursoId())).toList();
+    }
+
+    /** Quizzes do concurso em vigor (em "Todos", todos). */
+    public List<Quiz> visibleQuizzes() {
+        return allQuizzes().stream().filter(q -> workspace.matches(q.getConcursoId())).toList();
+    }
+
+    /** Concurso de algo novo ligado a tarefa: o do cronograma da tarefa ou, sem ele, o em vigor. */
+    private Long concursoFor(Long taskId, Long fallback) {
+        Long fromTask = concursoService.concursoOfTask(taskId);
+        return fromTask != null ? fromTask : fallback != null ? fallback : workspace.currentId();
     }
 
     public Lesson find(Long id) {
@@ -68,6 +89,7 @@ public class LessonService {
         lesson.setEditalTopic(blank(editalTopic));
         lesson.setContent(content.strip());
         lesson.setTaskId(checkTask(taskId));
+        lesson.setConcursoId(concursoFor(taskId, null));
         return lessonRepository.save(lesson);
     }
 
@@ -130,11 +152,19 @@ public class LessonService {
             Lesson lesson = lessonRepository.findById(lessonId)
                     .orElseThrow(() -> new IllegalArgumentException("Aula " + lessonId + " não existe."));
             lesson.setTaskId(task);
+            Long concurso = concursoService.concursoOfTask(task);
+            if (concurso != null) {
+                lesson.setConcursoId(concurso);
+            }
             lessonRepository.save(lesson);
         }
         if (quizId != null) {
             Quiz quiz = quiz(quizId);
             quiz.setTaskId(task);
+            Long concurso = concursoService.concursoOfTask(task);
+            if (concurso != null) {
+                quiz.setConcursoId(concurso);
+            }
             quizRepository.save(quiz);
         }
     }
@@ -229,6 +259,8 @@ public class LessonService {
         Map<Long, Quiz> quizzes = allQuizzes().stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
         List<QuizQuestion> candidates = questionRepository.findAll().stream()
                 .filter(q -> s == null || ScoringCalculator.normalize(subjectName(q.getSubject())).equals(s))
+                .filter(q -> workspace.matches(quizzes.containsKey(q.getQuizId())
+                        ? quizzes.get(q.getQuizId()).getConcursoId() : null))
                 .toList();
         Map<Long, QuizAttempt> last = new LinkedHashMap<>();
         attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(candidates.stream().map(QuizQuestion::getId).toList())
@@ -316,6 +348,8 @@ public class LessonService {
         Quiz quiz = new Quiz();
         quiz.setLessonId(lessonId);
         quiz.setTaskId(checkTask(taskId));
+        quiz.setConcursoId(concursoFor(taskId != null ? taskId : lesson == null ? null : lesson.getTaskId(),
+                lesson == null ? null : lesson.getConcursoId()));
         quiz.setSubject(subj);
         quiz.setTopic(top);
         quiz.setLevel(lvl);
@@ -538,8 +572,10 @@ public class LessonService {
 
     /** Quizzes a responder (mais recentes primeiro) e aulas/quizzes avulsos por disciplina (mais mexida primeiro). */
     public Overview overview() {
-        Map<Long, Lesson> lessons = all().stream().collect(Collectors.toMap(Lesson::getId, Function.identity()));
-        List<QuizCard> cards = allQuizzes().stream().map(q -> {
+        Map<Long, Lesson> lessons = visible().stream().collect(Collectors.toMap(Lesson::getId, Function.identity(),
+                (a, b) -> a, LinkedHashMap::new));
+        List<Quiz> visibleQuizzes = visibleQuizzes();
+        List<QuizCard> cards = visibleQuizzes.stream().map(q -> {
             QuizResult r = result(q.getId());
             Lesson l = q.getLessonId() == null ? null : lessons.get(q.getLessonId());
             return new QuizCard(q.getId(), q.getTitle(), q.getLevel(), r.perguntas(), r.respondidas(), r.acertos(),
@@ -547,7 +583,7 @@ public class LessonService {
         }).toList();
         Map<Long, List<QuizCard>> byLesson = cards.stream().filter(c -> c.aulaId() != null)
                 .collect(Collectors.groupingBy(QuizCard::aulaId));
-        Map<Long, Quiz> quizzes = allQuizzes().stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
+        Map<Long, Quiz> quizzes = visibleQuizzes.stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
 
         Map<String, String> names = new LinkedHashMap<>();
         Map<String, List<LessonCard>> lessonsBy = new LinkedHashMap<>();
@@ -598,7 +634,7 @@ public class LessonService {
 
     /** Desempenho nos quizzes por topico (ultima resposta de cada pergunta), piores primeiro. */
     public List<TopicStat> stats() {
-        return attemptRepository.statsByTopic().stream().map(r -> {
+        return attemptRepository.statsByTopic(workspace.currentId()).stream().map(r -> {
             long right = ((Number) r[2]).longValue();
             long total = ((Number) r[3]).longValue();
             return new TopicStat((String) r[0], (String) r[1], right, total,
@@ -611,11 +647,11 @@ public class LessonService {
 
     /** Acertos x erros em todos os quizzes (ultima resposta de cada pergunta). */
     public Totals totals() {
-        Object[] r = attemptRepository.totals().get(0);
+        Object[] r = attemptRepository.totals(workspace.currentId()).get(0);
         long right = ((Number) r[0]).longValue();
         long total = ((Number) r[1]).longValue();
         return new Totals(right, total - right, total, total == 0 ? 0 : Math.round(right * 1000.0 / total) / 10.0,
-                quizRepository.count());
+                visibleQuizzes().size());
     }
 
     /** Reaproveita o nome de disciplina ja usado (sem acento/caixa), para nao dividir a mesma materia em dois grupos. */

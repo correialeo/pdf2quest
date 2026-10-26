@@ -107,7 +107,7 @@ public class StudyController {
     }
 
     /** Volta para a tela de onde a anotacao rapida veio, se for desta aplicacao. */
-    static String sameSite(String referer, String fallback) {
+    public static String sameSite(String referer, String fallback) {
         if (referer == null) {
             return fallback;
         }

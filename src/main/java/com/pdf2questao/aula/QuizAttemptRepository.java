@@ -18,12 +18,15 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
             + "FROM quiz_attempt a JOIN quiz_question q ON q.id = a.quiz_question_id "
             + "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM quiz_attempt a2 "
             + "  WHERE a2.quiz_question_id = a.quiz_question_id) "
+            + "AND (:c IS NULL OR q.quiz_id IN (SELECT id FROM quiz WHERE concurso_id = :c)) "
             + "GROUP BY 1, 2 ORDER BY 3 * 1.0 / COUNT(*), 1, 2", nativeQuery = true)
-    List<Object[]> statsByTopic();
+    List<Object[]> statsByTopic(@org.springframework.data.repository.query.Param("c") Long concursoId);
 
-    /** [acertos, respondidas] de todos os quizzes (ultima resposta de cada pergunta). */
+    /** [acertos, respondidas] dos quizzes do concurso (nulo = todos), ultima resposta de cada pergunta. */
     @Query(value = "SELECT COALESCE(SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), 0), COUNT(*) FROM quiz_attempt a "
             + "WHERE a.answered_at = (SELECT MAX(a2.answered_at) FROM quiz_attempt a2 "
-            + "  WHERE a2.quiz_question_id = a.quiz_question_id)", nativeQuery = true)
-    List<Object[]> totals();
+            + "  WHERE a2.quiz_question_id = a.quiz_question_id) "
+            + "AND (:c IS NULL OR a.quiz_question_id IN (SELECT qq.id FROM quiz_question qq JOIN quiz z ON z.id = qq.quiz_id "
+            + "  WHERE z.concurso_id = :c))", nativeQuery = true)
+    List<Object[]> totals(@org.springframework.data.repository.query.Param("c") Long concursoId);
 }

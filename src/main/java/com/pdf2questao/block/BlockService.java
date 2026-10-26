@@ -58,9 +58,13 @@ public class BlockService {
     private final ImportJobRepository importJobRepository;
     private final ScoringProfileService profileService;
 
+    private final com.pdf2questao.concurso.Workspace workspace;
+
     public BlockService(StudyBlockRepository blockRepository, StudyBlockSourceRepository sourceRepository,
                         StudyBlockExclusionRepository exclusionRepository, QuestionRepository questionRepository,
-                        ImportJobRepository importJobRepository, ScoringProfileService profileService) {
+                        ImportJobRepository importJobRepository, ScoringProfileService profileService,
+                        com.pdf2questao.concurso.Workspace workspace) {
+        this.workspace = workspace;
         this.blockRepository = blockRepository;
         this.sourceRepository = sourceRepository;
         this.exclusionRepository = exclusionRepository;
@@ -206,6 +210,9 @@ public class BlockService {
 
     @Transactional
     public StudyBlock save(Draft draft) {
+        if (draft.block().getId() == null && draft.block().getConcursoId() == null) {
+            draft.block().setConcursoId(workspace.currentId());
+        }
         StudyBlock block = blockRepository.save(draft.block());
         sourceRepository.deleteByBlockId(block.getId());
         exclusionRepository.deleteByBlockId(block.getId());
@@ -232,6 +239,11 @@ public class BlockService {
 
     public List<StudyBlock> findAll() {
         return blockRepository.findAll();
+    }
+
+    /** Blocos do concurso em vigor (em "Todos", todos). */
+    public List<StudyBlock> visible() {
+        return findAll().stream().filter(b -> workspace.matches(b.getConcursoId())).toList();
     }
 
     public Optional<StudyBlock> find(Long id) {

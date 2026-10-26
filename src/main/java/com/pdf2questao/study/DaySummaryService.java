@@ -78,8 +78,11 @@ public class DaySummaryService {
                 return parent.get();
             }
         }
-        return pageService.create(null, PARENT_TITLE, null,
+        StudyPage created = pageService.create(null, PARENT_TITLE, null,
                 "<p>Um resumo para cada dia do cronograma. Abra pelo botão <strong>Resumo do dia</strong> no cronograma.</p>");
+        // Os resumos do dia sao de todos os concursos (um por dia).
+        created.setConcursoId(null);
+        return pageRepository.save(created);
     }
 
     static String title(LocalDate date) {

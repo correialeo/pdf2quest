@@ -49,11 +49,15 @@ public class GeneratedExamService {
     private final com.pdf2questao.session.StudySessionService sessionService;
     private final com.pdf2questao.simulado.review.QuestionReviewService reviewService;
 
+    private final com.pdf2questao.concurso.ConcursoService concursoService;
+
     public GeneratedExamService(GeneratedExamRepository examRepository, ImportJobRepository importJobRepository,
                                 QuestionRepository questionRepository, StructuredImportService importService,
                                 ScoringProfileService profileService, BlockService blockService,
                                 com.pdf2questao.session.StudySessionService sessionService,
-                                com.pdf2questao.simulado.review.QuestionReviewService reviewService) {
+                                com.pdf2questao.simulado.review.QuestionReviewService reviewService,
+                                com.pdf2questao.concurso.ConcursoService concursoService) {
+        this.concursoService = concursoService;
         this.sessionService = sessionService;
         this.reviewService = reviewService;
         this.examRepository = examRepository;
@@ -114,11 +118,14 @@ public class GeneratedExamService {
         job.setStartedAt(LocalDateTime.now());
         job.setFinishedAt(LocalDateTime.now());
         job.setReport("Simulado criado pelo Claude (" + spec.name() + (group == null ? "" : " · " + group) + ").");
+        Long concurso = concursoService.forProfile(profileId);
+        job.setConcursoId(concurso);
         job = importJobRepository.save(job);
 
         GeneratedExam exam = new GeneratedExam();
         exam.setImportJobId(job.getId());
         exam.setScoringProfileId(profileId);
+        exam.setConcursoId(concurso);
         exam.setGroupName(group);
         exam.setTimeLimitMinutes(timeLimit);
         exam.setStyleNotes(styleNotes.strip());
@@ -237,8 +244,10 @@ public class GeneratedExamService {
         String blockName = name != null && !name.isBlank() ? name.trim() : exams.size() == 1
                 ? importJobRepository.findById(exams.get(0).getImportJobId()).orElseThrow().getDisplayName()
                 : "Dia de prova · " + exams.size() + " provas";
-        StudyBlock block = blockService.save(blockService.draft(null, blockName, description.toString(),
-                time == null ? null : time.toString(), profileId, sources, ""));
+        var blockDraft = blockService.draft(null, blockName, description.toString(),
+                time == null ? null : time.toString(), profileId, sources, "");
+        blockDraft.block().setConcursoId(exams.get(0).getConcursoId());
+        StudyBlock block = blockService.save(blockDraft);
         for (GeneratedExam exam : exams) {
             exam.setBlockId(block.getId());
             exam.setFinishedAt(LocalDateTime.now());

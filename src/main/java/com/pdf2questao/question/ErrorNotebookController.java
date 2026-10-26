@@ -22,8 +22,12 @@ public class ErrorNotebookController {
     private final AttemptRepository attemptRepository;
     private final ImportJobRepository importJobRepository;
 
+    private final com.pdf2questao.concurso.Workspace workspace;
+
     public ErrorNotebookController(QuestionRepository questionRepository, StudySessionService sessionService,
-                                   AttemptRepository attemptRepository, ImportJobRepository importJobRepository) {
+                                   AttemptRepository attemptRepository, ImportJobRepository importJobRepository,
+                                   com.pdf2questao.concurso.Workspace workspace) {
+        this.workspace = workspace;
         this.importJobRepository = importJobRepository;
         this.questionRepository = questionRepository;
         this.sessionService = sessionService;
@@ -32,7 +36,7 @@ public class ErrorNotebookController {
 
     @GetMapping("/caderno-erros")
     public String list(@org.springframework.web.bind.annotation.RequestParam(required = false) Long prova, Model model) {
-        List<Question> all = questionRepository.findErrorNotebook();
+        List<Question> all = questionRepository.findErrorNotebook(workspace.currentId());
         // Contagem por prova para os filtros no topo da tela.
         Map<Long, Long> perProva = new LinkedHashMap<>();
         for (Question q : all) {
@@ -45,7 +49,8 @@ public class ErrorNotebookController {
         model.addAttribute("perProva", perProva);
         model.addAttribute("totalErrors", all.size());
         model.addAttribute("selectedProva", prova);
-        model.addAttribute("questions", prova == null ? all : questionRepository.findErrorNotebookByJob(prova));
+        model.addAttribute("questions", prova == null ? all
+                : all.stream().filter(q -> prova.equals(q.getImportJobId())).toList());
         Map<Long, String> wrongAnswers = new HashMap<>();
         for (Object[] row : attemptRepository.findLatestWrongAnswers()) {
             wrongAnswers.put(((Number) row[0]).longValue(), (String) row[1]);
@@ -56,8 +61,8 @@ public class ErrorNotebookController {
 
     @PostMapping("/caderno-erros/refazer")
     public String refazer(@org.springframework.web.bind.annotation.RequestParam(required = false) Long prova) {
-        java.util.List<Long> ids = (prova == null ? questionRepository.findErrorNotebook()
-                : questionRepository.findErrorNotebookByJob(prova)).stream()
+        java.util.List<Long> ids = questionRepository.findErrorNotebook(workspace.currentId()).stream()
+                .filter(q -> prova == null || prova.equals(q.getImportJobId()))
                 .map(Question::getId)
                 .toList();
         StudySession session = sessionService.startRefazer(ids);
