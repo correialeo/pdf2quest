@@ -22,10 +22,13 @@ public class StudyTaskController {
     private final DaySummaryService daySummaryService;
     private final SpacedRepetitionService spacedRepetition;
     private final com.pdf2questao.aula.LessonService lessonService;
+    private final com.pdf2questao.concurso.ConcursoService concursoService;
 
     public StudyTaskController(StudyTaskService taskService, StudyPageService pageService, StudySubjects subjects,
                                DaySummaryService daySummaryService, SpacedRepetitionService spacedRepetition,
-                               com.pdf2questao.aula.LessonService lessonService) {
+                               com.pdf2questao.aula.LessonService lessonService,
+                               com.pdf2questao.concurso.ConcursoService concursoService) {
+        this.concursoService = concursoService;
         this.lessonService = lessonService;
         this.spacedRepetition = spacedRepetition;
         this.taskService = taskService;
@@ -41,12 +44,17 @@ public class StudyTaskController {
     }
 
     @GetMapping("/estudos/cronograma")
-    public String list(@RequestParam(defaultValue = "") String ver, Model model) {
+    public String list(@RequestParam(defaultValue = "") String ver,
+                       @RequestParam(name = "cronograma", required = false) Long cronogramaId, Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
         boolean showAll = ver.equals("todas");
         spacedRepetition.syncReviewTask(today);
-        var schedule = taskService.schedule(today, showAll);
+        var schedule = taskService.schedule(today, showAll, cronogramaId);
+        model.addAttribute("cronogramaId", cronogramaId);
+        var names = new java.util.HashMap<Long, String>();
+        taskService.cronogramas().forEach((id, c) -> names.put(id, c.getNome()));
+        model.addAttribute("cronogramaNames", names);
         var groups = schedule.groups();
         model.addAttribute("groups", groups);
         model.addAttribute("showAll", showAll);
@@ -70,11 +78,12 @@ public class StudyTaskController {
                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate plannedDate,
                          @RequestParam(required = false) Integer estimatedMinutes,
                          @RequestParam(required = false) Long pageId,
+                         @RequestParam(required = false) Long cronogramaId,
                          @RequestHeader(value = "Referer", required = false) String referer,
                          RedirectAttributes redirectAttributes) {
         try {
             taskService.create(new StudyTaskService.TaskForm(title, description, subject, plannedDate,
-                    estimatedMinutes, null, pageId));
+                    estimatedMinutes, null, pageId, cronogramaId));
             redirectAttributes.addFlashAttribute("message", "Tarefa adicionada ao cronograma.");
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -91,6 +100,14 @@ public class StudyTaskController {
         }
         model.addAttribute("task", task.get());
         model.addAttribute("linked", lessonService.forTask(id));
+        // Na edicao, todos os cronogramas (a tarefa pode ir para outro concurso).
+        model.addAttribute("allCronogramas", taskService.cronogramas().values().stream()
+                .sorted(java.util.Comparator.comparing(com.pdf2questao.concurso.Cronograma::getNome)).toList());
+        var concursos = concursoService.byId();
+        var labels = new java.util.HashMap<Long, String>();
+        taskService.cronogramas().forEach((cid, c) -> labels.put(cid, c.getNome() + (c.getConcursoId() == null
+                || !concursos.containsKey(c.getConcursoId()) ? " (avulso)" : " · " + concursos.get(c.getConcursoId()).getNome())));
+        model.addAttribute("cronogramaLabels", labels);
         model.addAttribute("pages", pageService.flatTree());
         model.addAttribute("subjects", subjects.all());
         return "estudos-tarefa";
@@ -105,10 +122,11 @@ public class StudyTaskController {
                          @RequestParam(required = false) Integer estimatedMinutes,
                          @RequestParam(required = false) Integer spentMinutes,
                          @RequestParam(required = false) Long pageId,
+                         @RequestParam(required = false) Long cronogramaId,
                          RedirectAttributes redirectAttributes) {
         try {
             taskService.update(id, new StudyTaskService.TaskForm(title, description, subject, plannedDate,
-                    estimatedMinutes, spentMinutes, pageId));
+                    estimatedMinutes, spentMinutes, pageId, cronogramaId));
             redirectAttributes.addFlashAttribute("message", "Tarefa atualizada.");
             return "redirect:/estudos/cronograma";
         } catch (IllegalArgumentException e) {

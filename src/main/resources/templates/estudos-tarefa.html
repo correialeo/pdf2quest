@@ -46,6 +46,14 @@
                 <input type="number" name="spentMinutes" class="form-control" min="0" step="5" th:value="${task.spentMinutes}"/>
             </div>
         </div>
+        <div class="mb-3" th:unless="${task.review}">
+            <label class="form-label">Cronograma</label>
+            <select name="cronogramaId" class="form-select">
+                <option value="">Nenhum (tarefa avulsa)</option>
+                <option th:each="c : ${allCronogramas}" th:value="${c.id}" th:selected="${c.id == task.cronogramaId}"
+                        th:text="${cronogramaLabels[c.id]}"></option>
+            </select>
+        </div>
         <div class="mb-3">
             <label class="form-label">Página de resumo</label>
             <select name="pageId" class="form-select">

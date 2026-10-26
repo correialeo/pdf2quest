@@ -35,6 +35,13 @@
                 <span th:text="${preview.totalMinutes() / 60}"></span> h planejadas), ligadas a esta página
             </label>
         </div>
+        <div class="mt-2" th:if="${preview.newTasks() > 0}" style="max-width: 28rem">
+            <label class="form-label small">Em qual cronograma</label>
+            <select name="cronogramaId" class="form-select form-select-sm">
+                <option value="" th:text="${concursoAtivo != null ? '(o padrão de ' + concursoAtivo.nome + ')' : '(nenhum: tarefas avulsas)'}"></option>
+                <option th:each="c : ${cronogramasMenu}" th:value="${c.id}" th:text="${c.nome}"></option>
+            </select>
+        </div>
         <div class="form-text" th:if="${preview.existingTasks() > 0}"
              th:text="${preview.existingTasks()} + ' tarefas iguais (mesmo dia e título) já estão no cronograma e não serão repetidas.'"></div>
         <p class="small text-muted mt-3 mb-0" th:if="${preview.tasks.isEmpty()}">

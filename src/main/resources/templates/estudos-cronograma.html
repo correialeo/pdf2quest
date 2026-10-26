@@ -13,6 +13,18 @@
     <nav th:replace="~{fragments/estudos :: tabs('schedule')}"></nav>
     <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3" th:unless="${cronogramasMenu.isEmpty()}">
+        <span class="small text-muted">Cronograma:</span>
+        <a class="btn btn-sm" th:classappend="${cronogramaId == null} ? 'btn-primary' : 'btn-outline-secondary'"
+           href="/estudos/cronograma" th:text="${concursoAtivo != null} ? 'Todos de ' + ${concursoAtivo.nome} : 'Todos'"></a>
+        <a th:each="c : ${cronogramasMenu}" class="btn btn-sm"
+           th:classappend="${cronogramaId == c.id} ? 'btn-primary' : 'btn-outline-secondary'"
+           th:href="@{/estudos/cronograma(cronograma=${c.id})}">
+            <span th:text="${c.nome}"></span><span class="ms-1 opacity-75" th:if="${!c.ativo}">(inativo)</span>
+        </a>
+        <a class="small ms-1" href="/estudos/cronogramas"><i class="bi bi-gear"></i> Gerenciar</a>
+    </div>
+
     <form method="post" action="/estudos/cronograma" class="card p-3 mb-4">
         <div class="row g-2 align-items-end">
             <div class="col-md-5">
@@ -38,9 +50,16 @@
         </div>
         <textarea name="description" class="form-control form-control-sm mt-2 task-desc-new" rows="1"
                   placeholder="Descrição (opcional): o que estudar, links, observações…"></textarea>
-        <details class="mt-2">
-            <summary class="small text-muted">Página de resumo</summary>
+        <details class="mt-2" th:open="${cronogramaId != null}">
+            <summary class="small text-muted">Cronograma e página de resumo</summary>
             <div class="row g-2 mt-1">
+                <div class="col-md-4">
+                    <select name="cronogramaId" class="form-select form-select-sm" aria-label="Cronograma">
+                        <option value="" th:text="${concursoAtivo != null} ? 'Cronograma padrão de ' + ${concursoAtivo.nome} : 'Sem cronograma (avulsa)'"></option>
+                        <option th:each="c : ${cronogramasMenu}" th:value="${c.id}" th:text="${c.nome}"
+                                th:selected="${cronogramaId == c.id}"></option>
+                    </select>
+                </div>
                 <div class="col-md-5">
                     <select name="pageId" class="form-select form-select-sm">
                         <option value="">Sem página de resumo</option>
@@ -86,6 +105,8 @@
                 <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
                 <div class="task-info">
                     <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
+                    <span class="badge text-bg-light border ms-1 fw-normal" th:if="${cronogramaId == null and t.cronogramaId != null and cronogramaNames[t.cronogramaId] != null}"
+                          th:text="${cronogramaNames[t.cronogramaId]}"></span>
                     <div class="task-meta">
                         <span th:if="${t.subject != null}" class="fw-medium" th:text="${t.subject}"></span>
                         <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>

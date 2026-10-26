@@ -1,5 +1,8 @@
 package com.pdf2questao.study;
 
+import com.pdf2questao.concurso.ConcursoService;
+import com.pdf2questao.concurso.Cronograma;
+import com.pdf2questao.concurso.Workspace;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +28,14 @@ public class StudyTaskService {
     private final StudyTaskRepository taskRepository;
     private final StudyPageRepository pageRepository;
     private final SpacedRepetitionService spacedRepetition;
+    private final ConcursoService concursoService;
+    private final Workspace workspace;
 
     public StudyTaskService(StudyTaskRepository taskRepository, StudyPageRepository pageRepository,
-                            SpacedRepetitionService spacedRepetition) {
+                            SpacedRepetitionService spacedRepetition, ConcursoService concursoService,
+                            Workspace workspace) {
+        this.concursoService = concursoService;
+        this.workspace = workspace;
         this.taskRepository = taskRepository;
         this.pageRepository = pageRepository;
         this.spacedRepetition = spacedRepetition;
@@ -57,9 +65,31 @@ public class StudyTaskService {
     public record Schedule(List<TaskGroup> groups, int hiddenDays) {
     }
 
-    /** Dados para o formulario de tarefa (criar e editar usam o mesmo). */
+    /**
+     * Dados para o formulario de tarefa (criar e editar usam o mesmo). {@code cronogramaId} nulo ao criar = o
+     * cronograma padrao do concurso em vigor (em "Todos", tarefa avulsa).
+     */
     public record TaskForm(String title, String description, String subject, LocalDate plannedDate,
-                           Integer estimatedMinutes, Integer spentMinutes, Long pageId) {
+                           Integer estimatedMinutes, Integer spentMinutes, Long pageId, Long cronogramaId) {
+
+        public TaskForm(String title, String description, String subject, LocalDate plannedDate,
+                        Integer estimatedMinutes, Integer spentMinutes, Long pageId) {
+            this(title, description, subject, plannedDate, estimatedMinutes, spentMinutes, pageId, null);
+        }
+    }
+
+    /**
+     * Tarefas do concurso em vigor (em "Todos", todas). A tarefa diaria de revisao vale para todos os concursos.
+     * Com {@code cronogramaId}, so as daquele cronograma.
+     */
+    public List<StudyTask> visible(Long cronogramaId) {
+        Map<Long, Long> concursoBy = new java.util.HashMap<>();
+        concursoService.cronogramasById().forEach((id, c) -> concursoBy.put(id, c.getConcursoId()));
+        return taskRepository.findAll().stream()
+                .filter(t -> cronogramaId == null ? t.isReview()
+                        || workspace.matches(t.getCronogramaId() == null ? null : concursoBy.get(t.getCronogramaId()))
+                        : cronogramaId.equals(t.getCronogramaId()))
+                .toList();
     }
 
     public record WeekSummary(int planned, int done, int estimatedMinutes, int spentMinutes) {
@@ -75,7 +105,11 @@ public class StudyTaskService {
      * so nos ultimos {@link #RECENT_DAYS} dias, ou sempre com {@code showAll}.
      */
     public Schedule schedule(LocalDate today, boolean showAll) {
-        List<StudyTask> all = taskRepository.findAll().stream()
+        return schedule(today, showAll, null);
+    }
+
+    public Schedule schedule(LocalDate today, boolean showAll, Long cronogramaId) {
+        List<StudyTask> all = visible(cronogramaId).stream()
                 .sorted(Comparator.comparing(StudyTask::getPlannedDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(StudyTask::getId)).toList();
         List<TaskGroup> groups = new ArrayList<>();
@@ -117,7 +151,7 @@ public class StudyTaskService {
     /** Traz para hoje as tarefas atrasadas ainda abertas (menos a de revisao). @return quantas mudaram */
     @Transactional
     public int moveOverdueTo(LocalDate today) {
-        List<StudyTask> overdue = taskRepository.findAll().stream().filter(t -> !t.isDone() && !t.isReview()
+        List<StudyTask> overdue = visible(null).stream().filter(t -> !t.isDone() && !t.isReview()
                 && t.getPlannedDate() != null && t.getPlannedDate().isBefore(today)).toList();
         overdue.forEach(t -> t.setPlannedDate(today));
         taskRepository.saveAll(overdue);
@@ -126,7 +160,7 @@ public class StudyTaskService {
 
     /** Tarefas de hoje e atrasadas, para a visao geral. */
     public List<StudyTask> dueBy(LocalDate today) {
-        return taskRepository.findAll().stream()
+        return visible(null).stream()
                 .filter(t -> !t.isDone() && t.getPlannedDate() != null && !t.getPlannedDate().isAfter(today))
                 .sorted(Comparator.comparing(StudyTask::getPlannedDate).thenComparing(StudyTask::getId)).toList();
     }
@@ -134,7 +168,7 @@ public class StudyTaskService {
     public WeekSummary week(LocalDate today) {
         LocalDate start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate end = start.plusDays(6);
-        List<StudyTask> inWeek = taskRepository.findAll().stream().filter(t -> t.getPlannedDate() != null
+        List<StudyTask> inWeek = visible(null).stream().filter(t -> t.getPlannedDate() != null
                 && !t.getPlannedDate().isBefore(start) && !t.getPlannedDate().isAfter(end)).toList();
         int done = (int) inWeek.stream().filter(StudyTask::isDone).count();
         int estimated = inWeek.stream().mapToInt(t -> t.getEstimatedMinutes() == null ? 0 : t.getEstimatedMinutes()).sum();
@@ -158,6 +192,9 @@ public class StudyTaskService {
     public StudyTask create(TaskForm form) {
         StudyTask task = new StudyTask();
         apply(task, form);
+        if (task.getCronogramaId() == null && workspace.currentId() != null) {
+            task.setCronogramaId(concursoService.defaultCronograma(workspace.currentId()).getId());
+        }
         return taskRepository.save(task);
     }
 
@@ -189,6 +226,29 @@ public class StudyTaskService {
         task.setEstimatedMinutes(form.estimatedMinutes());
         task.setSpentMinutes(form.spentMinutes());
         task.setPageId(form.pageId());
+        if (form.cronogramaId() != null || task.getId() != null) {
+            if (form.cronogramaId() != null && concursoService.cronograma(form.cronogramaId()).isEmpty()) {
+                throw new IllegalArgumentException("O cronograma escolhido não existe mais.");
+            }
+            task.setCronogramaId(form.cronogramaId());
+        }
+    }
+
+    /** Move tarefas para outro cronograma (nulo = avulsas). @return quantas mudaram */
+    @Transactional
+    public int move(java.util.Collection<Long> ids, Long cronogramaId) {
+        if (cronogramaId != null && concursoService.cronograma(cronogramaId).isEmpty()) {
+            throw new IllegalArgumentException("O cronograma escolhido não existe mais.");
+        }
+        List<StudyTask> tasks = taskRepository.findAllById(ids).stream().filter(t -> !t.isReview()).toList();
+        tasks.forEach(t -> t.setCronogramaId(cronogramaId));
+        taskRepository.saveAll(tasks);
+        return tasks.size();
+    }
+
+    /** Nome do cronograma de cada tarefa (para a lista e o MCP). */
+    public Map<Long, Cronograma> cronogramas() {
+        return concursoService.cronogramasById();
     }
 
     private static boolean negative(Integer minutes) {

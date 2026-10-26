@@ -23,9 +23,15 @@ public class DocxImportService {
 
     private final StudyPageService pageService;
     private final StudyTaskRepository taskRepository;
+    private final com.pdf2questao.concurso.ConcursoService concursoService;
+    private final com.pdf2questao.concurso.Workspace workspace;
     private final Map<String, Preview> previews = new ConcurrentHashMap<>();
 
-    public DocxImportService(StudyPageService pageService, StudyTaskRepository taskRepository) {
+    public DocxImportService(StudyPageService pageService, StudyTaskRepository taskRepository,
+                             com.pdf2questao.concurso.ConcursoService concursoService,
+                             com.pdf2questao.concurso.Workspace workspace) {
+        this.concursoService = concursoService;
+        this.workspace = workspace;
         this.pageService = pageService;
         this.taskRepository = taskRepository;
     }
@@ -86,9 +92,16 @@ public class DocxImportService {
         return Optional.ofNullable(previews.get(token));
     }
 
-    /** Cria a pagina e, se {@code createTasks}, as tarefas novas ligadas a ela (as ja existentes sao puladas). */
-    @Transactional
     public Outcome confirm(String token, String title, Long parentId, boolean createTasks) {
+        return confirm(token, title, parentId, createTasks, null);
+    }
+
+    /**
+     * Cria a pagina e, se {@code createTasks}, as tarefas novas ligadas a ela (as ja existentes sao puladas), no
+     * cronograma escolhido (nulo = o padrao do concurso em vigor; em "Todos", avulsas).
+     */
+    @Transactional
+    public Outcome confirm(String token, String title, Long parentId, boolean createTasks, Long cronogramaId) {
         Preview preview = previews.get(token);
         if (preview == null) {
             throw new IllegalStateException("Esta prévia expirou. Envie o arquivo de novo.");
@@ -96,6 +109,8 @@ public class DocxImportService {
         String pageTitle = title == null || title.isBlank() ? preview.title() : title;
         StudyPage page = pageService.create(parentId, pageTitle, null, preview.html());
         int created = 0;
+        Long cronograma = cronogramaId != null ? cronogramaId : workspace.currentId() == null ? null
+                : concursoService.defaultCronograma(workspace.currentId()).getId();
         if (createTasks) {
             for (TaskPreview t : preview.tasks()) {
                 if (t.existing()) {
@@ -112,6 +127,7 @@ public class DocxImportService {
                 task.setPlannedDate(i.date());
                 task.setEstimatedMinutes(i.minutes());
                 task.setPageId(page.getId());
+                task.setCronogramaId(cronograma);
                 taskRepository.save(task);
                 created++;
             }

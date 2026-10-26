@@ -69,9 +69,10 @@ public class StudyPageController {
     public String importConfirm(@PathVariable String token, @RequestParam(defaultValue = "") String title,
                                 @RequestParam(required = false) Long parentId,
                                 @RequestParam(defaultValue = "false") boolean createTasks,
+                                @RequestParam(required = false) Long cronogramaId,
                                 RedirectAttributes redirectAttributes) {
         try {
-            var outcome = docxImportService.confirm(token, title, parentId, createTasks);
+            var outcome = docxImportService.confirm(token, title, parentId, createTasks, cronogramaId);
             redirectAttributes.addFlashAttribute("message", "Documento importado como página"
                     + (outcome.tasksCreated() > 0 ? " e " + outcome.tasksCreated() + " tarefas criadas no cronograma" : "")
                     + ".");
