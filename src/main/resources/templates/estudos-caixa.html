@@ -38,7 +38,7 @@
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-file-earmark-plus me-1"></i>Virar página</button>
                 </form>
-                <form method="post" th:action="@{/estudos/caixa-de-entrada/{id}/excluir(id=${n.id})}" onsubmit="return confirm('Apagar esta anotação?')">
+                <form method="post" th:action="@{/estudos/caixa-de-entrada/{id}/excluir(id=${n.id})}" data-confirm="Apagar esta anotação?">
                     <button type="submit" class="icon-btn border-0 text-bad" title="Apagar" aria-label="Apagar anotação"><i class="bi bi-trash"></i></button>
                 </form>
             </div>

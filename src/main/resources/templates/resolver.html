@@ -255,9 +255,10 @@
         });
         hlButton.addEventListener('click', function () { highlighter.apply(); });
         document.getElementById('clearHighlights').addEventListener('click', function () {
-            if (highlighter.ranges().length === 0 || confirm('Remover todos os grifos deste texto?')) {
-                highlighter.clear();
-            }
+            if (highlighter.ranges().length === 0) { highlighter.clear(); return; }
+            window.p2qConfirm('Remover todos os grifos deste texto?', 'Remover').then(function (ok) {
+                if (ok) { highlighter.clear(); }
+            });
         });
 
         panel.scrollTop = parseInt(sessionStorage.getItem(scrollKey) || '0', 10);
@@ -349,12 +350,13 @@
         if (finishing) { return; }
         e.preventDefault();
         const pending = document.querySelectorAll('.question-map a:not(.done)').length;
-        if (pending > 0 && !confirm(pending + (pending === 1 ? ' questão sem resposta' : ' questões sem resposta')
-                + '. Finalizar mesmo assim?')) {
-            return;
-        }
-        finishing = true;
-        afterSave().then(sendTime).then(function () { finishForm.submit(); });
+        const go = function () {
+            finishing = true;
+            afterSave().then(sendTime).then(function () { finishForm.submit(); });
+        };
+        if (pending === 0) { go(); return; }
+        window.p2qConfirm(pending + (pending === 1 ? ' questão sem resposta' : ' questões sem resposta')
+                + '. Finalizar mesmo assim?', 'Finalizar').then(function (ok) { if (ok) { go(); } });
     });
 
     // Atalhos: A-E responde, Shift+letra risca, X marca chute, M abre o mapa, setas navegam (e nao trocam o radio focado).

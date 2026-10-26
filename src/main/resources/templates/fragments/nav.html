@@ -65,6 +65,10 @@
     </div>
 </aside>
 
+<!-- Mensagem de sucesso/erro: telas sem o fragmento flash mostram como aviso no canto (app.js). -->
+<template id="flashData" th:if="${message != null or error != null}"
+          th:attr="data-message=${message},data-error=${error}"></template>
+
 <!-- Erro vindo de outra tela (ex.: filtros sem questoes): aparece por cima de qualquer pagina. -->
 <div class="alert alert-danger alert-dismissible global-alert" role="alert" th:if="${globalError}">
     <span th:text="${globalError}"></span>

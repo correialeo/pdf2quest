@@ -1761,3 +1761,64 @@ html.sidebar-collapsed .workspace-switch {
     height: 100%;
     background: var(--accent);
 }
+
+/* ---- cronograma: semana e lote ---- */
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .5rem;
+}
+
+@media (max-width: 991.98px) {
+    .week-grid { grid-template-columns: 1fr; }
+}
+
+.week-day {
+    min-height: 8rem;
+    padding: .5rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .5rem;
+    background: var(--bs-body-bg);
+}
+
+.week-day.is-today { border-color: var(--accent); }
+.week-day.is-drop { background: var(--accent-soft); }
+
+.week-day-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: .78rem;
+    font-weight: 600;
+    margin-bottom: .4rem;
+    text-transform: capitalize;
+}
+
+.week-task {
+    display: block;
+    padding: .35rem .45rem;
+    margin-bottom: .35rem;
+    border-radius: .375rem;
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    font-size: .8rem;
+    text-decoration: none;
+    word-break: break-word;
+}
+
+.week-task[draggable=true] { cursor: grab; }
+.week-task.is-done { opacity: .6; text-decoration: line-through; }
+.week-task.is-overdue { border-left: 3px solid var(--bs-danger); }
+.week-task.is-dragging { opacity: .4; }
+
+.bulk-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    z-index: 1040;
+    max-width: calc(100vw - 2rem);
+}
+
+/* ---- quiz: pergunta atual e fim ---- */
+.quiz-question.is-current { outline: 2px solid var(--accent-soft); }
+.quiz-done { border-left: 4px solid var(--accent); }

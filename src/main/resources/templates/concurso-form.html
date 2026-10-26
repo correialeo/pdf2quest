@@ -78,7 +78,7 @@
     </form>
 
     <form th:if="${concurso.id != null}" method="post" th:action="@{/concursos/{id}/excluir(id=${concurso.id})}" class="mt-4"
-          onsubmit="return confirm('Apagar o concurso? Cronogramas, aulas e simulados dele continuam, sem concurso.')">
+          data-confirm="Apagar o concurso? Cronogramas, aulas e simulados dele continuam, sem concurso.">
         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Apagar concurso</button>
     </form>
 </main>

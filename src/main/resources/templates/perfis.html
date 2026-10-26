@@ -10,8 +10,7 @@
             <p class="page-subtitle">Peso de cada disciplina, mínimo por grupo e mínimo total. Anuladas contam como acerto; erros não descontam.</p>
         </div>
     </div>
-    <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
-    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+    <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
     <th:block th:if="${profiles.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-sliders', 'Nenhum perfil ainda. Crie um com o JSON abaixo.', null, null)}"></div></th:block>
     <div class="row row-cols-1 row-cols-lg-2 g-3">

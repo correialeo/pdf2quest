@@ -47,7 +47,7 @@
                         <li><hr class="dropdown-divider"/></li>
                         <li>
                             <form method="post" th:action="@{/blocos/{id}/excluir(id=${b.id})}"
-                                  onsubmit="return confirm('Apagar este bloco? As questões e sessões continuam no banco.')">
+                                  data-confirm="Apagar este bloco? As questões e sessões continuam no banco.">
                                 <button type="submit" class="dropdown-item text-bad"><i class="bi bi-trash me-2"></i>Apagar</button>
                             </form>
                         </li>

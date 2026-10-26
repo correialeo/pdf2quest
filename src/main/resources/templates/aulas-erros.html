@@ -95,7 +95,7 @@
                     reveal(card);
                     score();
                 }).catch(function () {
-                    alert('Não foi possível salvar a resposta. Tente de novo.');
+                    window.p2qToast('Não foi possível salvar a resposta. Tente de novo.', 'danger');
                 }).finally(function () { delete card.dataset.sending; });
             });
         });

@@ -27,7 +27,7 @@
                     <a class="btn btn-primary btn-sm"
                        th:href="@{/resolver/{id}(id=${o.session.id}, index=${o.resumeIndex})}">Continuar</a>
                     <form method="post" th:action="@{/resolver/{id}/descartar(id=${o.session.id})}"
-                          onsubmit="return confirm('Descartar esta sessão? As respostas dela serão apagadas.')">
+                          data-confirm="Descartar esta sessão? As respostas dela serão apagadas.">
                         <button type="submit" class="btn btn-outline-secondary btn-sm">Descartar</button>
                     </form>
                 </div>

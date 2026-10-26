@@ -150,7 +150,7 @@
                 </form>
                 <form method="post" th:action="@{/estudos/paginas/{id}/excluir(id=${page.id})}" class="mt-3"
                       th:attr="data-confirm=${descendants.isEmpty()} ? 'Apagar esta página? Não dá para desfazer.' : 'Apagar esta página e as ' + ${descendants.size()} + ' subpáginas dentro dela? Não dá para desfazer.'"
-                      onsubmit="return confirm(this.getAttribute('data-confirm'))">
+                      data-confirm-ok="Apagar">
                     <button type="submit" class="btn btn-sm btn-link text-bad p-0"><i class="bi bi-trash me-1"></i>Apagar página</button>
                 </form>
             </div>

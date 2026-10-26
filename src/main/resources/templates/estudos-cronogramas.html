@@ -80,7 +80,7 @@
             <a th:href="@{/estudos/cronograma(cronograma=${cr.id})}"
                th:text="${counts[cr.id] == null} ? 'Sem tarefas' : ${counts[cr.id][1]} + ' de ' + ${counts[cr.id][0]} + ' tarefas concluídas'"></a>
             <form method="post" th:action="@{/estudos/cronogramas/{id}/excluir(id=${cr.id})}" class="ms-auto"
-                  onsubmit="return confirm('Apagar o cronograma? As tarefas dele continuam, como avulsas.')">
+                  data-confirm="Apagar o cronograma? As tarefas dele continuam, como avulsas.">
                 <button type="submit" class="btn btn-sm btn-link text-danger p-0">Apagar</button>
             </form>
         </div>

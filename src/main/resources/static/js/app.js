@@ -199,7 +199,149 @@
         });
     }
 
+    // Aviso rapido no canto (no lugar do alert nativo). kind: success | danger | secondary.
+    function toast(message, kind) {
+        var box = document.querySelector('.p2q-toasts');
+        if (!box) {
+            box = document.createElement('div');
+            box.className = 'p2q-toasts toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(box);
+        }
+        var el = document.createElement('div');
+        el.className = 'toast align-items-center border-0 text-bg-' + (kind || 'secondary');
+        el.setAttribute('role', kind === 'danger' ? 'alert' : 'status');
+        el.innerHTML = '<div class="d-flex"><div class="toast-body"></div>'
+            + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button></div>';
+        el.querySelector('.toast-body').textContent = message;
+        box.appendChild(el);
+        el.addEventListener('hidden.bs.toast', function () { el.remove(); });
+        new bootstrap.Toast(el, {delay: 4000}).show();
+    }
+
+    // Confirmacao em modal (no lugar do confirm nativo): devolve uma Promise<boolean>.
+    var confirmDialog = null;
+    function confirmModal(message, okLabel) {
+        if (!confirmDialog) {
+            confirmDialog = document.createElement('dialog');
+            confirmDialog.className = 'task-time-dialog';
+            confirmDialog.innerHTML = '<form method="dialog"><p class="mb-3" data-role="msg"></p>'
+                + '<div class="d-flex gap-2 justify-content-end">'
+                + '<button type="submit" value="no" class="btn btn-outline-secondary btn-sm">Cancelar</button>'
+                + '<button type="submit" value="yes" class="btn btn-danger btn-sm" data-role="ok"></button></div></form>';
+            document.body.appendChild(confirmDialog);
+        }
+        confirmDialog.querySelector('[data-role=msg]').textContent = message;
+        var ok = confirmDialog.querySelector('[data-role=ok]');
+        ok.textContent = okLabel || (/^(Apagar|Descartar|Remover)/.test(message) ? message.split(/[ ?]/)[0] : 'Confirmar');
+        ok.className = 'btn btn-sm ' + (/^(Apagar|Descartar|Remover)/.test(ok.textContent) ? 'btn-danger' : 'btn-primary');
+        confirmDialog.returnValue = '';
+        return new Promise(function (resolve) {
+            confirmDialog.addEventListener('close', function () { resolve(confirmDialog.returnValue === 'yes'); }, {once: true});
+            confirmDialog.showModal();
+            confirmDialog.querySelector('[data-role=ok]').focus();
+        });
+    }
+
+    // data-confirm="mensagem" em <form> ou num botao de envio pede confirmacao antes de enviar.
+    function setupConfirm() {
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            var button = e.submitter;
+            var message = (button && button.dataset.confirm) || form.dataset.confirm;
+            if (!message || form.dataset.confirmed === '1') { delete form.dataset.confirmed; return; }
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            confirmModal(message, (button && button.dataset.confirmOk) || form.dataset.confirmOk).then(function (ok) {
+                if (!ok) return;
+                form.dataset.confirmed = '1';
+                form.requestSubmit(button || undefined);
+            });
+        }, true);
+    }
+
+    // data-copy-text: copia um pedido pronto para colar no Claude Code.
+    function setupCopyText() {
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-copy-text]');
+            if (!btn) return;
+            navigator.clipboard.writeText(btn.dataset.copyText).then(function () {
+                toast('Copiado! Cole no Claude Code.', 'success');
+            }, function () { toast('Não foi possível copiar.', 'danger'); });
+        });
+    }
+
+    // Mensagem do redirect que a tela nao mostrou (sem o fragmento flash): vira aviso no canto.
+    function showUnseenFlash() {
+        var data = document.getElementById('flashData');
+        if (!data) return;
+        var shown = Array.from(document.querySelectorAll('main .alert')).map(function (a) { return a.textContent.trim(); });
+        [['message', 'success'], ['error', 'danger']].forEach(function (pair) {
+            var text = data.dataset[pair[0]];
+            if (text && shown.indexOf(text.trim()) < 0) toast(text, pair[1]);
+        });
+    }
+
+    // Cronograma: marcar tarefas abre a barra de acoes em lote.
+    function setupBulk() {
+        var form = document.getElementById('bulkForm');
+        if (!form) return;
+        var boxes = Array.from(document.querySelectorAll('.task-select'));
+        function update() {
+            var n = boxes.filter(function (b) { return b.checked; }).length;
+            form.hidden = n === 0;
+            document.getElementById('bulkCount').textContent = n === 1 ? '1 tarefa' : n + ' tarefas';
+        }
+        boxes.forEach(function (b) { b.addEventListener('change', update); });
+        document.getElementById('bulkClear').addEventListener('click', function () {
+            boxes.forEach(function (b) { b.checked = false; });
+            update();
+        });
+    }
+
+    // Visao semanal: arrastar uma tarefa para outro dia muda a data.
+    function setupWeekDrag() {
+        var dragged = null;
+        document.querySelectorAll('.week-task[draggable=true]').forEach(function (task) {
+            task.addEventListener('dragstart', function (e) {
+                dragged = task;
+                e.dataTransfer.effectAllowed = 'move';
+                task.classList.add('is-dragging');
+            });
+            task.addEventListener('dragend', function () { task.classList.remove('is-dragging'); });
+        });
+        document.querySelectorAll('.week-day').forEach(function (day) {
+            day.addEventListener('dragover', function (e) {
+                if (!dragged) return;
+                e.preventDefault();
+                day.classList.add('is-drop');
+            });
+            day.addEventListener('dragleave', function () { day.classList.remove('is-drop'); });
+            day.addEventListener('drop', function (e) {
+                e.preventDefault();
+                day.classList.remove('is-drop');
+                if (!dragged || dragged.closest('.week-day') === day) return;
+                var task = dragged;
+                dragged = null;
+                day.appendChild(task);
+                fetch('/estudos/cronograma/' + task.dataset.id + '/adiar?para=' + day.dataset.date, {method: 'POST'})
+                    .then(function (r) {
+                        if (!r.ok) throw new Error(r.status);
+                        location.reload();
+                    })
+                    .catch(function () { toast('Não foi possível mudar o dia.', 'danger'); location.reload(); });
+            });
+        });
+    }
+
+    window.p2qToast = toast;
+    window.p2qConfirm = confirmModal;
+
     document.addEventListener('DOMContentLoaded', function () {
+        setupConfirm();
+        showUnseenFlash();
+        setupBulk();
+        setupWeekDrag();
+        setupCopyText();
         setupTaskTime();
         setupTaskDescription();
         setupQuickNote();
