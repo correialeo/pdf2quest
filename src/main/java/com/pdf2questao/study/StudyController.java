@@ -57,7 +57,7 @@ public class StudyController {
         model.addAttribute("recentPages", pageService.recent());
         model.addAttribute("inboxCount", inboxService.count());
         model.addAttribute("practice", dashboardService.today());
-        model.addAttribute("lessons", lessonService.all().stream().limit(3).toList());
+        model.addAttribute("lessons", lessonService.visible().stream().limit(3).toList());
         return "estudos";
     }
 

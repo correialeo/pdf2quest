@@ -9,7 +9,7 @@ public interface StudyPageRepository extends JpaRepository<StudyPage, Long> {
 
     List<StudyPage> findByParentId(Long parentId);
 
-    List<StudyPage> findTop6ByOrderByUpdatedAtDesc();
+    List<StudyPage> findTop50ByOrderByUpdatedAtDesc();
 
     /** Paginas com o termo no titulo ou no texto (sem diferenciar maiusculas), as editadas por ultimo primeiro. */
     @Query(value = "SELECT * FROM study_page WHERE title LIKE '%' || :term || '%' "

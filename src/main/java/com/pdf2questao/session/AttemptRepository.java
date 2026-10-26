@@ -57,6 +57,9 @@ public interface AttemptRepository extends JpaRepository<Attempt, Long> {
             "GROUP BY q.subject ORDER BY q.subject", nativeQuery = true)
     List<Object[]> statsBySubject(@Param("c") Long concursoId);
 
+    @Query(value = "SELECT COUNT(DISTINCT a.question_id) FROM attempt a WHERE " + IN_CONCURSO, nativeQuery = true)
+    long countDistinctQuestionsAnswered(@Param("c") Long concursoId);
+
     /** [acertos, erros] nas sessoes do concurso (nulo = todas). */
     @Query(value = "SELECT COALESCE(SUM(CASE WHEN a.correct = 1 THEN 1 ELSE 0 END), 0), " +
             "COALESCE(SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END), 0) FROM attempt a WHERE " + IN_CONCURSO,

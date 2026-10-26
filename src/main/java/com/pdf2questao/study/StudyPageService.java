@@ -89,7 +89,8 @@ public class StudyPageService {
     }
 
     public List<StudyPage> recent() {
-        return pageRepository.findTop6ByOrderByUpdatedAtDesc();
+        return pageRepository.findTop50ByOrderByUpdatedAtDesc().stream()
+                .filter(p -> workspace.matchesOrShared(p.getConcursoId())).limit(6).toList();
     }
 
     public List<StudyPage> children(Long id) {

@@ -89,11 +89,14 @@ public class DashboardService {
                 .collect(Collectors.toMap(StudySession::getId, s -> s));
 
         List<ProvaCard> cards = new ArrayList<>();
-        for (ImportJob job : importJobRepository.findAll().stream().sorted(Comparator.comparing(ImportJob::getId)).toList()) {
+        long visibleQuestions = 0;
+        for (ImportJob job : importJobRepository.findAll().stream().filter(j -> workspace.matchesOrShared(j.getConcursoId()))
+                .sorted(Comparator.comparing(ImportJob::getId)).toList()) {
             long questions = questionCounts.getOrDefault(job.getId(), 0L);
             if (questions == 0) {
                 continue;
             }
+            visibleQuestions += questions;
             long[] t = totals.getOrDefault(job.getId(), new long[3]);
             List<StudySession> jobSessions = sessionIdsByJob.getOrDefault(job.getId(), List.of()).stream()
                     .map(sessions::get).filter(Objects::nonNull).toList();
@@ -122,7 +125,7 @@ public class DashboardService {
         Object[] answers = attemptRepository.totals(concurso).get(0);
         long correct = num(answers[0]);
         long wrong = num(answers[1]);
-        return new Overview(cards.size(), questionRepository.count(), attemptRepository.countDistinctQuestionsAnswered(),
+        return new Overview(cards.size(), visibleQuestions, attemptRepository.countDistinctQuestionsAnswered(concurso),
                 correct, wrong, groups, blocks, recent, mapStats(attemptRepository.statsBySubject(concurso)),
                 guessService.counts(null), open, errorNotebookCount());
     }

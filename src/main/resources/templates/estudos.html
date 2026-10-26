@@ -7,7 +7,16 @@
     <div class="page-header">
         <div>
             <h1>Hoje</h1>
-            <p class="page-subtitle" th:text="${#temporals.format(today, 'EEEE, d ''de'' MMMM', new java.util.Locale('pt', 'BR'))}"></p>
+            <p class="page-subtitle">
+                <span th:text="${#temporals.format(today, 'EEEE, d ''de'' MMMM', new java.util.Locale('pt', 'BR'))}"></span>
+                <th:block th:if="${concursoAtivo != null}">
+                    · <a class="text-reset fw-medium" th:href="@{/concursos/{id}(id=${concursoAtivo.id})}">
+                        <span class="workspace-dot d-inline-block align-middle me-1" th:style="'background:' + ${concursoAtivo.corOuPadrao}"></span><span th:text="${concursoAtivo.nome}"></span></a>
+                    <span th:if="${concursoAtivo.dataProva != null}" th:with="d=${concursoAtivo.diasParaProva(today)}"
+                          th:classappend="${d != null and d >= 0 and d <= 30} ? 'text-bad fw-medium' : ''"
+                          th:text="${d > 0} ? ' · faltam ' + ${d} + ' dias para a prova' : (${d == 0} ? ' · a prova é hoje' : '')"></span>
+                </th:block>
+            </p>
         </div>
         <form method="post" action="/estudos/paginas">
             <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nova página</button>
@@ -57,7 +66,7 @@
                 </div>
             </div>
 
-            <div class="row row-cols-3 g-3 mt-1">
+            <div class="row row-cols-1 row-cols-sm-3 g-3 mt-1">
                 <div class="col"><div th:replace="~{fragments/ui :: stat('Tarefas da semana', ${week.done} + ' de ' + ${week.planned}, '')}"></div></div>
                 <div class="col"><div th:replace="~{fragments/ui :: stat('Planejado na semana', ${week.estimatedMinutes} + ' min', '')}"></div></div>
                 <div class="col"><div th:replace="~{fragments/ui :: stat('Estudado na semana', ${week.spentMinutes} + ' min', 'text-ok')}"></div></div>
@@ -113,14 +122,12 @@
                 </div>
             </th:block>
 
-            <div class="section-title d-flex align-items-center">
-                <span>Anotação rápida</span>
-                <a href="/estudos/caixa-de-entrada" class="ms-auto small fw-normal"
-                   th:text="${inboxCount > 0} ? 'Caixa de entrada (' + ${inboxCount} + ')' : 'Caixa de entrada'"></a>
-            </div>
-            <form th:replace="~{fragments/estudos :: quickNote}"></form>
-
-            <div class="section-title mt-4">Páginas recentes</div>
+        </div>
+    </div>
+    <!-- Anotacoes e paginas: apoio, abaixo do que e para fazer hoje. -->
+    <div class="row g-4 mt-1">
+        <div class="col-lg-7">
+            <div class="section-title">Páginas recentes</div>
             <div th:if="${recentPages.isEmpty()}" class="empty-state">
                 <i class="bi bi-file-earmark-text"></i>
                 <span>Crie sua primeira página de resumo: use títulos, listas, tabelas e checklists.</span>
@@ -132,6 +139,15 @@
                     <span class="text-muted small ms-auto text-nowrap" th:text="${#temporals.format(p.updatedAt, 'dd/MM HH:mm')}"></span>
                 </a>
             </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="section-title d-flex align-items-center">
+                <span>Anotação rápida</span>
+                <a href="/estudos/caixa-de-entrada" class="ms-auto small fw-normal"
+                   th:text="${inboxCount > 0} ? 'Caixa de entrada (' + ${inboxCount} + ')' : 'Caixa de entrada'"></a>
+            </div>
+            <form th:replace="~{fragments/estudos :: quickNote}"></form>
+
         </div>
     </div>
 </main>
