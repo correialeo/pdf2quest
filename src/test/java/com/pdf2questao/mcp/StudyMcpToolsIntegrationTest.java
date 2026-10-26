@@ -55,14 +55,14 @@ class StudyMcpToolsIntegrationTest {
         assertEquals(1, result.erros());
         assertTrue(result.avisos().stream().anyMatch(a -> a.contains("Questão 3")));
 
-        var errors = tools.listErrors("afo", 5);
+        var errors = tools.listErrors("afo", 5, null);
         assertEquals(1, errors.size());
         assertEquals("B", errors.get(0).suaResposta());
         assertEquals("C", errors.get(0).respostaCorreta());
         assertEquals("Porque sim.", errors.get(0).explicacao());
-        assertTrue(tools.listErrors("portugues", 5).isEmpty());
+        assertTrue(tools.listErrors("portugues", 5, null).isEmpty());
 
-        var afo = tools.subjectPerformance().stream().filter(s -> s.disciplina().equals("AFO")).findFirst().orElseThrow();
+        var afo = tools.subjectPerformance(null).stream().filter(s -> s.disciplina().equals("AFO")).findFirst().orElseThrow();
         assertEquals(2, afo.respondidas());
         assertEquals(50.0, afo.percentual());
     }
@@ -72,7 +72,7 @@ class StudyMcpToolsIntegrationTest {
         LocalDate today = LocalDate.now();
         StudyTask task = taskService.create(new StudyTaskService.TaskForm("Princípios orçamentários", null, "AFO",
                 today, 60, null, null));
-        assertTrue(tools.todayTasks().stream().anyMatch(t -> t.id().equals(task.getId())));
+        assertTrue(tools.todayTasks(null, null).stream().anyMatch(t -> t.id().equals(task.getId())));
 
         var done = tools.completeTask(task.getId(), 50);
         assertEquals(50, done.minutos());

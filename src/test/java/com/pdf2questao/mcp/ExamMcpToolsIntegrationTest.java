@@ -104,16 +104,16 @@ class ExamMcpToolsIntegrationTest {
         var profile = exam.saveProfile("Teste – C03", "P1 min 3", 5.0, List.of(
                 new GroupInput("P1", 3.0, List.of(new SubjectInput("Português", List.of("Língua Portuguesa"), 2, 1.0),
                         new SubjectInput("AFO", List.of(), 2, 2.0))),
-                new GroupInput("P2", 3.0, List.of(new SubjectInput("TI", List.of(), 2, 3.0)))));
+                new GroupInput("P2", 3.0, List.of(new SubjectInput("TI", List.of(), 2, 3.0)))), null);
         assertEquals(2, profile.provas().size());
-        assertEquals(1, exam.examStructure("teste – c03").size());
+        assertEquals(1, exam.examStructure("teste – c03", null).size());
 
         assertThrows(IllegalArgumentException.class, () -> exam.createExam(profile.id(), "P1", "Sim", "FCC", 240,
-                "curto", "a\nb"), "sem pesquisa da banca nao cria");
+                "curto", "a\nb", null), "sem pesquisa da banca nao cria");
         assertThrows(IllegalArgumentException.class, () -> exam.createExam(profile.id(), "P1", "Sim", "FCC", 240,
-                STYLE, "so uma prova"), "precisa de duas provas analisadas");
+                STYLE, "so uma prova", null), "precisa de duas provas analisadas");
 
-        var p1 = exam.createExam(profile.id(), "P1", "Simulado P1", "FCC", 240, STYLE, "prova local #1\nhttps://x/prova.pdf");
+        var p1 = exam.createExam(profile.id(), "P1", "Simulado P1", "FCC", 240, STYLE, "prova local #1\nhttps://x/prova.pdf", null);
         assertEquals(2, p1.disciplinas().size());
 
         var added = exam.addQuestions(p1.id(), List.of(q("Língua Portuguesa", "A"), q("Português", "B"),
@@ -137,7 +137,7 @@ class ExamMcpToolsIntegrationTest {
         assertEquals(2, afterRemove.questoes());
         exam.addQuestions(p1.id(), List.of(q("AFO", "B")));
         exam.addQuestions(p1.id(), List.of(q("AFO", "E")));
-        var p2 = exam.createExam(profile.id(), "P2", "Simulado P2", "FCC", 240, STYLE, "a\nb");
+        var p2 = exam.createExam(profile.id(), "P2", "Simulado P2", "FCC", 240, STYLE, "a\nb", null);
         exam.addQuestions(p2.id(), List.of(q("TI", "A"), q("TI", "B")));
         assertThrows(IllegalArgumentException.class, () -> exam.finishExam(List.of(p1.id(), p2.id()), "Dia de prova",
                 false), "sem revisão aprovada não finaliza");
@@ -171,8 +171,8 @@ class ExamMcpToolsIntegrationTest {
         assertEquals(1, result.acertos());   // TI A (a Q1 de Português foi corrigida para C)
         assertTrue(result.notaProjetada() != null);
         assertEquals(5, result.erradas().size());
-        assertEquals(1, insight.examHistory().size());
-        assertTrue(insight.errorSummary().totalDeErros() >= 4);
+        assertEquals(1, insight.examHistory(null).size());
+        assertTrue(insight.errorSummary(null).totalDeErros() >= 4);
         var explanation = blockService.questionIds(block.blocoId()).size();
         assertEquals(6, explanation);
     }
@@ -180,9 +180,9 @@ class ExamMcpToolsIntegrationTest {
     @Test
     void foraDoEditalEReprovadaAparecemNaAuditoriaEBloqueiam() throws Exception {
         var profile = exam.saveProfile("Teste – edital", null, null, List.of(
-                new GroupInput("P1", null, List.of(new SubjectInput("Dir. Constitucional", List.of(), 2, 1.0)))));
+                new GroupInput("P1", null, List.of(new SubjectInput("Dir. Constitucional", List.of(), 2, 1.0)))), null);
         review.saveTopics(profile.id(), "Dir. Constitucional", List.of("Precatórios", "Direitos fundamentais"));
-        var p1 = exam.createExam(profile.id(), "P1", "Sim edital", "FCC", 60, STYLE, "a\nb");
+        var p1 = exam.createExam(profile.id(), "P1", "Sim edital", "FCC", 60, STYLE, "a\nb", null);
         exam.addQuestions(p1.id(), List.of(q("Dir. Constitucional", "C"), q("Dir. Constitucional", "A")));
         Long ref = realReference();
         var refs = List.of(new ReviewMcpTools.ReferenceInput(ref, null, null));
@@ -212,7 +212,7 @@ class ExamMcpToolsIntegrationTest {
     @Test
     void discursivaCriadaEscritaEntregueECorrigida() {
         var created = essays.createEssay("P3 – Caso", "Analise o caso...", "FCC", "Conteúdo – 80\nLíngua – 40",
-                90, 30, 120.0);
+                90, 30, 120.0, null);
         essayService.saveDraft(created.id(), "Primeiro parágrafo.", 60_000L);
         assertThrows(IllegalStateException.class, () -> essays.correctEssay(created.id(), 80, "ok"),
                 "so corrige depois de entregue");
@@ -225,7 +225,7 @@ class ExamMcpToolsIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> essays.correctEssay(created.id(), 130, "x"));
         var corrected = essays.correctEssay(created.id(), 84.5, "## Conteúdo\n- faltou citar a LRF");
         assertEquals(84.5, corrected.nota());
-        assertEquals("corrigida", essays.listEssays().get(0).situacao());
+        assertEquals("corrigida", essays.listEssays(null).get(0).situacao());
         assertThrows(IllegalStateException.class, () -> essayService.saveDraft(created.id(), "mudou", 0L));
     }
 

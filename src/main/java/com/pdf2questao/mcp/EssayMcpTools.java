@@ -15,9 +15,11 @@ import java.util.List;
 public class EssayMcpTools {
 
     private final EssayService essayService;
+    private final McpConcurso mcpConcurso;
     private final String baseUrl;
 
-    public EssayMcpTools(EssayService essayService, @Value("${server.port:8080}") int port) {
+    public EssayMcpTools(EssayService essayService, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+        this.mcpConcurso = mcpConcurso;
         this.essayService = essayService;
         this.baseUrl = "http://localhost:" + port;
     }
@@ -37,8 +39,10 @@ public class EssayMcpTools {
             @McpToolParam(description = "Critérios de correção com a pontuação de cada um, um por linha.") String criterios,
             @McpToolParam(description = "Tempo em minutos.", required = false) Integer tempoMinutos,
             @McpToolParam(description = "Máximo de linhas da folha de respostas.", required = false) Integer linhas,
-            @McpToolParam(description = "Nota máxima (ex.: 120).", required = false) Double notaMaxima) {
-        Essay essay = essayService.create(titulo, enunciado, banca, criterios, tempoMinutos, linhas, notaMaxima);
+            @McpToolParam(description = "Nota máxima (ex.: 120).", required = false) Double notaMaxima,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        Essay essay = mcpConcurso.in(concurso,
+                () -> essayService.create(titulo, enunciado, banca, criterios, tempoMinutos, linhas, notaMaxima));
         return new EssayCreated(essay.getId(), essay.getTitle(), baseUrl + "/discursivas/" + essay.getId());
     }
 
@@ -49,8 +53,9 @@ public class EssayMcpTools {
     @McpTool(name = "listar_discursivas",
             description = "Discursivas do usuário e a situação de cada uma (nova, em andamento, entregue, corrigida).",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public List<EssaySummary> listEssays() {
-        return essayService.all().stream().map(e -> new EssaySummary(e.getId(), e.getTitle(),
+    public List<EssaySummary> listEssays(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        return mcpConcurso.in(concurso, essayService::all).stream().map(e -> new EssaySummary(e.getId(), e.getTitle(),
                 e.isCorrected() ? "corrigida" : e.isSubmitted() ? "entregue" : e.getStartedAt() != null
                         ? "em andamento" : "nova", e.getScore(), e.getMaxScore(), e.getSubmittedAt(),
                 baseUrl + "/discursivas/" + e.getId())).toList();

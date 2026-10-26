@@ -46,16 +46,21 @@ public class ExamMcpTools {
     private static final int MAX_SAMPLES = 10;
 
     private final ScoringProfileService profileService;
+    private final com.pdf2questao.concurso.ConcursoService concursoService;
     private final GeneratedExamService examService;
     private final QuestionRepository questionRepository;
     private final ImportJobRepository importJobRepository;
     private final PassageRepository passageRepository;
+    private final McpConcurso mcpConcurso;
     private final String baseUrl;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public ExamMcpTools(ScoringProfileService profileService, GeneratedExamService examService,
+    public ExamMcpTools(ScoringProfileService profileService, com.pdf2questao.concurso.ConcursoService concursoService,
+                        GeneratedExamService examService,
                         QuestionRepository questionRepository, ImportJobRepository importJobRepository,
-                        PassageRepository passageRepository, @Value("${server.port:8080}") int port) {
+                        PassageRepository passageRepository, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+        this.mcpConcurso = mcpConcurso;
+        this.concursoService = concursoService;
         this.passageRepository = passageRepository;
         this.profileService = profileService;
         this.examService = examService;
@@ -198,11 +203,18 @@ public class ExamMcpTools {
 
     @McpTool(name = "estrutura_do_edital",
             description = "Perfis de pontuação cadastrados (estrutura do edital): provas, disciplinas com nº de "
-                    + "questões e peso, mínimos. Sem 'perfil', lista todos.",
+                    + "questões e peso, mínimos. Sem 'perfil', lista todos; com 'concurso', só o perfil dele.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
     public List<ProfileView> examStructure(
-            @McpToolParam(description = "Parte do nome do perfil ou o id (vazio = todos).", required = false) String perfil) {
+            @McpToolParam(description = "Parte do nome do perfil ou o id (vazio = todos).", required = false) String perfil,
+            @McpToolParam(description = "Concurso (id ou parte do nome): devolve o perfil ligado a ele.",
+                    required = false) String concurso) {
+        Long concursoProfile = McpText.blank(concurso) ? null : java.util.Optional.ofNullable(
+                mcpConcurso.resolveOrCurrent(concurso)).map(com.pdf2questao.concurso.Concurso::getScoringProfileId)
+                .orElseThrow(() -> new IllegalArgumentException("O concurso não tem perfil de pontuação ligado. "
+                        + "Crie com salvar_perfil_edital(concurso=...)."));
         return profileService.findAll().stream()
+                .filter(p -> concursoProfile == null || concursoProfile.equals(p.getId()))
                 .filter(p -> McpText.blank(perfil) || p.getId().toString().equals(perfil.strip())
                         || p.getName().toLowerCase(Locale.ROOT).contains(perfil.strip().toLowerCase(Locale.ROOT)))
                 .map(this::view).toList();
@@ -238,7 +250,9 @@ public class ExamMcpTools {
             @McpToolParam(description = "Nome do perfil, ex.: \"SEFAZ-SP APOFP 2026 – C03\".") String nome,
             @McpToolParam(description = "Resumo das regras (mínimos, totais).", required = false) String descricao,
             @McpToolParam(description = "Mínimo total das objetivas.", required = false) Double minimoTotal,
-            @McpToolParam(description = "Provas objetivas.") List<GroupInput> provas) throws JsonProcessingException {
+            @McpToolParam(description = "Provas objetivas.") List<GroupInput> provas,
+            @McpToolParam(description = "Concurso a que o perfil pertence (id ou parte do nome): o perfil passa a "
+                    + "ser o edital dele.", required = false) String concurso) throws JsonProcessingException {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("name", nome);
         root.put("description", descricao);
@@ -261,7 +275,11 @@ public class ExamMcpTools {
             groups.add(group);
         }
         root.put("groups", groups);
-        return view(profileService.saveFromJson(mapper.writeValueAsString(root)));
+        ScoringProfile saved = profileService.saveFromJson(mapper.writeValueAsString(root));
+        if (!McpText.blank(concurso)) {
+            concursoService.linkProfile(concursoService.resolve(concurso).getId(), saved.getId());
+        }
+        return view(saved);
     }
 
     // ---- provas reais da banca ----
@@ -346,15 +364,28 @@ public class ExamMcpTools {
                     + "quantas questões criar de cada disciplina. Veja o roteiro no prompt montar_simulado.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public ExamStatus createExam(
-            @McpToolParam(description = "Id do perfil (estrutura_do_edital).") Long perfilId,
+            @McpToolParam(description = "Id do perfil (estrutura_do_edital); vazio = o perfil do concurso.",
+                    required = false) Long perfilId,
             @McpToolParam(description = "Prova do perfil, ex.: P1 (vazio = todas as provas num simulado só).",
                     required = false) String prova,
             @McpToolParam(description = "Título, ex.: \"Simulado inédito FCC – APOFP C03 – P1 #1\".") String titulo,
             @McpToolParam(description = "Banca imitada, ex.: FCC.") String banca,
             @McpToolParam(description = "Tempo da prova em minutos (do edital).", required = false) Integer tempoMinutos,
             @McpToolParam(description = "Perfil da banca levantado na pesquisa (mínimo 600 caracteres).") String estiloDaBanca,
-            @McpToolParam(description = "Provas reais analisadas, uma por linha (link ou \"prova local #id\").") String fontes) {
-        return examService.create(perfilId, prova, titulo, banca, tempoMinutos, estiloDaBanca, fontes);
+            @McpToolParam(description = "Provas reais analisadas, uma por linha (link ou \"prova local #id\").") String fontes,
+            @McpToolParam(description = McpConcurso.PARAM + " O simulado e o bloco final ficam nesse concurso.",
+                    required = false) String concurso) {
+        return mcpConcurso.in(concurso, () -> {
+            Long profile = perfilId;
+            if (profile == null) {
+                var c = mcpConcurso.resolveOrCurrent(null);
+                profile = c == null ? null : c.getScoringProfileId();
+            }
+            if (profile == null) {
+                throw new IllegalArgumentException("Informe perfilId (estrutura_do_edital) ou um concurso com perfil ligado.");
+            }
+            return examService.create(profile, prova, titulo, banca, tempoMinutos, estiloDaBanca, fontes);
+        });
     }
 
     public record ExamQuestion(

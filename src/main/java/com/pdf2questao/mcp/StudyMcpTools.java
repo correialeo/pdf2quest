@@ -58,6 +58,7 @@ public class StudyMcpTools {
     private final DaySummaryService daySummaryService;
     private final StudyPageService pageService;
     private final LessonService lessonService;
+    private final McpConcurso mcpConcurso;
     private final String baseUrl;
 
     public StudyMcpTools(DashboardService dashboardService, AttemptRepository attemptRepository,
@@ -65,7 +66,8 @@ public class StudyMcpTools {
                          StructuredImportService importService, StudySessionService sessionService,
                          StudyTaskService taskService, SpacedRepetitionService spacedRepetition,
                          DaySummaryService daySummaryService, StudyPageService pageService,
-                         LessonService lessonService, @Value("${server.port:8080}") int port) {
+                         LessonService lessonService, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+        this.mcpConcurso = mcpConcurso;
         this.dashboardService = dashboardService;
         this.attemptRepository = attemptRepository;
         this.questionRepository = questionRepository;
@@ -86,11 +88,12 @@ public class StudyMcpTools {
     }
 
     @McpTool(name = "desempenho_por_disciplina",
-            description = "Acertos por disciplina em todas as questões já respondidas no sistema (simulados, provas e "
-                    + "treinos importados), piores primeiro. Use para decidir o que treinar.",
+            description = "Acertos por disciplina nas questões já respondidas (simulados, provas e treinos) do "
+                    + "concurso, piores primeiro. Use para decidir o que treinar.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public List<SubjectPerformance> subjectPerformance() {
-        return attemptRepository.statsBySubject().stream()
+    public List<SubjectPerformance> subjectPerformance(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        return attemptRepository.statsBySubject(mcpConcurso.id(concurso)).stream()
                 .map(r -> new SubjectStat((String) r[0], ((Number) r[1]).longValue(), ((Number) r[2]).longValue()))
                 .sorted(Comparator.comparingDouble(SubjectStat::percent))
                 .map(s -> new SubjectPerformance(s.label(), s.correct(), s.total(), round(s.percent())))
@@ -115,8 +118,9 @@ public class StudyMcpTools {
                     + "inteira, mínimos por grupo e o que cada disciplina rende. Disciplinas sem questões na sessão "
                     + "vêm com pontosProjetados nulo. Retorna nulo se ainda não houve simulado com perfil.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public LastSimulado lastSimulado() {
-        var today = dashboardService.today();
+    public LastSimulado lastSimulado(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        var today = mcpConcurso.in(concurso, dashboardService::today);
         StudySession s = today.lastScored();
         ScoreResult score = today.lastScore();
         if (s == null || score == null) {
@@ -146,7 +150,12 @@ public class StudyMcpTools {
     public List<ErrorQuestion> listErrors(
             @McpToolParam(description = "Filtra pela disciplina (parte do nome, sem diferenciar acentos). "
                     + "Vazio = todas.", required = false) String disciplina,
-            @McpToolParam(description = "Quantas questões, de 1 a 20 (padrão 10).", required = false) Integer limite) {
+            @McpToolParam(description = "Quantas questões, de 1 a 20 (padrão 10).", required = false) Integer limite,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        return mcpConcurso.in(concurso, () -> errors(disciplina, limite));
+    }
+
+    private List<ErrorQuestion> errors(String disciplina, Integer limite) {
         int limit = Math.max(1, Math.min(limite == null ? 10 : limite, MAX_ERRORS));
         String wanted = disciplina == null || disciplina.isBlank() ? null : normalize(disciplina);
         Map<Long, String> mine = new HashMap<>();
@@ -155,7 +164,7 @@ public class StudyMcpTools {
         }
         Map<Long, String> passages = new HashMap<>();
         List<ErrorQuestion> out = new ArrayList<>();
-        for (Question q : questionRepository.findErrorNotebook()) {
+        for (Question q : questionRepository.findErrorNotebook(mcpConcurso.id(null))) {
             if (wanted != null && (q.getSubject() == null || !normalize(q.getSubject()).contains(wanted))) {
                 continue;
             }
@@ -245,21 +254,39 @@ public class StudyMcpTools {
     // ---- rotina do dia ----
 
     public record TaskView(Long id, String titulo, String disciplina, LocalDate dia, boolean atrasada,
-                           Integer minutosPlanejados, String descricao, String link,
-                           List<LessonService.Linked> aulasEQuizzes) {
+                           Integer minutosPlanejados, String descricao, String concurso, String cronograma,
+                           String link, List<LessonService.Linked> aulasEQuizzes) {
     }
 
     @McpTool(name = "tarefas_de_hoje",
-            description = "Tarefas do cronograma para hoje e as atrasadas ainda abertas (sem a tarefa de revisão; "
-                    + "para ela use revisoes_de_hoje).",
+            description = "Tarefas do cronograma do concurso para hoje e as atrasadas ainda abertas (sem a tarefa de "
+                    + "revisão; para ela use revisoes_de_hoje). Ex.: \"monte as aulas de hoje do concurso X\" = esta "
+                    + "ferramenta com concurso=X e, para cada tarefa, criar_aula com tarefaId.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public List<TaskView> todayTasks() {
+    public List<TaskView> todayTasks(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso,
+            @McpToolParam(description = "Id ou parte do nome de um cronograma do concurso (vazio = todos).",
+                    required = false) String cronograma) {
         LocalDate today = LocalDate.now();
-        List<StudyTask> tasks = taskService.dueBy(today).stream().filter(t -> !t.isReview()).toList();
+        List<StudyTask> tasks = mcpConcurso.in(concurso, () -> taskService.dueBy(today)).stream()
+                .filter(t -> !t.isReview()).toList();
+        var cronogramas = taskService.cronogramas();
+        if (!McpText.blank(cronograma)) {
+            String wanted = cronograma.strip().toLowerCase(java.util.Locale.ROOT);
+            tasks = tasks.stream().filter(t -> t.getCronogramaId() != null && cronogramas.containsKey(t.getCronogramaId())
+                    && (t.getCronogramaId().toString().equals(wanted)
+                    || cronogramas.get(t.getCronogramaId()).getNome().toLowerCase(java.util.Locale.ROOT).contains(wanted)))
+                    .toList();
+        }
         var linked = lessonService.forTasks(tasks.stream().map(StudyTask::getId).toList());
         return tasks.stream()
                 .map(t -> new TaskView(t.getId(), t.getTitle(), t.getSubject(), t.getPlannedDate(), t.isOverdue(),
-                        t.getEstimatedMinutes(), t.getDescription(), baseUrl + "/estudos/cronograma/" + t.getId() + "/editar",
+                        t.getEstimatedMinutes(), t.getDescription(),
+                        t.getCronogramaId() == null || !cronogramas.containsKey(t.getCronogramaId()) ? null
+                                : mcpConcurso.name(cronogramas.get(t.getCronogramaId()).getConcursoId()),
+                        t.getCronogramaId() == null || !cronogramas.containsKey(t.getCronogramaId()) ? null
+                                : cronogramas.get(t.getCronogramaId()).getNome(),
+                        baseUrl + "/estudos/cronograma/" + t.getId() + "/editar",
                         linked.getOrDefault(t.getId(), List.of()).stream()
                                 .map(l -> new LessonService.Linked(l.tipo(), l.id(), l.titulo(), l.andamento(),
                                         l.concluido(), baseUrl + l.link())).toList()))

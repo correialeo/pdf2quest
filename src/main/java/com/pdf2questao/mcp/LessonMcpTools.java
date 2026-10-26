@@ -26,9 +26,11 @@ import java.util.List;
 public class LessonMcpTools {
 
     private final LessonService lessonService;
+    private final McpConcurso mcpConcurso;
     private final String baseUrl;
 
-    public LessonMcpTools(LessonService lessonService, @Value("${server.port:8080}") int port) {
+    public LessonMcpTools(LessonService lessonService, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+        this.mcpConcurso = mcpConcurso;
         this.lessonService = lessonService;
         this.baseUrl = "http://localhost:" + port;
     }
@@ -38,9 +40,11 @@ public class LessonMcpTools {
                     + "responde, agenda reforços e atualiza as revisões.")
     public String dailyRoutine(
             @McpArg(name = "foco", description = "Disciplina ou assunto para priorizar hoje (opcional).",
-                    required = false) String foco) {
+                    required = false) String foco,
+            @McpArg(name = "concurso", description = "Concurso do dia (id ou parte do nome; vazio = o ativo).",
+                    required = false) String concurso) {
         return """
-                Seja o tutor do usuário hoje, usando o servidor MCP pdf2questao. %s
+                Seja o tutor do usuário hoje, usando o servidor MCP pdf2questao. %s%s
 
                 1. PLANEJAMENTO. Consulte tarefas_de_hoje, revisoes_de_hoje, desempenho_quiz (quizzes, por tópico), \\
                 resumo_de_erros e desempenho_por_disciplina (questões de prova/simulado). Escolha o tópico principal \\
@@ -67,10 +71,14 @@ public class LessonMcpTools {
                 o que confundiu) e confirme com ele. Conclua a tarefa do cronograma com concluir_tarefa (minutos \\
                 informados por ele), registre o resumo com anexar_ao_resumo_do_dia e, se houver revisões do dia, \\
                 faça-as com marcar_revisao. Termine dizendo o que vem amanhã.
-                """.formatted(McpText.blank(foco) ? "" : "Foco pedido: " + foco + ".");
+                """.formatted(McpText.blank(foco) ? "" : "Foco pedido: " + foco + ". ",
+                McpText.blank(concurso) ? "Use o concurso ativo (listar_concursos)."
+                        : "Concurso: " + concurso + ". Passe concurso=\"" + concurso + "\" em tarefas_de_hoje, "
+                        + "criar_aula, criar_quiz, criar_tarefa, desempenho_quiz, desempenho_por_disciplina e "
+                        + "listar_erros; o perfil do edital é o perfilId dele em listar_concursos.");
     }
 
-    public record LessonCreated(Long aulaId, String titulo, String link) {
+    public record LessonCreated(Long aulaId, String titulo, String concurso, String link) {
     }
 
     @McpTool(name = "criar_aula",
@@ -83,9 +91,14 @@ public class LessonMcpTools {
             @McpToolParam(description = "Disciplina (como no perfil do edital; use o mesmo nome das aulas já existentes, veja listar_aulas).") String disciplina,
             @McpToolParam(description = "Tópico do conteúdo programático do edital.") String topicoEdital,
             @McpToolParam(description = "Conteúdo da aula em Markdown.") String conteudo,
-            @McpToolParam(description = "Id da tarefa do cronograma que a aula cobre.", required = false) Long tarefaId) {
-        Lesson lesson = lessonService.create(titulo, disciplina, topicoEdital, conteudo, tarefaId);
-        return new LessonCreated(lesson.getId(), lesson.getTitle(), baseUrl + "/aulas/" + lesson.getId());
+            @McpToolParam(description = "Id da tarefa do cronograma que a aula cobre (a aula fica no concurso da "
+                    + "tarefa).", required = false) Long tarefaId,
+            @McpToolParam(description = McpConcurso.PARAM + " Ignorado se a tarefa já é de um concurso.",
+                    required = false) String concurso) {
+        Lesson lesson = mcpConcurso.in(concurso,
+                () -> lessonService.create(titulo, disciplina, topicoEdital, conteudo, tarefaId));
+        return new LessonCreated(lesson.getId(), lesson.getTitle(), mcpConcurso.name(lesson.getConcursoId()),
+                baseUrl + "/aulas/" + lesson.getId());
     }
 
     @McpPrompt(name = "novo_quiz", title = "Novo quiz",
@@ -164,9 +177,12 @@ public class LessonMcpTools {
                     required = false) List<Long> errosRetomados,
             @McpToolParam(description = "Perguntas.") List<QuizItem> perguntas,
             @McpToolParam(description = "Id da tarefa do cronograma que o quiz cobre (vazio = a da aula, se houver).",
-                    required = false) Long tarefaId) {
-        Quiz quiz = lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel, duvidas, errosRetomados,
-                perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(), tarefaId);
+                    required = false) Long tarefaId,
+            @McpToolParam(description = McpConcurso.PARAM + " Vazio também herda o da aula/tarefa.", required = false)
+            String concurso) {
+        Quiz quiz = mcpConcurso.in(concurso, () -> lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel,
+                duvidas, errosRetomados, perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(),
+                tarefaId));
         return new QuizCreated(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), lessonService.questions(quiz.getId()).size(),
                 errosRetomados == null ? 0 : errosRetomados.size(), baseUrl + "/quizzes/" + quiz.getId());
     }
@@ -252,8 +268,9 @@ public class LessonMcpTools {
                     + "também o conteúdo da aula (para criar um quiz baseado nela).",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
     public List<LessonSummary> listLessons(
-            @McpToolParam(description = "Id de uma aula (vazio = todas, sem conteúdo).", required = false) Long aulaId) {
-        return lessonService.all().stream().filter(l -> aulaId == null || aulaId.equals(l.getId())).limit(30)
+            @McpToolParam(description = "Id de uma aula (vazio = todas, sem conteúdo).", required = false) Long aulaId,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        return (aulaId != null ? lessonService.all() : mcpConcurso.in(concurso, lessonService::visible)).stream().filter(l -> aulaId == null || aulaId.equals(l.getId())).limit(30)
                 .map(l -> new LessonSummary(l.getId(), l.getTitle(), l.getSubject(), l.getEditalTopic(),
                         l.getCreatedAt().toLocalDate(), lessonService.quizzes(l.getId()).stream()
                         .map(q -> new QuizSummary(q.getId(), q.getTitle(), q.getLevel(), q.getFinishedAt() != null)).toList(),
@@ -267,7 +284,8 @@ public class LessonMcpTools {
             description = "Acertos x erros nos quizzes: geral e por disciplina/tópico (última resposta de cada "
                     + "pergunta), piores primeiro. Separado do desempenho em provas/simulados (desempenho_por_disciplina).",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public QuizPerformance quizPerformance() {
-        return new QuizPerformance(lessonService.totals(), lessonService.stats());
+    public QuizPerformance quizPerformance(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        return mcpConcurso.in(concurso, () -> new QuizPerformance(lessonService.totals(), lessonService.stats()));
     }
 }

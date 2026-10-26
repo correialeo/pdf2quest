@@ -38,18 +38,23 @@ public class InsightMcpTools {
     private final StudySessionService sessionService;
     private final StudyPageRepository pageRepository;
     private final StudyTaskService taskService;
+    private final com.pdf2questao.concurso.ConcursoService concursoService;
+    private final McpConcurso mcpConcurso;
     private final String baseUrl;
 
     public InsightMcpTools(QuestionRepository questionRepository, AttemptRepository attemptRepository,
                            StudySessionRepository sessionRepository, StudySessionService sessionService,
                            StudyPageRepository pageRepository, StudyTaskService taskService,
-                           @Value("${server.port:8080}") int port) {
+                           com.pdf2questao.concurso.ConcursoService concursoService,
+                           McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+        this.mcpConcurso = mcpConcurso;
         this.questionRepository = questionRepository;
         this.attemptRepository = attemptRepository;
         this.sessionRepository = sessionRepository;
         this.sessionService = sessionService;
         this.pageRepository = pageRepository;
         this.taskService = taskService;
+        this.concursoService = concursoService;
         this.baseUrl = "http://localhost:" + port;
     }
 
@@ -65,10 +70,18 @@ public class InsightMcpTools {
             description = "Quantos erros (caderno de erros) e acertos no chute há em cada disciplina, sem trazer as "
                     + "questões. Use antes de listar_erros para escolher a disciplina.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public ErrorSummary errorSummary() {
+    public ErrorSummary errorSummary(
+            @McpToolParam(description = McpConcurso.PARAM + " Os acertos no chute são de todos.", required = false)
+            String concurso) {
         Map<String, long[]> by = new LinkedHashMap<>();
-        questionRepository.errorNotebookBySubject().forEach(r ->
-                by.computeIfAbsent((String) r[0], k -> new long[2])[0] = ((Number) r[1]).longValue());
+        Long concursoId = mcpConcurso.id(concurso);
+        if (concursoId == null) {
+            questionRepository.errorNotebookBySubject().forEach(r ->
+                    by.computeIfAbsent((String) r[0], k -> new long[2])[0] = ((Number) r[1]).longValue());
+        } else {
+            questionRepository.findErrorNotebook(concursoId).forEach(q ->
+                    by.computeIfAbsent(q.getSubject() == null ? "(sem disciplina)" : q.getSubject(), k -> new long[2])[0]++);
+        }
         questionRepository.luckyGuessesBySubject().forEach(r ->
                 by.computeIfAbsent((String) r[0], k -> new long[2])[1] = ((Number) r[1]).longValue());
         List<SubjectErrors> list = by.entrySet().stream()
@@ -178,9 +191,14 @@ public class InsightMcpTools {
             description = "Simulados finalizados com perfil de pontuação, do mais antigo ao mais recente: nota "
                     + "projetada contra os mínimos de cada prova. Use para ver a evolução.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public List<HistoryRow> examHistory() {
+    public List<HistoryRow> examHistory(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        Long concursoId = mcpConcurso.id(concurso);
         List<HistoryRow> rows = new ArrayList<>();
         for (StudySession s : sessionRepository.findByFinishedAtIsNotNullOrderByStartedAtDesc()) {
+            if (concursoId != null && !concursoId.equals(s.getConcursoId())) {
+                continue;
+            }
             ScoreResult score = s.getScoreReport() == null ? null : sessionService.scoreResult(s);
             if (score == null) {
                 continue;
@@ -239,7 +257,7 @@ public class InsightMcpTools {
 
     // ---- cronograma ----
 
-    public record CreatedTask(Long id, String titulo, LocalDate dia, String link) {
+    public record CreatedTask(Long id, String titulo, LocalDate dia, String concurso, String cronograma, String link) {
     }
 
     @McpTool(name = "criar_tarefa",
@@ -251,11 +269,30 @@ public class InsightMcpTools {
             @McpToolParam(description = "Dia (AAAA-MM-DD); vazio = hoje.", required = false) String dia,
             @McpToolParam(description = "Disciplina.", required = false) String disciplina,
             @McpToolParam(description = "Minutos planejados.", required = false) Integer minutos,
-            @McpToolParam(description = "Detalhes: tópicos, questões, links.", required = false) String descricao) {
+            @McpToolParam(description = "Detalhes: tópicos, questões, links.", required = false) String descricao,
+            @McpToolParam(description = McpConcurso.PARAM + " A tarefa entra no cronograma ativo mais recente dele.",
+                    required = false) String concurso,
+            @McpToolParam(description = "Id ou nome de um cronograma do concurso (vazio = o padrão).", required = false)
+            String cronograma) {
         LocalDate date = McpText.blank(dia) ? LocalDate.now() : LocalDate.parse(dia.strip());
-        StudyTask task = taskService.create(new StudyTaskService.TaskForm(titulo, descricao, disciplina, date, minutos,
-                null, null));
+        StudyTask task = mcpConcurso.in(concurso, () -> {
+            Long cronogramaId = null;
+            if (!McpText.blank(cronograma)) {
+                String wanted = cronograma.strip().toLowerCase(java.util.Locale.ROOT);
+                cronogramaId = concursoService.cronogramas().stream()
+                        .filter(c -> c.getId().toString().equals(wanted)
+                                || c.getNome().toLowerCase(java.util.Locale.ROOT).contains(wanted))
+                        .map(com.pdf2questao.concurso.Cronograma::getId).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Cronograma \"" + cronograma
+                                + "\" não encontrado no concurso (veja listar_concursos)."));
+            }
+            return taskService.create(new StudyTaskService.TaskForm(titulo, descricao, disciplina, date, minutos,
+                    null, null, cronogramaId));
+        });
+        var cr = concursoService.cronograma(task.getCronogramaId());
         return new CreatedTask(task.getId(), task.getTitle(), task.getPlannedDate(),
+                cr.map(c -> mcpConcurso.name(c.getConcursoId())).orElse(null),
+                cr.map(com.pdf2questao.concurso.Cronograma::getNome).orElse(null),
                 baseUrl + "/estudos/cronograma/" + task.getId() + "/editar");
     }
 
