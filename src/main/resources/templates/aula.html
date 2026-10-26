@@ -19,11 +19,27 @@
 
     <article class="card p-4 rich-text lesson-content" th:utext="${contentHtml}"></article>
 
+    <!-- Proximo passo depois de ler: fazer o quiz, concluir a tarefa ou seguir para a proxima de hoje. -->
+    <section class="card p-3 mt-3 next-step">
+        <div class="small text-muted mb-2">Próximo passo</div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a class="btn btn-primary btn-sm" th:if="${pendingQuiz != null}" th:href="@{/quizzes/{id}(id=${pendingQuiz.id})}">
+                <i class="bi bi-ui-checks me-1"></i>Fazer o quiz: <span th:text="${pendingQuiz.title}"></span></a>
+            <th:block th:if="${quizzes.isEmpty()}"><button th:replace="~{fragments/ui :: askClaude('cria um quiz da aula ' + ${lesson.id} + (${concursoAtivo != null} ? ' do concurso ' + ${concursoAtivo.nome} : ''), 'Copiar pedido de quiz')}"></button></th:block>
+            <th:block th:if="${task != null and !task.done}">
+                <form th:replace="~{fragments/estudos :: taskDoneButton(${task})}"></form>
+            </th:block>
+            <span class="small text-ok" th:if="${task != null and task.done}"><i class="bi bi-check-circle-fill me-1"></i>Tarefa concluída</span>
+            <a class="btn btn-outline-secondary btn-sm" th:if="${next != null}" th:href="${next.link}" th:title="${next.task.title}">
+                Próxima de hoje: <span class="text-truncate d-inline-block align-bottom" style="max-width: 16rem" th:text="${next.task.title}"></span></a>
+        </div>
+    </section>
+
     <!-- Quizzes da aula: cada um em sua tela; peca outro ao Claude (nivel, duvidas; ele retoma os erros). -->
     <section class="mt-4">
         <h2 class="h4">Quizzes</h2>
         <div class="empty-state" th:if="${quizzes.isEmpty()}">
-            <i class="bi bi-ui-checks"></i><span>Esta aula ainda não tem quiz. No Claude Code: <em>"cria um quiz desta aula"</em>.</span>
+            <i class="bi bi-ui-checks"></i><span>Esta aula ainda não tem quiz. Copie o pedido acima e cole no Claude Code.</span>
         </div>
         <div class="card page-list" th:unless="${quizzes.isEmpty()}">
             <a class="page-list-row" th:each="q : ${quizzes}" th:href="@{/quizzes/{id}(id=${q.id})}" th:with="r=${results[q.id]}">
@@ -34,7 +50,9 @@
                       th:text="${r.concluido} ? ${r.acertos} + ' de ' + ${r.perguntas} + ' certas' : (${r.respondidas} > 0 ? ${r.respondidas} + ' de ' + ${r.perguntas} + ' respondidas' : ${r.perguntas} + ' perguntas')"></span>
             </a>
         </div>
-        <p class="small text-muted mt-2">Quer outro? No Claude Code: <em th:text="'cria outro quiz da aula ' + ${lesson.id} + ', nível avançado, com foco em ...'"></em></p>
+        <div class="mt-2" th:unless="${quizzes.isEmpty()}">
+            <button th:replace="~{fragments/ui :: askClaude('cria outro quiz da aula ' + ${lesson.id} + ', nível avançado, com foco em ', 'Copiar pedido de outro quiz')}"></button>
+        </div>
     </section>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

@@ -25,7 +25,7 @@
 
     <!-- Clicar numa alternativa responde: ela fica verde/vermelha com o porque; se errou, a correta aparece.
          Depois de responder, clicar nas outras mostra a explicacao delas. -->
-    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : '',data-answer=${q.correctAnswer}">
+    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-topic=${q.topic},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : '',data-answer=${q.correctAnswer}">
         <div class="d-flex align-items-center gap-2 mb-1">
             <span class="small text-muted" th:text="${q.position} + ' de ' + ${questions.size()} + (${q.topic != null} ? ' · ' + ${q.topic} : '')"></span>
             <button type="button" class="btn-copy" data-copy="question" title="Copiar questão" aria-label="Copiar questão"><i class="bi bi-clipboard"></i></button>
@@ -42,8 +42,29 @@
             </button>
         </div>
     </div>
+    <!-- Fim do quiz: resultado, o que errou e o proximo passo (concluir a tarefa, outro quiz, proxima tarefa). -->
+    <section class="card p-4 mb-3 quiz-done" id="quizDone" hidden>
+        <div class="d-flex align-items-baseline gap-2 flex-wrap">
+            <h2 class="h4 m-0">Quiz concluído</h2>
+            <span class="fs-5 fw-semibold" id="quizDoneScore"></span>
+        </div>
+        <p class="small text-muted mb-2" id="quizDoneTopics"></p>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <th:block th:if="${task != null and !task.done}">
+                <form th:replace="~{fragments/estudos :: taskDoneButton(${task})}"></form>
+            </th:block>
+            <span class="small text-ok" th:if="${task != null and task.done}"><i class="bi bi-check-circle-fill me-1"></i>Tarefa concluída</span>
+            <a class="btn btn-outline-primary btn-sm" th:if="${nextQuiz != null}" th:href="@{/quizzes/{id}(id=${nextQuiz.id})}">
+                Próximo quiz: <span th:text="${nextQuiz.title}"></span></a>
+            <a class="btn btn-outline-secondary btn-sm" th:if="${next != null}" th:href="${next.link}"
+               th:title="${next.task.title}">Próxima de hoje: <span class="text-truncate d-inline-block align-bottom" style="max-width: 16rem" th:text="${next.task.title}"></span></a>
+            <a class="btn btn-link btn-sm" th:if="${lesson != null}" th:href="@{/aulas/{id}(id=${lesson.id})}">Voltar à aula</a>
+            <button th:replace="~{fragments/ui :: askClaude('fiz o quiz ' + ${quiz.id} + ': corrija minhas dúvidas e agende o reforço do que errei', 'Copiar pedido de correção')}"></button>
+        </div>
+    </section>
+
     <div class="d-flex justify-content-between align-items-center">
-        <span class="small text-muted">Terminou? No Claude Code, diga "fiz o quiz": ele corrige as dúvidas e agenda o reforço.</span>
+        <span class="small text-muted">Atalhos: <kbd>A</kbd>–<kbd>E</kbd> respondem a pergunta atual, <kbd>Enter</kbd> vai para a próxima.</span>
         <form method="post" th:action="@{/quizzes/{id}/refazer(id=${quiz.id})}">
             <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Refazer</button>
         </form>
@@ -88,7 +109,44 @@
         const right = done.filter(c => c.dataset.selected === c.dataset.correct).length;
         document.getElementById('quizScore').textContent = done.length === 0 ? cards.length + ' perguntas'
             : right + ' de ' + done.length + ' certas' + (done.length < cards.length ? ' · ' + (cards.length - done.length) + ' faltando' : '');
+        const panel = document.getElementById('quizDone');
+        const finished = cards.length > 0 && done.length === cards.length;
+        const wasHidden = panel.hidden;
+        panel.hidden = !finished;
+        if (finished) {
+            document.getElementById('quizDoneScore').textContent = right + ' de ' + cards.length + ' certas ('
+                + Math.round(right * 100 / cards.length) + '%)';
+            const wrong = [...new Set(done.filter(c => c.dataset.selected !== c.dataset.correct)
+                .map(c => c.dataset.topic).filter(t => t))];
+            document.getElementById('quizDoneTopics').textContent = right === cards.length ? 'Gabaritou!'
+                : (wrong.length ? 'Para reforçar: ' + wrong.join(', ') + '.' : 'Revise as perguntas em vermelho.');
+            if (wasHidden && current !== null) { panel.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+        }
+        markCurrent();
     }
+
+    // Pergunta atual (a primeira sem resposta) para os atalhos de teclado.
+    let current = null;
+    let fromKeyboard = false;
+    function markCurrent() {
+        const first = cards.find(c => !c.dataset.selected) || null;
+        cards.forEach(c => c.classList.toggle('is-current', c === first));
+        current = first;
+    }
+
+    document.addEventListener('keydown', function (e) {
+        const t = e.target;
+        if (e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
+        if (document.querySelector('dialog[open]')) return;
+        const key = e.key.toUpperCase();
+        if (current && /^[A-E]$/.test(key)) {
+            const opt = current.querySelector('.quiz-option[data-letter="' + key + '"]');
+            if (opt) { e.preventDefault(); fromKeyboard = true; opt.click(); }
+        } else if (e.key === 'Enter' && current) {
+            e.preventDefault();
+            current.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    });
 
     /** Mostra o resultado: a escolhida (certa/errada) com o porquê e a correta destacada. */
     function reveal(card) {
@@ -125,8 +183,12 @@
                     card.dataset.correct = res.correctAnswer;
                     reveal(card);
                     score();
+                    if (current && fromKeyboard) {
+                        setTimeout(function () { current.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 600);
+                    }
+                    fromKeyboard = false;
                 }).catch(function () {
-                    alert('Não foi possível salvar a resposta. Tente de novo.');
+                    window.p2qToast('Não foi possível salvar a resposta. Tente de novo.', 'danger');
                 }).finally(function () { delete card.dataset.sending; });
             });
         });

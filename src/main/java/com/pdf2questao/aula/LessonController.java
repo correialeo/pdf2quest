@@ -18,9 +18,26 @@ import java.util.stream.Collectors;
 public class LessonController {
 
     private final LessonService lessonService;
+    private final com.pdf2questao.study.StudyTaskService taskService;
 
-    public LessonController(LessonService lessonService) {
+    public LessonController(LessonService lessonService, com.pdf2questao.study.StudyTaskService taskService) {
         this.lessonService = lessonService;
+        this.taskService = taskService;
+    }
+
+    /** Proximo passo depois de terminar: a proxima tarefa aberta de hoje (ou atrasada), com o link da aula/quiz dela. */
+    public record NextStep(com.pdf2questao.study.StudyTask task, String link, String label) {
+    }
+
+    private NextStep next(Long exceptTaskId) {
+        return taskService.dueBy(java.time.LocalDate.now()).stream()
+                .filter(t -> !t.isReview() && !t.getId().equals(exceptTaskId)).findFirst()
+                .map(t -> {
+                    var linked = lessonService.forTask(t.getId()).stream().filter(l -> !l.concluido()).findFirst();
+                    return new NextStep(t, linked.map(LessonService.Linked::link)
+                            .orElse("/estudos/cronograma/" + t.getId() + "/editar"),
+                            linked.map(l -> "Abrir " + l.tipo().toLowerCase()).orElse("Abrir tarefa"));
+                }).orElse(null);
     }
 
     @GetMapping("/aulas")
@@ -51,6 +68,9 @@ public class LessonController {
         Map<Long, LessonService.QuizResult> results = lessonService.quizzes(id).stream()
                 .collect(Collectors.toMap(Quiz::getId, q -> lessonService.result(q.getId())));
         model.addAttribute("results", results);
+        model.addAttribute("pendingQuiz", lessonService.quizzes(id).stream()
+                .filter(q -> !results.get(q.getId()).concluido()).findFirst().orElse(null));
+        model.addAttribute("next", next(lesson.getTaskId()));
         return "aula";
     }
 
@@ -62,6 +82,11 @@ public class LessonController {
         model.addAttribute("lesson", quiz.getLessonId() == null ? null : lessonService.find(quiz.getLessonId()));
         model.addAttribute("questions", lessonService.questions(id));
         model.addAttribute("answers", lessonService.latest(id));
+        Long taskId = lessonService.effectiveTaskId(quiz);
+        model.addAttribute("next", next(taskId));
+        // Outro quiz da mesma aula ainda por fazer (para seguir direto).
+        model.addAttribute("nextQuiz", quiz.getLessonId() == null ? null : lessonService.quizzes(quiz.getLessonId()).stream()
+                .filter(q -> !q.getId().equals(id) && !lessonService.result(q.getId()).concluido()).findFirst().orElse(null));
         return "quiz";
     }
 

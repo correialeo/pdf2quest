@@ -8,6 +8,12 @@
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
 </th:block>
 
+<!-- Pedido pronto para colar no Claude Code (as acoes de IA rodam por la). -->
+<button th:fragment="askClaude(prompt, label)" type="button" class="btn btn-outline-secondary btn-sm"
+        th:attr="data-copy-text=${prompt}" th:title="'Copia: ' + ${prompt}">
+    <i class="bi bi-chat-dots me-1"></i><span th:text="${label}"></span>
+</button>
+
 <!-- Cartao de metrica: rotulo pequeno em cima, numero grande embaixo. -->
 <div th:fragment="stat(label, value, cls)" class="card stat">
     <div class="stat-label" th:text="${label}"></div>

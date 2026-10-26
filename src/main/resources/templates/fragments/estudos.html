@@ -42,6 +42,14 @@
         <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
 </form>
 
+<!-- Botao "Concluir tarefa" (aula, quiz): abre o mesmo dialogo de minutos do cronograma. -->
+<form th:fragment="taskDoneButton(t)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}"
+      class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+    <input type="hidden" name="done" value="true"/>
+    <input type="hidden" name="spentMinutes" value=""/>
+    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Concluir tarefa</button>
+</form>
+
 <!-- Tempo da tarefa ("45 de 60 min"); clicar corrige os minutos dedicados. -->
 <form th:fragment="taskTime(t)" method="post" th:action="@{/estudos/cronograma/{id}/tempo(id=${t.id})}" class="task-time-form d-inline"
       th:attr="data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
