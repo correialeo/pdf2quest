@@ -65,7 +65,8 @@
                 </div>
                 <div class="empty-state mt-3" th:unless="${essay.corrected}">
                     <i class="bi bi-chat-dots"></i>
-                    <span>Entregue. No Claude Code, peça: <em th:text="'corrige a discursiva ' + ${essay.id}"></em>.</span>
+                    <span>Entregue. Peça a correção no Claude Code:</span>
+                    <button th:replace="~{fragments/ui :: askClaude('corrige a discursiva ' + ${essay.id}, 'Copiar pedido de correção')}"></button>
                 </div>
             </th:block>
         </div>
@@ -138,8 +139,9 @@
         this.querySelector('i').className = 'bi ' + (clock.paused ? 'bi-play-fill' : 'bi-pause-fill');
         this.title = clock.paused ? 'Continuar' : 'Pausar';
     });
+    document.getElementById('essayForm').dataset.confirm = 'Entregar? Depois de entregue, o texto não pode mais ser alterado.';
+    document.getElementById('essayForm').dataset.confirmOk = 'Entregar';
     document.getElementById('essayForm').addEventListener('submit', function (e) {
-        if (!confirm('Entregar? Depois de entregue, o texto não pode mais ser alterado.')) { e.preventDefault(); return; }
         tick();
         document.getElementById('millis').value = clock.pending;
     });

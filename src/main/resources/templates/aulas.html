@@ -7,9 +7,9 @@
     <div class="page-header">
         <div>
             <h1>Aulas</h1>
-            <p class="page-subtitle">Aulas do tutor com quiz. No Claude Code, rode <em>/mcp__pdf2questao__rotina_estudo_do_dia</em>
-                para montar a aula de hoje a partir do cronograma.</p>
+            <p class="page-subtitle">Aulas do tutor com quiz, montadas pelo Claude Code a partir do cronograma.</p>
         </div>
+        <button th:replace="~{fragments/ui :: askClaude('monte as aulas do cronograma de hoje' + (${concursoAtivo != null} ? ' do concurso ' + ${concursoAtivo.nome} : ''), 'Copiar pedido das aulas de hoje')}"></button>
     </div>
 
     <!-- Placar geral dos quizzes (ultima resposta de cada pergunta), separado do das provas e simulados. -->

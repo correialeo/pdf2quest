@@ -17,6 +17,10 @@
         <h2 class="h6 mb-2">Aulas e quizzes desta tarefa</h2>
         <div th:replace="~{fragments/estudos :: taskLinked(${linked})}"></div>
     </div>
+    <div class="card p-3 form-narrow mb-3" th:if="${linked.isEmpty() and !task.review}">
+        <div class="small text-muted mb-2">Sem aula ainda. Peça ao Claude Code:</div>
+        <button th:replace="~{fragments/ui :: askClaude('monte a aula e o quiz da tarefa ' + ${task.id} + ' (' + ${task.title} + ')' + (${concursoAtivo != null} ? ' do concurso ' + ${concursoAtivo.nome} : ''), 'Copiar pedido de aula')}"></button>
+    </div>
 
     <form method="post" th:action="@{/estudos/cronograma/{id}/editar(id=${task.id})}" class="card p-4 form-narrow">
         <div class="mb-3">
@@ -69,7 +73,7 @@
                     th:text="${task.done} ? 'Reabrir' : 'Marcar como concluída'"></button>
             <button type="submit" class="btn btn-link text-bad ms-auto" formnovalidate
                     th:formaction="@{/estudos/cronograma/{id}/excluir(id=${task.id})}"
-                    onclick="return confirm('Apagar esta tarefa?')"><i class="bi bi-trash me-1"></i>Apagar</button>
+                    data-confirm="Apagar esta tarefa?" data-confirm-ok="Apagar"><i class="bi bi-trash me-1"></i>Apagar</button>
         </div>
     </form>
     <datalist th:replace="~{fragments/estudos :: subjects}"></datalist>

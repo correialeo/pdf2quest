@@ -16,7 +16,8 @@
     <th:block th:if="${essays.isEmpty()}">
         <div class="empty-state">
             <i class="bi bi-pencil-square"></i>
-            <span>Nenhuma discursiva ainda. No Claude Code, peça: <em>"cria uma discursiva da P3 no estilo da FCC"</em>.</span>
+            <span>Nenhuma discursiva ainda. Peça uma ao Claude Code:</span>
+            <button th:replace="~{fragments/ui :: askClaude('cria uma discursiva no estilo da banca' + (${concursoAtivo != null} ? ' do concurso ' + ${concursoAtivo.nome} : ''), 'Copiar pedido de discursiva')}"></button>
         </div>
     </th:block>
     <div class="card page-list" th:unless="${essays.isEmpty()}">
