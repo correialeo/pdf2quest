@@ -310,6 +310,36 @@ public class StudyMcpTools {
         return new TaskDone(task.getId(), task.getTitle(), task.getSpentMinutes(), task.getNextReviewDate());
     }
 
+    public record TasksRescheduled(LocalDate dia, int reagendadas, int ignoradas) {
+    }
+
+    @McpTool(name = "reagendar_tarefas",
+            description = "Muda o dia de tarefas do cronograma: passe os ids (de tarefas_de_hoje) e/ou atrasadas=true "
+                    + "para levar todas as atrasadas ainda abertas do concurso para o dia escolhido. A tarefa de "
+                    + "revisão do dia não é reagendada e volta em 'ignoradas', junto com ids que não existem. "
+                    + "Confirme com o usuário antes de mexer em muitas.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
+    public TasksRescheduled rescheduleTasks(
+            @McpToolParam(description = "Novo dia (AAAA-MM-DD); vazio = hoje.", required = false) String dia,
+            @McpToolParam(description = "Ids das tarefas a reagendar.", required = false) List<Long> ids,
+            @McpToolParam(description = "true = inclui todas as tarefas atrasadas abertas do concurso.",
+                    required = false) Boolean atrasadas,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        LocalDate date = McpText.blank(dia) ? LocalDate.now() : LocalDate.parse(dia.strip());
+        java.util.Set<Long> wanted = new java.util.LinkedHashSet<>(ids == null ? List.of() : ids);
+        if (Boolean.TRUE.equals(atrasadas)) {
+            LocalDate today = LocalDate.now();
+            mcpConcurso.in(concurso, () -> taskService.dueBy(today)).stream()
+                    .filter(t -> !t.isReview() && t.getPlannedDate().isBefore(today))
+                    .forEach(t -> wanted.add(t.getId()));
+        }
+        if (wanted.isEmpty()) {
+            throw new IllegalArgumentException("Informe ids ou atrasadas=true (e confira se há tarefas atrasadas).");
+        }
+        int moved = taskService.bulk(wanted, date, false, null);
+        return new TasksRescheduled(date, moved, wanted.size() - moved);
+    }
+
     public record ReviewView(Long id, String assunto, String disciplina, LocalDate estudadoEm, LocalDate venceuEm,
                              int etapa, String materialLink) {
     }

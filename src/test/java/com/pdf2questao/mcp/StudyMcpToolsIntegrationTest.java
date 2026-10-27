@@ -87,4 +87,22 @@ class StudyMcpToolsIntegrationTest {
         tools.appendToDaySummary("mais", today.toString());
         assertTrue(pageRepository.findById(summary.paginaId()).orElseThrow().getContent().endsWith("<p>mais</p>"));
     }
+
+    @Test
+    void reagendaTarefasPorIdEAtrasadas() {
+        LocalDate today = LocalDate.now();
+        StudyTask late = taskService.create(new StudyTaskService.TaskForm("Atrasada", null, "AFO",
+                today.minusDays(3), 30, null, null));
+        StudyTask other = taskService.create(new StudyTaskService.TaskForm("Outra", null, "AFO",
+                today, 30, null, null));
+
+        var byId = tools.rescheduleTasks(today.plusDays(2).toString(), List.of(other.getId(), -1L), null, null);
+        assertEquals(1, byId.reagendadas());
+        assertEquals(1, byId.ignoradas());
+        assertEquals(today.plusDays(2), taskService.forEdit(other.getId()).orElseThrow().getPlannedDate());
+
+        var overdue = tools.rescheduleTasks(null, null, true, null);
+        assertTrue(overdue.reagendadas() >= 1);
+        assertEquals(today, taskService.forEdit(late.getId()).orElseThrow().getPlannedDate());
+    }
 }
