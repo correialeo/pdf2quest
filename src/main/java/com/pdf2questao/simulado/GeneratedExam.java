@@ -41,4 +41,10 @@ public class GeneratedExam {
     private Long blockId;
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime finishedAt;
+    /** Formato: null = multipla escolha; {@link com.pdf2questao.aula.Quiz#CERTO_ERRADO} = itens Certo/Errado. */
+    private String format;
+
+    public boolean certoErrado() {
+        return com.pdf2questao.aula.Quiz.CERTO_ERRADO.equals(format);
+    }
 }

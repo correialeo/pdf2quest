@@ -160,6 +160,11 @@ public class QuestionReviewService {
                                      String notes) {
         GeneratedExam exam = exam(examId);
         Question q = question(exam, number);
+        if (exam.certoErrado()) {
+            // O revisor julga com C/E; grava como as letras do item (A = Certo, B = Errado).
+            independentAnswer = ceLetter(independentAnswer);
+            defensible = defensible == null ? null : defensible.stream().map(QuestionReviewService::ceLetter).toList();
+        }
         Outcome outcome = ReviewRules.material(type, q.getCorrectAnswer(), independentAnswer, defensible,
                 involvesCalculation, calculation, sources, historicalRule, temporalReference);
         QuestionReview review = review(q);
@@ -277,7 +282,9 @@ public class QuestionReviewService {
                 }
             }
             for (Question q : questions) {
-                if (q.alternatives().size() != 5) {
+                if (exam.certoErrado() && !q.certoErrado()) {
+                    structure.add(prova + " Q" + q.getQuestionNumber() + ": não é item Certo/Errado.");
+                } else if (!exam.certoErrado() && q.alternatives().size() != 5) {
                     structure.add(prova + " Q" + q.getQuestionNumber() + ": " + q.alternatives().size() + " alternativas (FCC usa 5).");
                 }
                 if (q.getCorrectAnswer() == null || !q.alternatives().containsKey(q.getCorrectAnswer())) {
@@ -372,6 +379,11 @@ public class QuestionReviewService {
     }
 
     // ---- apoio ----
+
+    private static String ceLetter(String answer) {
+        String letter = Question.certoErradoLetter(answer);
+        return letter == null ? answer : letter;
+    }
 
     private ReviewView view(GeneratedExam exam, Question q, QuestionReview r) {
         String current = hash(q);

@@ -69,12 +69,14 @@
         <div class="question-meta" th:if="${question.subject != null}" th:text="${question.subject}"></div>
         <div class="question-statement rich-text" th:utext="${@richText.html(question.statement)}"></div>
 
-        <div class="alternatives">
-            <label class="alternative" th:each="alt : ${question.alternatives()}" th:attr="data-letter=${alt.key}"
+        <div class="question-meta" th:if="${question.certoErrado()}">Julgue o item (Cebraspe: um erro anula um acerto; em branco não desconta).</div>
+        <div class="alternatives" th:with="ce=${question.certoErrado()}">
+            <label class="alternative" th:each="alt : ${question.alternatives()}"
+                   th:attr="data-letter=${alt.key},data-shortcut=${ce ? (alt.key == 'A' ? 'C' : 'E') : alt.key}"
                    th:for="'opt' + ${alt.key}">
                 <input class="answer-option visually-hidden" type="radio" name="answer" th:value="${alt.key}" th:id="'opt' + ${alt.key}"
                        th:checked="${attempt != null and attempt.selectedAnswer == alt.key}"/>
-                <span class="alt-letter" th:text="${alt.key}"></span>
+                <span class="alt-letter" th:text="${ce ? (alt.key == 'A' ? 'C' : 'E') : alt.key}"></span>
                 <span class="alt-text rich-text" th:utext="${@richText.html(alt.value)}"></span>
                 <button type="button" class="strike-toggle" title="Riscar alternativa (Shift + letra)"
                         aria-label="Riscar alternativa"><i class="bi bi-slash-circle"></i></button>
@@ -359,7 +361,7 @@
                 + '. Finalizar mesmo assim?', 'Finalizar').then(function (ok) { if (ok) { go(); } });
     });
 
-    // Atalhos: A-E responde, Shift+letra risca, X marca chute, M abre o mapa, setas navegam (e nao trocam o radio focado).
+    // Atalhos: A-E responde (C/E no item Certo/Errado), Shift+letra risca, X marca chute, M abre o mapa, setas navegam (e nao trocam o radio focado).
     // Ignorados enquanto se digita (observacao) ou com Ctrl/Cmd/Alt, para nao brigar com o navegador.
     document.addEventListener('keydown', function (e) {
         const t = e.target;
@@ -374,7 +376,7 @@
             return;
         }
         if (clock.paused) { return; }
-        const alt = document.querySelector('.alternative[data-letter="' + key + '"]');
+        const alt = document.querySelector('.alternative[data-shortcut="' + key + '"]');
         if (alt) {
             e.preventDefault();
             if (e.shiftKey) {

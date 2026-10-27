@@ -107,7 +107,9 @@ public class ExamMcpTools {
                 programático (grave-o antes com registrar_conteudo_programatico). Para CADA questão: escolha 1 a 3 \
                 questões reais pertinentes (mesma disciplina/assunto; para TI e dados, provas de TI; para direito e \
                 AFO, provas fiscais) e LEIA o conteúdo delas; use-as como modelo de estrutura, profundidade e \
-                distratores, sem copiar nem parafrasear. Envie no máximo 5 por chamada de adicionar_questoes.
+                distratores, sem copiar nem parafrasear. Envie no máximo 5 por chamada de adicionar_questoes. \
+                Cebraspe: crie com formato=certo_errado; cada questão é um item a julgar (resposta C ou E, sem \
+                alternativas) e o gabarito comentado explica por que o item está certo ou errado.
 
                 4. REVISÃO EM CAMADAS, A CADA LOTE (o simulado só finaliza com tudo aprovado):
                    B) revisar_fidelidade: 8 critérios de 0 a 4, cada um com justificativa verificável apoiada nas \
@@ -366,7 +368,8 @@ public class ExamMcpTools {
             description = "Abre o rascunho de um simulado INÉDITO para uma prova do perfil (ex.: P1). Exige a pesquisa "
                     + "da banca já feita: 'estiloDaBanca' com o perfil detalhado (formato dos enunciados, comandos, "
                     + "distratores e pegadinhas por disciplina) e 'fontes' com ao menos 2 provas reais lidas. Devolve "
-                    + "quantas questões criar de cada disciplina. Veja o roteiro no prompt montar_simulado.",
+                    + "quantas questões criar de cada disciplina. Cebraspe: formato=certo_errado (cada questão é um item "
+                    + "a julgar, sem alternativas; resposta C ou E). Veja o roteiro no prompt montar_simulado.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public ExamStatus createExam(
             @McpToolParam(description = "Id do perfil (estrutura_do_edital); vazio = o perfil do concurso.",
@@ -379,7 +382,9 @@ public class ExamMcpTools {
             @McpToolParam(description = "Perfil da banca levantado na pesquisa (mínimo 600 caracteres).") String estiloDaBanca,
             @McpToolParam(description = "Provas reais analisadas, uma por linha (link ou \"prova local #id\").") String fontes,
             @McpToolParam(description = McpConcurso.PARAM + " O simulado e o bloco final ficam nesse concurso.",
-                    required = false) String concurso) {
+                    required = false) String concurso,
+            @McpToolParam(description = "multipla_escolha (padrão) ou certo_errado (Cebraspe).", required = false)
+            String formato) {
         return mcpConcurso.in(concurso, () -> {
             Long profile = perfilId;
             if (profile == null) {
@@ -389,7 +394,7 @@ public class ExamMcpTools {
             if (profile == null) {
                 throw new IllegalArgumentException("Informe perfilId (estrutura_do_edital) ou um concurso com perfil ligado.");
             }
-            return examService.create(profile, prova, titulo, banca, tempoMinutos, estiloDaBanca, fontes);
+            return examService.create(profile, prova, titulo, banca, tempoMinutos, estiloDaBanca, fontes, formato);
         });
     }
 
@@ -399,9 +404,11 @@ public class ExamMcpTools {
             @McpToolParam(description = "Texto base, se a questão tiver (repita igual nas questões que o usam).",
                     required = false) String textoBase,
             @McpToolParam(description = "Enunciado completo, no estilo da banca.") String enunciado,
-            @McpToolParam(description = "Alternativas na ordem A–E, só o texto (5 na FCC).") List<String> alternativas,
-            @McpToolParam(description = "Letra correta.") String resposta,
-            @McpToolParam(description = "Gabarito comentado: por que a correta está certa e cada distrator errado.")
+            @McpToolParam(description = "Alternativas na ordem A–E, só o texto (5 na FCC). Vazio no simulado "
+                    + "certo_errado.", required = false) List<String> alternativas,
+            @McpToolParam(description = "Letra correta; no certo_errado, C (Certo) ou E (Errado).") String resposta,
+            @McpToolParam(description = "Gabarito comentado: por que a correta está certa e cada distrator errado (C/E: "
+                    + "por que o item está certo ou errado).")
             String explicacao,
             @McpToolParam(description = "Padrão real em que se baseou (prova/questão ou tipo de questão da banca).")
             String inspiracao,
@@ -460,8 +467,9 @@ public class ExamMcpTools {
             @McpToolParam(description = "Id do simulado.") Long simuladoId,
             @McpToolParam(description = "Número da questão na prova (1 = primeira).") Integer numero,
             @McpToolParam(description = "Novo enunciado.", required = false) String enunciado,
-            @McpToolParam(description = "Novas alternativas A–E (todas).", required = false) List<String> alternativas,
-            @McpToolParam(description = "Nova letra correta.", required = false) String resposta,
+            @McpToolParam(description = "Novas alternativas A–E (todas); ignoradas no certo_errado.",
+                    required = false) List<String> alternativas,
+            @McpToolParam(description = "Nova letra correta; no certo_errado, C ou E.", required = false) String resposta,
             @McpToolParam(description = "Novo gabarito comentado.", required = false) String explicacao,
             @McpToolParam(description = "Motivo da correção (fica no histórico), ex.: \"prazo de precatórios "
                     + "alterado pela EC 136/2025\".") String motivo) {

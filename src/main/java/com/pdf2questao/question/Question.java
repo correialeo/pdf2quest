@@ -110,4 +110,21 @@ public class Question {
         }
         return map;
     }
+
+    /** Item Certo/Errado (Cebraspe): alternativas A = "Certo" e B = "Errado", e nada mais. */
+    public boolean certoErrado() {
+        return "Certo".equals(alternativeA) && "Errado".equals(alternativeB) && alternativeC == null;
+    }
+
+    /** Letra gravada de um julgamento C/E: C, Certo ou A = A; E, Errado ou B = B; outro valor = null. */
+    public static String certoErradoLetter(String answer) {
+        if (answer == null) {
+            return null;
+        }
+        return switch (answer.strip().toUpperCase(java.util.Locale.ROOT)) {
+            case "C", "CERTO", "A" -> "A";
+            case "E", "ERRADO", "B" -> "B";
+            default -> null;
+        };
+    }
 }

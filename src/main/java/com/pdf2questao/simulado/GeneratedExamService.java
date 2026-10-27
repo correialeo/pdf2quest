@@ -39,6 +39,7 @@ public class GeneratedExamService {
     static final int MIN_SOURCES = 2;
     /** Questoes por chamada: forca escrever (e revisar) poucas de cada vez. */
     public static final int MAX_BATCH = 5;
+    private static final List<String> CERTO_ERRADO = List.of("Certo", "Errado");
 
     private final GeneratedExamRepository examRepository;
     private final ImportJobRepository importJobRepository;
@@ -92,6 +93,17 @@ public class GeneratedExamService {
     @Transactional
     public ExamStatus create(Long profileId, String groupName, String title, String banca, Integer timeLimit,
                              String styleNotes, String styleSources) {
+        return create(profileId, groupName, title, banca, timeLimit, styleNotes, styleSources, null);
+    }
+
+    /** {@code format} = {@link com.pdf2questao.aula.Quiz#CERTO_ERRADO} para itens Certo/Errado (Cebraspe). */
+    @Transactional
+    public ExamStatus create(Long profileId, String groupName, String title, String banca, Integer timeLimit,
+                             String styleNotes, String styleSources, String format) {
+        String fmt = format == null || format.isBlank() ? null : format.strip().toLowerCase(java.util.Locale.ROOT);
+        if (fmt != null && !fmt.equals("multipla_escolha") && !fmt.equals(com.pdf2questao.aula.Quiz.CERTO_ERRADO)) {
+            throw new IllegalArgumentException("Formato: multipla_escolha ou certo_errado.");
+        }
         ProfileSpec spec = profileService.spec(profileId)
                 .orElseThrow(() -> new IllegalArgumentException("Perfil " + profileId + " não existe."));
         String group = groupName == null || groupName.isBlank() ? null : groupName.trim();
@@ -128,6 +140,7 @@ public class GeneratedExamService {
         exam.setConcursoId(concurso);
         exam.setGroupName(group);
         exam.setTimeLimitMinutes(timeLimit);
+        exam.setFormat(com.pdf2questao.aula.Quiz.CERTO_ERRADO.equals(fmt) ? fmt : null);
         exam.setStyleNotes(styleNotes.strip());
         exam.setStyleSources(styleSources == null ? null : styleSources.strip());
         return status(examRepository.save(exam));
@@ -172,8 +185,19 @@ public class GeneratedExamService {
                         + " questões do edital.");
                 continue;
             }
+            List<String> alternatives = q.alternatives();
+            String answer = q.answer();
+            if (exam.certoErrado()) {
+                // Item C/E: alternativas fixas, o julgamento vira A (Certo) ou B (Errado).
+                answer = Question.certoErradoLetter(q.answer());
+                if (answer == null) {
+                    refused.add("Questão " + (i + 1) + ": julgamento \"" + q.answer() + "\" inválido (use C ou E).");
+                    continue;
+                }
+                alternatives = CERTO_ERRADO;
+            }
             room.get(rule.subject())[0]--;
-            accepted.add(new QuestionDraft(q.statement(), q.alternatives(), q.answer(), null, null, rule.subject(),
+            accepted.add(new QuestionDraft(q.statement(), alternatives, answer, null, null, rule.subject(),
                     q.topic(), q.explanation(), q.passage()));
         }
         int saved = 0;
@@ -278,6 +302,16 @@ public class GeneratedExamService {
         reviewService.snapshot(q, reason == null || reason.isBlank() ? "correção sem motivo informado" : reason.strip());
         if (statement != null && !statement.isBlank()) {
             q.setStatement(statement.strip());
+        }
+        if (exam.certoErrado()) {
+            alternatives = null;
+            if (answer != null && !answer.isBlank()) {
+                String letter = Question.certoErradoLetter(answer);
+                if (letter == null) {
+                    throw new IllegalArgumentException("Julgamento \"" + answer + "\" inválido (use C ou E).");
+                }
+                answer = letter;
+            }
         }
         if (alternatives != null && !alternatives.isEmpty()) {
             if (alternatives.size() > 5 || alternatives.stream().anyMatch(a -> a == null || a.isBlank())) {

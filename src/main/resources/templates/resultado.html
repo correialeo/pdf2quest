@@ -169,7 +169,7 @@
                 <div class="rich-text mb-3" th:utext="${@richText.html(item.question.statement)}"></div>
                 <div th:each="alt : ${item.question.alternatives()}" class="review-alt"
                      th:classappend="${alt.key == item.question.correctAnswer} ? 'is-correct' : (${alt.key == item.selectedAnswer} ? 'is-wrong' : '')">
-                    <strong th:text="${alt.key} + ')'"></strong> <span class="rich-text" th:utext="${@richText.html(alt.value)}"></span>
+                    <strong th:text="${item.question.certoErrado() ? (alt.key == 'A' ? 'C' : 'E') : alt.key} + ')'"></strong> <span class="rich-text" th:utext="${@richText.html(alt.value)}"></span>
                 </div>
                 <p class="text-muted small mt-3 mb-0" th:if="${item.question.note != null}"
                    th:text="'Observação: ' + ${item.question.note}"></p>

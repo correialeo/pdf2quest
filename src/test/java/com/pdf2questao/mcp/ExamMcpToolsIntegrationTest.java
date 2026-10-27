@@ -109,11 +109,11 @@ class ExamMcpToolsIntegrationTest {
         assertEquals(1, exam.examStructure("teste – c03", null).size());
 
         assertThrows(IllegalArgumentException.class, () -> exam.createExam(profile.id(), "P1", "Sim", "FCC", 240,
-                "curto", "a\nb", null), "sem pesquisa da banca nao cria");
+                "curto", "a\nb", null, null), "sem pesquisa da banca nao cria");
         assertThrows(IllegalArgumentException.class, () -> exam.createExam(profile.id(), "P1", "Sim", "FCC", 240,
-                STYLE, "so uma prova", null), "precisa de duas provas analisadas");
+                STYLE, "so uma prova", null, null), "precisa de duas provas analisadas");
 
-        var p1 = exam.createExam(profile.id(), "P1", "Simulado P1", "FCC", 240, STYLE, "prova local #1\nhttps://x/prova.pdf", null);
+        var p1 = exam.createExam(profile.id(), "P1", "Simulado P1", "FCC", 240, STYLE, "prova local #1\nhttps://x/prova.pdf", null, null);
         assertEquals(2, p1.disciplinas().size());
 
         var added = exam.addQuestions(p1.id(), List.of(q("Língua Portuguesa", "A"), q("Português", "B"),
@@ -137,7 +137,7 @@ class ExamMcpToolsIntegrationTest {
         assertEquals(2, afterRemove.questoes());
         exam.addQuestions(p1.id(), List.of(q("AFO", "B")));
         exam.addQuestions(p1.id(), List.of(q("AFO", "E")));
-        var p2 = exam.createExam(profile.id(), "P2", "Simulado P2", "FCC", 240, STYLE, "a\nb", null);
+        var p2 = exam.createExam(profile.id(), "P2", "Simulado P2", "FCC", 240, STYLE, "a\nb", null, null);
         exam.addQuestions(p2.id(), List.of(q("TI", "A"), q("TI", "B")));
         assertThrows(IllegalArgumentException.class, () -> exam.finishExam(List.of(p1.id(), p2.id()), "Dia de prova",
                 false), "sem revisão aprovada não finaliza");
@@ -182,7 +182,7 @@ class ExamMcpToolsIntegrationTest {
         var profile = exam.saveProfile("Teste – edital", null, null, List.of(
                 new GroupInput("P1", null, List.of(new SubjectInput("Dir. Constitucional", List.of(), 2, 1.0)))), null, null);
         review.saveTopics(profile.id(), "Dir. Constitucional", List.of("Precatórios", "Direitos fundamentais"));
-        var p1 = exam.createExam(profile.id(), "P1", "Sim edital", "FCC", 60, STYLE, "a\nb", null);
+        var p1 = exam.createExam(profile.id(), "P1", "Sim edital", "FCC", 60, STYLE, "a\nb", null, null);
         exam.addQuestions(p1.id(), List.of(q("Dir. Constitucional", "C"), q("Dir. Constitucional", "A")));
         Long ref = realReference();
         var refs = List.of(new ReviewMcpTools.ReferenceInput(ref, null, null));
@@ -253,5 +253,49 @@ class ExamMcpToolsIntegrationTest {
         assertEquals(2, found.paginas().get(0).pagina());
         assertNull(found.aviso());
         assertThrows(IllegalArgumentException.class, () -> exam.readEdital("/nao/existe.pdf", null, null, null));
+    }
+
+    @Test
+    void simuladoCertoErradoGravaItensCEEDescontaOErro() throws Exception {
+        var profile = exam.saveProfile("Teste – Cebraspe", null, null, List.of(
+                new GroupInput("P1", null, List.of(new SubjectInput("Auditoria", List.of(), 3, 1.0)))), 1.0, null);
+        var p1 = exam.createExam(profile.id(), "P1", "Sim C/E", "Cebraspe", 60, STYLE, "a\nb", null, "certo_errado");
+        assertThrows(IllegalArgumentException.class, () -> exam.createExam(profile.id(), "P1", "Sim", "Cebraspe", 60,
+                STYLE, "a\nb", null, "verdadeiro_falso"));
+
+        var added = exam.addQuestions(p1.id(), List.of(ce("C"), ce("Errado"), ce("X"), ce("e")));
+        assertEquals(3, added.gravadas());
+        assertEquals(1, added.recusadas().size(), "julgamento X não é C nem E");
+        assertEquals(List.of("A", "B", "B"), exam.examStatus(p1.id()).get(0).gravadas().stream()
+                .map(r -> r.resposta()).toList());
+        assertEquals("A", exam.fixQuestion(p1.id(), 3, null, List.of("ignorada"), "certo", null, "gabarito").resposta());
+        assertThrows(IllegalArgumentException.class, () -> exam.fixQuestion(p1.id(), 3, null, null, "D", null, null));
+
+        var real = questionRepository.findById(realReference()).orElseThrow();
+        real.setOrganization("Cebraspe");
+        Long ref = questionRepository.save(real).getId();
+        for (int n = 1; n <= 3; n++) {
+            review.reviewFidelity(p1.id(), n, notes(4), List.of(new ReviewMcpTools.ReferenceInput(ref, null, null)), null);
+            review.validateMaterial(p1.id(), n, "CONCEITO_ESTAVEL", n == 2 ? "E" : "C", null, false, null, null,
+                    false, null, "fundamento");
+        }
+        var audit = review.audit(List.of(p1.id()));
+        assertTrue(audit.falhasCriticas().isEmpty(), audit.falhasCriticas().toString());
+        var block = exam.finishExam(List.of(p1.id()), null, false);
+
+        StudySession session = sessionService.startBloco(block.blocoId());
+        var ids = session.questionIds();
+        sessionService.answer(session.getId(), ids.get(0), "A", 10_000L);   // certo
+        sessionService.answer(session.getId(), ids.get(1), "A", 10_000L);   // errado: anula o acerto
+        sessionService.finish(session.getId());
+        var result = insight.sessionResult(session.getId());
+        assertEquals(1, result.acertos());
+        assertEquals(0.0, result.notaProjetada(), 0.001);
+    }
+
+    private static ExamQuestion ce(String answer) {
+        return new ExamQuestion("Auditoria", "Assunto", null, statement(++counter) + ": a afirmação está correta.",
+                null, answer, "O item está " + answer + " porque a regra do referencial técnico diz assim.",
+                "Cebraspe TCU 2025 item 51", "troca de conceito");
     }
 }
