@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 /**
  * Cria, le e converte perfis de pontuacao. O formato JSON de {@link #saveFromJson} e o mesmo do
  * perfil de exemplo {@link #EXAMPLE_NAME}, criado na subida se ainda nao existir:
- * <pre>{"name": "...", "description": "...", "minTotal": 116,
+ * <pre>{"name": "...", "description": "...", "minTotal": 116, "wrongPenalty": 1,
  *  "groups": [{"name": "P1", "minScore": 45, "rules": [
  *      {"subject": "Portugues", "aliases": ["Lingua Portuguesa"], "weight": 1, "questionCount": 10}]}]}</pre>
  */
@@ -104,6 +104,8 @@ public class ScoringProfileService implements ApplicationRunner {
         profile.setName(root.get("name").asText().trim());
         profile.setDescription(root.hasNonNull("description") ? root.get("description").asText() : null);
         profile.setMinTotal(root.hasNonNull("minTotal") ? root.get("minTotal").asDouble() : null);
+        profile.setWrongPenalty(root.hasNonNull("wrongPenalty") && root.get("wrongPenalty").asDouble() > 0
+                ? root.get("wrongPenalty").asDouble() : null);
         profile = profileRepository.save(profile);
         deleteChildren(profile.getId());
 
@@ -161,7 +163,7 @@ public class ScoringProfileService implements ApplicationRunner {
                 .collect(Collectors.groupingBy(ScoringRule::getGroupId));
         List<GroupSpec> groupSpecs = groups.stream().map(g -> new GroupSpec(g.getName(), g.getMinScore(),
                 rules.getOrDefault(g.getId(), List.of()).stream().map(this::toSpec).toList())).toList();
-        return new ProfileSpec(profile.getName(), profile.getMinTotal(), groupSpecs);
+        return new ProfileSpec(profile.getName(), profile.getMinTotal(), groupSpecs, profile.getWrongPenalty());
     }
 
     private RuleSpec toSpec(ScoringRule rule) {

@@ -104,7 +104,7 @@ class ExamMcpToolsIntegrationTest {
         var profile = exam.saveProfile("Teste – C03", "P1 min 3", 5.0, List.of(
                 new GroupInput("P1", 3.0, List.of(new SubjectInput("Português", List.of("Língua Portuguesa"), 2, 1.0),
                         new SubjectInput("AFO", List.of(), 2, 2.0))),
-                new GroupInput("P2", 3.0, List.of(new SubjectInput("TI", List.of(), 2, 3.0)))), null);
+                new GroupInput("P2", 3.0, List.of(new SubjectInput("TI", List.of(), 2, 3.0)))), null, null);
         assertEquals(2, profile.provas().size());
         assertEquals(1, exam.examStructure("teste – c03", null).size());
 
@@ -180,7 +180,7 @@ class ExamMcpToolsIntegrationTest {
     @Test
     void foraDoEditalEReprovadaAparecemNaAuditoriaEBloqueiam() throws Exception {
         var profile = exam.saveProfile("Teste – edital", null, null, List.of(
-                new GroupInput("P1", null, List.of(new SubjectInput("Dir. Constitucional", List.of(), 2, 1.0)))), null);
+                new GroupInput("P1", null, List.of(new SubjectInput("Dir. Constitucional", List.of(), 2, 1.0)))), null, null);
         review.saveTopics(profile.id(), "Dir. Constitucional", List.of("Precatórios", "Direitos fundamentais"));
         var p1 = exam.createExam(profile.id(), "P1", "Sim edital", "FCC", 60, STYLE, "a\nb", null);
         exam.addQuestions(p1.id(), List.of(q("Dir. Constitucional", "C"), q("Dir. Constitucional", "A")));

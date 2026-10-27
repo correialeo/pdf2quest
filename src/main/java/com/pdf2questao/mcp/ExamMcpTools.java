@@ -198,7 +198,8 @@ public class ExamMcpTools {
     public record ProfileGroup(String prova, Double minimo, List<ProfileRule> disciplinas) {
     }
 
-    public record ProfileView(Long id, String nome, String descricao, Double minimoTotal, List<ProfileGroup> provas) {
+    public record ProfileView(Long id, String nome, String descricao, Double minimoTotal, Double descontoPorErro,
+                              List<ProfileGroup> provas) {
     }
 
     @McpTool(name = "estrutura_do_edital",
@@ -222,7 +223,7 @@ public class ExamMcpTools {
 
     private ProfileView view(ScoringProfile profile) {
         ProfileSpec spec = profileService.toSpec(profile);
-        return new ProfileView(profile.getId(), profile.getName(), profile.getDescription(), spec.minTotal(),
+        return new ProfileView(profile.getId(), profile.getName(), profile.getDescription(), spec.minTotal(), spec.wrongPenalty(),
                 spec.groups().stream().map(g -> new ProfileGroup(g.name(), g.minScore(), g.rules().stream()
                         .map(r -> new ProfileRule(r.subject(), List.copyOf(r.aliases()), r.weight(), r.questionCount()))
                         .toList())).toList());
@@ -244,19 +245,23 @@ public class ExamMcpTools {
 
     @McpTool(name = "salvar_perfil_edital",
             description = "Cria ou atualiza (pelo nome) o perfil de pontuação a partir da estrutura do edital: provas "
-                    + "objetivas com disciplinas, nº de questões, pesos e mínimos. Não inclua a discursiva aqui.",
+                    + "objetivas com disciplinas, nº de questões, pesos e mínimos. Não inclua a discursiva aqui. "
+                    + "Cebraspe (Certo/Errado): descontoPorErro = 1 (cada erro anula um acerto) e peso = valor do item.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
     public ProfileView saveProfile(
             @McpToolParam(description = "Nome do perfil, ex.: \"SEFAZ-SP APOFP 2026 – C03\".") String nome,
             @McpToolParam(description = "Resumo das regras (mínimos, totais).", required = false) String descricao,
             @McpToolParam(description = "Mínimo total das objetivas.", required = false) Double minimoTotal,
             @McpToolParam(description = "Provas objetivas.") List<GroupInput> provas,
+            @McpToolParam(description = "Acertos descontados por erro (Cebraspe: 1; vazio = erro não desconta).",
+                    required = false) Double descontoPorErro,
             @McpToolParam(description = "Concurso a que o perfil pertence (id ou parte do nome): o perfil passa a "
                     + "ser o edital dele.", required = false) String concurso) throws JsonProcessingException {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("name", nome);
         root.put("description", descricao);
         root.put("minTotal", minimoTotal);
+        root.put("wrongPenalty", descontoPorErro);
         List<Map<String, Object>> groups = new ArrayList<>();
         for (GroupInput g : provas == null ? List.<GroupInput>of() : provas) {
             List<Map<String, Object>> rules = new ArrayList<>();

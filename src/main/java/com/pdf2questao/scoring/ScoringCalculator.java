@@ -12,11 +12,12 @@ import java.util.Set;
  * Calcula a nota de uma sessao a partir de um perfil de pontuacao. Funcao pura: nao conhece banco
  * nem entidades. Cada questao cai na primeira regra (na ordem do perfil) cujo {@code subject} ou
  * apelido bate com a disciplina da questao, ignorando acentos e caixa. Questao anulada conta como
- * acerto para todos, respondida ou nao. Erro nao desconta. Disciplinas sem regra nao pontuam e
+ * acerto para todos, respondida ou nao. Erro so desconta se o perfil tiver {@code wrongPenalty} (Cebraspe: cada
+ * erro anula um acerto; em branco nao desconta). Disciplinas sem regra nao pontuam e
  * saem em {@link ScoreResult#unweightedSubjects()}.
  *
  * <p>Alem dos pontos crus, calcula a projecao para a prova do edital: cada disciplina com questoes na
- * sessao vale (acertos / questoes) x questoes do edital x peso; o grupo soma as disciplinas cobertas e
+ * sessao vale (acertos liquidos / questoes) x questoes do edital x peso; o grupo soma as disciplinas cobertas e
  * escala para o maximo do grupo (como se o aproveitamento se mantivesse no que nao caiu na sessao).
  */
 public final class ScoringCalculator {
@@ -30,16 +31,23 @@ public final class ScoringCalculator {
     public record GroupSpec(String name, Double minScore, List<RuleSpec> rules) {
     }
 
-    public record ProfileSpec(String name, Double minTotal, List<GroupSpec> groups) {
+    /** @param wrongPenalty acertos descontados por erro; null ou 0 = erro nao desconta. */
+    public record ProfileSpec(String name, Double minTotal, List<GroupSpec> groups, Double wrongPenalty) {
+        public ProfileSpec(String name, Double minTotal, List<GroupSpec> groups) {
+            this(name, minTotal, groups, null);
+        }
     }
 
     /** Uma questao da sessao: disciplina, se acertou (null = sem resposta) e se foi anulada. */
     public record Item(String subject, Boolean correct, boolean annulled) {
     }
 
-    /** @param projected pontos projetados para o edital; null se a disciplina nao caiu na sessao. */
+    /**
+     * @param projected pontos projetados para o edital; null se a disciplina nao caiu na sessao.
+     * @param wrong erros (questoes validas respondidas erradas); so descontam com {@code wrongPenalty}.
+     */
     public record RuleResult(String subject, double weight, int questions, int correct, double points,
-                             double maxPoints, Double projected) {
+                             double maxPoints, Double projected, int wrong) {
     }
 
     /**
@@ -68,7 +76,7 @@ public final class ScoringCalculator {
         for (GroupSpec group : profile.groups()) {
             for (RuleSpec rule : group.rules()) {
                 flat.add(rule);
-                counts.add(new int[2]);
+                counts.add(new int[3]);
             }
         }
         Map<String, Integer> unweighted = new LinkedHashMap<>();
@@ -82,9 +90,12 @@ public final class ScoringCalculator {
             counts.get(rule)[0]++;
             if (item.annulled() || Boolean.TRUE.equals(item.correct())) {
                 counts.get(rule)[1]++;
+            } else if (Boolean.FALSE.equals(item.correct())) {
+                counts.get(rule)[2]++;
             }
         }
 
+        double penalty = profile.wrongPenalty() == null ? 0 : profile.wrongPenalty();
         List<GroupResult> groups = new ArrayList<>();
         double total = 0;
         double maxTotal = 0;
@@ -103,15 +114,16 @@ public final class ScoringCalculator {
             double coveredMax = 0;
             for (RuleSpec rule : group.rules()) {
                 int[] c = counts.get(index++);
-                double rulePoints = c[1] * rule.weight();
+                double net = c[1] - penalty * c[2];
+                double rulePoints = net * rule.weight();
                 double ruleMax = (rule.questionCount() != null ? rule.questionCount() : c[0]) * rule.weight();
-                Double ruleProjected = c[0] == 0 ? null : (double) c[1] / c[0] * ruleMax;
+                Double ruleProjected = c[0] == 0 ? null : net / c[0] * ruleMax;
                 if (ruleProjected != null) {
                     projected += ruleProjected;
                     coveredMax += ruleMax;
                 }
                 rules.add(new RuleResult(rule.subject(), rule.weight(), c[0], c[1], rulePoints, ruleMax,
-                        ruleProjected));
+                        ruleProjected, c[2]));
                 points += rulePoints;
                 max += ruleMax;
             }

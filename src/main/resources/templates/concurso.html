@@ -11,6 +11,7 @@
                 <span th:text="${#strings.listJoin(#lists.toList({c.orgao, c.cargo, c.banca}).?[#this != null], ' · ')}"></span>
                 <span th:if="${profile != null}"> · perfil <strong th:text="${profile.name}"></strong></span>
                 <a th:if="${c.linkEdital != null}" th:href="${c.linkEdital}" target="_blank" rel="noopener" class="ms-2">edital <i class="bi bi-box-arrow-up-right"></i></a>
+                <a th:if="${temEdital}" th:href="@{/concursos/{id}/edital.pdf(id=${c.id})}" target="_blank" class="ms-2">edital (PDF) <i class="bi bi-file-earmark-pdf"></i></a>
             </p>
         </div>
         <div class="d-flex gap-2">
@@ -19,6 +20,12 @@
                 <button type="submit" class="btn btn-primary">Usar este concurso</button>
             </form>
             <a class="btn btn-outline-secondary" th:href="@{/concursos/{id}/editar(id=${c.id})}">Editar</a>
+            <form method="post" enctype="multipart/form-data" th:action="@{/concursos/{id}/edital(id=${c.id})}">
+                <label class="btn btn-outline-secondary m-0" th:title="${temEdital} ? 'Substituir o PDF do edital' : 'Anexar o PDF do edital'">
+                    <i class="bi bi-paperclip me-1"></i><span th:text="${temEdital} ? 'Trocar edital' : 'Anexar edital'"></span>
+                    <input type="file" name="arquivo" accept="application/pdf" hidden onchange="this.form.submit()"/>
+                </label>
+            </form>
         </div>
     </div>
     <th:block th:replace="~{fragments/ui :: flash}"></th:block>

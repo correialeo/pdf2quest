@@ -134,7 +134,7 @@ public class LessonMcpTools {
             @McpToolParam(description = "Enunciado.") String enunciado,
             @McpToolParam(description = "Tópico cobrado (para o desempenho por tópico).", required = false) String topico,
             @McpToolParam(description = "Alternativas na ordem A, B, C...") List<QuizAlternative> alternativas,
-            @McpToolParam(description = "Letra correta.") String correta) {
+            @McpToolParam(description = "Letra correta (no certo_errado: \"C\" ou \"E\").") String correta) {
 
         NewQuestion toNew() {
             return new NewQuestion(enunciado, topico,
@@ -163,7 +163,10 @@ public class LessonMcpTools {
             description = "Cria um quiz novo: de uma aula (aulaId; uma aula pode ter vários quizzes) ou avulso "
                     + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
-                    + "ids em errosRetomados. Cada alternativa precisa da explicação de por que está certa ou errada.",
+                    + "ids em errosRetomados. Cada alternativa precisa da explicação de por que está certa ou errada. "
+                    + "Formato certo_errado (Cebraspe): cada pergunta é um item afirmativo; envie 2 alternativas na "
+                    + "ordem Certo, Errado (o texto é ignorado; vale a explicação) e correta \"C\" ou \"E\". "
+                    + "Na tela, cada erro anula um acerto.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public QuizCreated createQuiz(
             @McpToolParam(description = "Id da aula (vazio = quiz avulso).", required = false) Long aulaId,
@@ -179,10 +182,12 @@ public class LessonMcpTools {
             @McpToolParam(description = "Id da tarefa do cronograma que o quiz cobre (vazio = a da aula, se houver).",
                     required = false) Long tarefaId,
             @McpToolParam(description = McpConcurso.PARAM + " Vazio também herda o da aula/tarefa.", required = false)
-            String concurso) {
+            String concurso,
+            @McpToolParam(description = "multipla_escolha (padrão) ou certo_errado (itens C/E, estilo Cebraspe).",
+                    required = false) String formato) {
         Quiz quiz = mcpConcurso.in(concurso, () -> lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel,
                 duvidas, errosRetomados, perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(),
-                tarefaId));
+                tarefaId, formato));
         return new QuizCreated(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), lessonService.questions(quiz.getId()).size(),
                 errosRetomados == null ? 0 : errosRetomados.size(), baseUrl + "/quizzes/" + quiz.getId());
     }

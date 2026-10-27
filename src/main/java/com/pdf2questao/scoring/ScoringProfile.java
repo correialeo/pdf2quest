@@ -30,5 +30,8 @@ public class ScoringProfile {
     /** Nota minima total (soma de todos os grupos); null = sem minimo. */
     private Double minTotal;
 
+    /** Quanto cada erro desconta, em acertos (Cebraspe: 1 = um erro anula um acerto); null = erro nao desconta. */
+    private Double wrongPenalty;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 }

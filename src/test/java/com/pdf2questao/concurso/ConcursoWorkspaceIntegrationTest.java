@@ -134,4 +134,19 @@ class ConcursoWorkspaceIntegrationTest {
         assertTrue(e.getMessage().contains("Mais de um concurso"));
         assertEquals("Prefeitura SP Auditor", concursoService.resolve("prefeitura sp").getNome());
     }
+
+    @Test
+    void editalAnexadoFicaGuardadoNoConcurso() throws Exception {
+        Concurso cgu = concurso("CGU AFFC", "CGU");
+        Path pdf = tempDir.resolve("edital.pdf");
+        java.nio.file.Files.write(pdf, "%PDF-1.4 edital".getBytes());
+        Path txt = tempDir.resolve("nao-e-pdf.pdf");
+        java.nio.file.Files.write(txt, "texto".getBytes());
+
+        var anexado = concursoTools.attachEdital(pdf.toString(), "cgu");
+        assertEquals(cgu.getId(), anexado.concursoId());
+        assertTrue(anexado.link().endsWith("/concursos/" + cgu.getId() + "/edital.pdf"));
+        assertTrue(java.nio.file.Files.isRegularFile(Path.of(anexado.caminho())));
+        assertThrows(IllegalArgumentException.class, () -> concursoTools.attachEdital(txt.toString(), "cgu"));
+    }
 }

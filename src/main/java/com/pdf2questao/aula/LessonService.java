@@ -326,6 +326,18 @@ public class LessonService {
     @Transactional
     public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
                            List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId) {
+        return createQuiz(lessonId, title, subject, topic, level, doubts, reviewedErrors, questions, taskId, null);
+    }
+
+    /** @param format null = multipla escolha; "certo_errado" = itens Certo/Errado (Cebraspe). */
+    @Transactional
+    public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
+                           List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId, String format) {
+        String fmt = blank(format) == null ? null : ScoringCalculator.normalize(format).replace(' ', '_')
+                .replace('/', '_').replace('-', '_');
+        if (fmt != null && !fmt.equals("multipla_escolha") && !fmt.equals(Quiz.CERTO_ERRADO)) {
+            throw new IllegalArgumentException("Formato: multipla_escolha ou certo_errado.");
+        }
         Lesson lesson = lessonId == null ? null : find(lessonId);
         String subj = lesson != null && blank(subject) == null ? lesson.getSubject() : canonicalSubject(subject);
         String top = lesson != null && blank(topic) == null ? lesson.getEditalTopic() : blank(topic);
@@ -353,6 +365,7 @@ public class LessonService {
         quiz.setSubject(subj);
         quiz.setTopic(top);
         quiz.setLevel(lvl);
+        quiz.setFormat(Quiz.CERTO_ERRADO.equals(fmt) ? fmt : null);
         quiz.setDoubts(blank(doubts));
         quiz.setPreviousErrors(errors.stream().filter(e -> reviewed.contains(e.perguntaId()))
                 .map(e -> "#" + e.perguntaId() + " " + (e.topico() == null ? "" : e.topico() + ": ")
@@ -381,20 +394,25 @@ public class LessonService {
             if (n.statement() == null || n.statement().isBlank()) {
                 throw new IllegalArgumentException(label + "falta o enunciado.");
             }
-            if (n.texts() == null || n.texts().size() < 2 || n.texts().size() > 5) {
-                throw new IllegalArgumentException(label + "de 2 a 5 alternativas.");
+            List<Alternative> alternatives;
+            if (quiz.certoErrado()) {
+                alternatives = certoErrado(label, n.explanations());
+            } else {
+                if (n.texts() == null || n.texts().size() < 2 || n.texts().size() > 5) {
+                    throw new IllegalArgumentException(label + "de 2 a 5 alternativas.");
+                }
+                if (n.explanations() == null || n.explanations().size() != n.texts().size()
+                        || n.explanations().stream().anyMatch(e -> e == null || e.isBlank())) {
+                    throw new IllegalArgumentException(label + "cada alternativa precisa da explicação de por que está "
+                            + "certa ou errada.");
+                }
+                alternatives = new ArrayList<>();
+                for (int a = 0; a < n.texts().size(); a++) {
+                    alternatives.add(new Alternative(String.valueOf((char) ('A' + a)), n.texts().get(a).strip(),
+                            n.explanations().get(a).strip()));
+                }
             }
-            if (n.explanations() == null || n.explanations().size() != n.texts().size()
-                    || n.explanations().stream().anyMatch(e -> e == null || e.isBlank())) {
-                throw new IllegalArgumentException(label + "cada alternativa precisa da explicação de por que está "
-                        + "certa ou errada.");
-            }
-            List<Alternative> alternatives = new ArrayList<>();
-            for (int a = 0; a < n.texts().size(); a++) {
-                alternatives.add(new Alternative(String.valueOf((char) ('A' + a)), n.texts().get(a).strip(),
-                        n.explanations().get(a).strip()));
-            }
-            String correct = n.correct() == null ? "" : n.correct().strip().toUpperCase(Locale.ROOT);
+            String correct = answerLetter(quiz, n.correct());
             if (alternatives.stream().noneMatch(a -> a.letra().equals(correct))) {
                 throw new IllegalArgumentException(label + "a correta (\"" + n.correct() + "\") não é uma das alternativas.");
             }
@@ -432,8 +450,14 @@ public class LessonService {
         if (topic != null && !topic.isBlank()) {
             q.setTopic(topic.strip());
         }
+        Quiz quiz = quiz(quizId);
         List<Alternative> alternatives = new ArrayList<>(q.alternativeList());
-        if (texts != null && !texts.isEmpty()) {
+        if (quiz.certoErrado()) {
+            List<String> given = explanations != null && !explanations.isEmpty() ? explanations : texts;
+            if (given != null && !given.isEmpty()) {
+                alternatives = certoErrado("", given);
+            }
+        } else if (texts != null && !texts.isEmpty()) {
             if (texts.size() < 2 || texts.size() > 5 || explanations == null || explanations.size() != texts.size()
                     || texts.stream().anyMatch(t -> t == null || t.isBlank())
                     || explanations.stream().anyMatch(e -> e == null || e.isBlank())) {
@@ -454,8 +478,7 @@ public class LessonService {
                 alternatives.set(a, new Alternative(old.letra(), old.texto(), explanations.get(a).strip()));
             }
         }
-        String letter = correct == null || correct.isBlank() ? q.getCorrectAnswer()
-                : correct.strip().toUpperCase(Locale.ROOT);
+        String letter = correct == null || correct.isBlank() ? q.getCorrectAnswer() : answerLetter(quiz, correct);
         if (alternatives.stream().noneMatch(a -> a.letra().equals(letter))) {
             throw new IllegalArgumentException("A correta (\"" + letter + "\") não é uma das alternativas.");
         }
@@ -466,6 +489,29 @@ public class LessonService {
         attempts.forEach(a -> a.setCorrect(letter.equals(a.getSelectedAnswer())));
         attemptRepository.saveAll(attempts);
         return q;
+    }
+
+    /** Item Certo/Errado: as duas opcoes fixas (C e E), com a explicacao de cada uma, na ordem Certo, Errado. */
+    private static List<Alternative> certoErrado(String label, List<String> explanations) {
+        if (explanations == null || explanations.size() != 2 || explanations.stream().anyMatch(e -> e == null || e.isBlank())) {
+            throw new IllegalArgumentException(label + "item Certo/Errado: envie 2 alternativas (Certo e Errado, nessa "
+                    + "ordem), cada uma com a explicação de por que o item está ou não certo.");
+        }
+        return List.of(new Alternative("C", "Certo", explanations.get(0).strip()),
+                new Alternative("E", "Errado", explanations.get(1).strip()));
+    }
+
+    /** Letra da correta; no Certo/Errado aceita "Certo"/"Errado" (e "A"/"B", na ordem das alternativas). */
+    private static String answerLetter(Quiz quiz, String correct) {
+        String c = correct == null ? "" : ScoringCalculator.normalize(correct).toUpperCase(Locale.ROOT);
+        if (quiz.certoErrado()) {
+            return switch (c) {
+                case "C", "CERTO", "A" -> "C";
+                case "E", "ERRADO", "B" -> "E";
+                default -> c;
+            };
+        }
+        return c;
     }
 
     public record AnswerResult(boolean correct, String correctAnswer, boolean finished, int correctCount, int total) {
@@ -519,9 +565,10 @@ public class LessonService {
                                  String correta, Boolean acertou, String explicacaoDaSuaResposta) {
     }
 
+    /** @param liquido no Certo/Errado: acertos menos erros (cada erro anula um acerto); null na multipla escolha. */
     public record QuizResult(Long quizId, String titulo, Long aulaId, String disciplina, String topico, String nivel,
                              int perguntas, int respondidas, int acertos, boolean concluido,
-                             List<QuestionResult> questoes) {
+                             List<QuestionResult> questoes, String formato, Integer liquido) {
     }
 
     public QuizResult result(Long quizId) {
@@ -541,7 +588,9 @@ public class LessonService {
         int answered = (int) items.stream().filter(i -> i.acertou() != null).count();
         int right = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.acertou())).count();
         return new QuizResult(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), quiz.getSubject(), quiz.getTopic(),
-                quiz.getLevel(), qs.size(), answered, right, quiz.getFinishedAt() != null, items);
+                quiz.getLevel(), qs.size(), answered, right, quiz.getFinishedAt() != null, items,
+                quiz.certoErrado() ? Quiz.CERTO_ERRADO : "multipla_escolha",
+                quiz.certoErrado() ? right - (answered - right) : null);
     }
 
     // ---- tela /aulas: tudo agrupado por disciplina ----

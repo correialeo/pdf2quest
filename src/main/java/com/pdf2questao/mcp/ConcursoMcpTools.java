@@ -5,11 +5,15 @@ import com.pdf2questao.concurso.ConcursoService;
 import com.pdf2questao.concurso.ConcursoStatus;
 import com.pdf2questao.concurso.Cronograma;
 import com.pdf2questao.concurso.Workspace;
+import com.pdf2questao.importer.PdfStorage;
 import org.springaicommunity.mcp.annotation.McpTool;
 import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -25,12 +29,14 @@ public class ConcursoMcpTools {
     private final Workspace workspace;
     private final McpConcurso mcpConcurso;
     private final String baseUrl;
+    private final PdfStorage pdfStorage;
 
     public ConcursoMcpTools(ConcursoService concursoService, Workspace workspace, McpConcurso mcpConcurso,
-                            @Value("${server.port:8080}") int port) {
+                            PdfStorage pdfStorage, @Value("${server.port:8080}") int port) {
         this.concursoService = concursoService;
         this.workspace = workspace;
         this.mcpConcurso = mcpConcurso;
+        this.pdfStorage = pdfStorage;
         this.baseUrl = "http://localhost:" + port;
     }
 
@@ -124,5 +130,28 @@ public class ConcursoMcpTools {
 
     private static LocalDate date(String s) {
         return McpText.blank(s) ? null : LocalDate.parse(s.strip());
+    }
+
+    public record EditalAnexado(Long concursoId, String concurso, String caminho, String link) {
+    }
+
+    @McpTool(name = "anexar_edital",
+            description = "Anexa (ou substitui) o PDF do edital ao concurso: fica guardado no sistema e abre pela tela "
+                    + "do concurso. Depois, ler_edital(caminho=...) com o caminho devolvido lê o texto.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
+    public EditalAnexado attachEdital(
+            @McpToolParam(description = "Caminho absoluto do PDF (ex.: /Users/.../Downloads/edital.pdf).") String caminho,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) throws IOException {
+        Concurso c = mcpConcurso.resolveOrCurrent(concurso);
+        if (c == null) {
+            throw new IllegalArgumentException("Informe o concurso.");
+        }
+        Path source = Path.of(caminho.strip().replaceFirst("^~", System.getProperty("user.home")));
+        if (!Files.isRegularFile(source)) {
+            throw new IllegalArgumentException("Não encontrei o PDF: " + source);
+        }
+        pdfStorage.storeEdital(c.getId(), Files.readAllBytes(source));
+        return new EditalAnexado(c.getId(), c.getNome(), pdfStorage.editalPath(c.getId()).toAbsolutePath().toString(),
+                baseUrl + "/concursos/" + c.getId() + "/edital.pdf");
     }
 }

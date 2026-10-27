@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class Quiz {
 
+    public static final String CERTO_ERRADO = "certo_errado";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -34,6 +36,8 @@ public class Quiz {
     private String topic;
     /** Nivel pedido: basico, intermediario, avancado, prova. */
     private String level;
+    /** Formato: null = multipla escolha; {@link #CERTO_ERRADO} = itens Certo/Errado (Cebraspe). */
+    private String format;
     /** Duvidas do usuario que o quiz deve trabalhar. */
     @Lob
     private String doubts;
@@ -44,4 +48,8 @@ public class Quiz {
     private LocalDateTime finishedAt;
     /** Refazer: respostas anteriores a isto saem da tela (continuam no historico). */
     private LocalDateTime restartedAt;
+
+    public boolean certoErrado() {
+        return CERTO_ERRADO.equals(format);
+    }
 }

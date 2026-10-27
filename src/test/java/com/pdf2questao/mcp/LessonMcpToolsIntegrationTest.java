@@ -70,10 +70,10 @@ class LessonMcpToolsIntegrationTest {
                 "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", null, null);
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null, null,
                 null, null, List.of(new QuizItem("x", null,
-                        List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null),
+                        List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null),
                 "toda alternativa precisa de explicação");
         var quiz1 = tools.createQuiz(lesson.aulaId(), null, null, null, "basico", null, null,
-                List.of(item("Créditos especiais", "B"), item("Créditos suplementares", "B")), null, null);
+                List.of(item("Créditos especiais", "B"), item("Créditos suplementares", "B")), null, null, null);
         assertEquals("Quiz 1", quiz1.titulo());
         var questions = lessonService.questions(quiz1.quizId());
 
@@ -109,10 +109,10 @@ class LessonMcpToolsIntegrationTest {
         assertEquals(1, errors.size());
         assertEquals("A", errors.get(0).suaResposta());
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null,
-                "prova", "confundo especial com suplementar", null, List.of(item("Créditos especiais", "B")), null, null),
+                "prova", "confundo especial com suplementar", null, List.of(item("Créditos especiais", "B")), null, null, null),
                 "sem retomar os erros anteriores");
         var quiz2 = tools.createQuiz(lesson.aulaId(), null, null, null, "prova", "confundo especial com suplementar",
-                List.of(errors.get(0).perguntaId()), List.of(item("Créditos especiais", "B")), null, null);
+                List.of(errors.get(0).perguntaId()), List.of(item("Créditos especiais", "B")), null, null, null);
         assertEquals("Quiz 2", quiz2.titulo());
         assertEquals(2, tools.listLessons(lesson.aulaId(), null).get(0).quizzes().size());
         mvc.perform(get("/quizzes/" + quiz2.quizId())).andExpect(content().string(containsString("Retoma erros anteriores")))
@@ -122,10 +122,10 @@ class LessonMcpToolsIntegrationTest {
 
         // Quiz avulso (sem aula) por disciplina/tópico; também retoma erros do mesmo tópico.
         var loose = tools.createQuiz(null, null, "AFO", "Créditos suplementares", "intermediario", null, null,
-                List.of(item("Créditos suplementares", "A")), null, null);
+                List.of(item("Créditos suplementares", "A")), null, null, null);
         assertEquals(null, tools.quizResult(loose.quizId()).aulaId());
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, null, null, null, null, null, null,
-                List.of(item("x", "A")), null, null), "avulso precisa de assunto");
+                List.of(item("x", "A")), null, null, null), "avulso precisa de assunto");
 
         var perf = tools.quizPerformance(null);
         assertEquals(2, perf.geral().acertos());
@@ -159,9 +159,9 @@ class LessonMcpToolsIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", 999_999L, null));
         var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita", taskId, null);
         var quiz = tools.createQuiz(lesson.aulaId(), null, null, null, null, null, null,
-                List.of(item("Receita", "B")), null, null);
+                List.of(item("Receita", "B")), null, null, null);
         var loose = tools.createQuiz(null, "Quiz de receita", "AFO", "Receita corrente", null, null, null,
-                List.of(item("Receita corrente", "B")), null, null);
+                List.of(item("Receita corrente", "B")), null, null, null);
         tools.linkTask(taskId, null, loose.quizId());
 
         var linked = lessonService.forTask(taskId);
@@ -189,5 +189,31 @@ class LessonMcpToolsIntegrationTest {
         mvc.perform(get("/simulado")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("Simulados")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Dataprev"))));
+    }
+
+    @Test
+    void quizCertoErradoUsaCeEEDescontaOErro() throws Exception {
+        var ce = tools.createQuiz(null, "C/E de ML", "TI", "Validação cruzada", "prova", null, null, List.of(
+                new QuizItem("Vazamento de dados infla a métrica de validação.", null, List.of(
+                        new QuizAlternative("", "Certo: o modelo viu informação do teste."),
+                        new QuizAlternative("", "Errado não: o item está correto.")), "Certo"),
+                new QuizItem("k-fold dispensa o conjunto de teste.", null, List.of(
+                        new QuizAlternative("", "Errado: o teste final continua separado."),
+                        new QuizAlternative("", "Errado: o teste final continua separado.")), "E")),
+                null, null, "certo_errado");
+        var qs = lessonService.questions(ce.quizId());
+        assertEquals("C", qs.get(0).getCorrectAnswer());
+        assertEquals("E", qs.get(1).getCorrectAnswer());
+        assertEquals("Certo", qs.get(0).alternativeList().get(0).texto());
+        assertThrows(IllegalArgumentException.class, () -> tools.addQuiz(ce.quizId(), List.of(new QuizItem("x", null,
+                List.of(new QuizAlternative("", "só uma")), "C"))), "C/E precisa das duas explicações");
+
+        mvc.perform(get("/quizzes/" + ce.quizId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("um erro anula um acerto")));
+        answer(ce.quizId(), qs.get(0).getId(), "C");
+        answer(ce.quizId(), qs.get(1).getId(), "C");
+        var result = tools.quizResult(ce.quizId());
+        assertEquals("certo_errado", result.formato());
+        assertEquals(0, result.liquido(), "1 certo - 1 errado");
     }
 }

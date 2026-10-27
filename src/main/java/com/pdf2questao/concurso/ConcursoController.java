@@ -1,8 +1,12 @@
 package com.pdf2questao.concurso;
 
+import com.pdf2questao.importer.PdfStorage;
 import com.pdf2questao.scoring.ScoringProfileService;
 import com.pdf2questao.study.StudyController;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,8 +14,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.LocalDate;
 
 /** Concursos (workspace): cadastro, home de cada concurso, seletor da barra lateral e cronogramas. */
@@ -22,13 +29,15 @@ public class ConcursoController {
     private final ConcursoHomeService homeService;
     private final ScoringProfileService profileService;
     private final Workspace workspace;
+    private final PdfStorage pdfStorage;
 
     public ConcursoController(ConcursoService concursoService, ConcursoHomeService homeService,
-                              ScoringProfileService profileService, Workspace workspace) {
+                              ScoringProfileService profileService, Workspace workspace, PdfStorage pdfStorage) {
         this.concursoService = concursoService;
         this.homeService = homeService;
         this.profileService = profileService;
         this.workspace = workspace;
+        this.pdfStorage = pdfStorage;
     }
 
     @GetMapping("/concursos")
@@ -95,7 +104,31 @@ public class ConcursoController {
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("profile", concursoService.get(id).getScoringProfileId() == null ? null
                 : profileService.find(concursoService.get(id).getScoringProfileId()).orElse(null));
+        model.addAttribute("temEdital", pdfStorage.hasEdital(id));
         return "concurso";
+    }
+
+    /** PDF do edital anexado ao concurso, aberto no navegador. */
+    @GetMapping("/concursos/{id}/edital.pdf")
+    public ResponseEntity<byte[]> edital(@PathVariable Long id) throws IOException {
+        if (!pdfStorage.hasEdital(concursoService.get(id).getId())) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"edital-concurso-" + id + ".pdf\"")
+                .body(Files.readAllBytes(pdfStorage.editalPath(id)));
+    }
+
+    @PostMapping("/concursos/{id}/edital")
+    public String uploadEdital(@PathVariable Long id, @RequestParam("arquivo") MultipartFile arquivo,
+                               RedirectAttributes redirectAttributes) throws IOException {
+        try {
+            pdfStorage.storeEdital(concursoService.get(id).getId(), arquivo.getBytes());
+            redirectAttributes.addFlashAttribute("message", "Edital anexado.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/concursos/" + id;
     }
 
     @PostMapping("/concursos/{id}/arquivar")

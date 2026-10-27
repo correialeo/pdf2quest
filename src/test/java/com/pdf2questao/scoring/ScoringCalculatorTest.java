@@ -170,4 +170,19 @@ class ScoringCalculatorTest {
         assertEquals(48, root.get("groups").get(1).get("minScore").asInt());
         assertEquals(116, root.get("minTotal").asInt());
     }
+
+    @Test
+    void cebraspeErroAnulaAcertoEBrancoNaoDesconta() {
+        ProfileSpec cebraspe = new ProfileSpec("Cebraspe", null, List.of(
+                new GroupSpec("P3", 4.0, List.of(new RuleSpec("TI", Set.of(), 2, 10)))), 1.0);
+        List<Item> session = new ArrayList<>(items("TI", 3, 1));
+        session.add(new Item("TI", null, false));   // em branco
+
+        ScoreResult r = ScoringCalculator.calculate(cebraspe, session);
+
+        assertEquals(4.0, r.total(), 1e-9, "(3 certos - 1 errado) x 2");
+        assertEquals(1, r.groups().get(0).rules().get(0).wrong());
+        assertEquals(8.0, r.projectedTotal(), 1e-9, "liquido 2 de 5 itens x 20 pontos");
+        assertTrue(r.passed());
+    }
 }
