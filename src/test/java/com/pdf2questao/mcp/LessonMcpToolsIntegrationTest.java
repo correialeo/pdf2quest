@@ -68,7 +68,7 @@ class LessonMcpToolsIntegrationTest {
     void aulaComVariosQuizzesQueRetomamOsErros() throws Exception {
         long attemptsBefore = attemptRepository.count();
         var lesson = tools.createLesson("Créditos adicionais", "AFO", "Créditos adicionais",
-                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "[Lei 4.320, art. 41](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", null, null);
+                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "[Lei 4.320, art. 41](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", null, null, null, null);
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null, null,
                 null, null, List.of(new QuizItem("x", null,
                         List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null),
@@ -157,13 +157,26 @@ class LessonMcpToolsIntegrationTest {
         task = taskRepository.save(task);
         Long taskId = task.getId();
 
-        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", "fonte", 999_999L, null));
-        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", " ", taskId, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", "fonte", 999_999L, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", " ", taskId, null, null, null));
         // Fonte sem link é recusada.
         assertThrows(IllegalArgumentException.class,
-                () -> tools.createLesson("x", "AFO", null, "y", "Lei 4.320 (planalto.gov.br)", taskId, null));
+                () -> tools.createLesson("x", "AFO", null, "y", "Lei 4.320 (planalto.gov.br)", taskId, null, null, null));
+        // Fonte "de memória" ou "só resumo" não entra em 'fontes'; o que não foi confirmado exige 'tentativas'.
+        String link = "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)";
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y",
+                link + "\nart. 43 de memória", taskId, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y",
+                link, taskId, null, "art. 43, §3º", null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y",
+                link, taskId, null, "art. 43, §3º", "não abriu"));
+        var comPendencia = tools.createLesson("Com pendência", "AFO", "Receita", "y", link, null, null,
+                "art. 43, §3º",
+                "Tentei o Planalto (resumo apenas), baixei o PDF da UFSM e extraí o texto com pdftotext.");
+        assertTrue(lessonService.find(comPendencia.aulaId()).getContent()
+                .contains("### Não confirmado"));
         var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita",
-                "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", taskId, null);
+                "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", taskId, null, null, null);
         var quiz = tools.createQuiz(lesson.aulaId(), null, null, null, null, null, null,
                 List.of(item("Receita", "B")), null, null, null);
         var loose = tools.createQuiz(null, "Quiz de receita", "AFO", "Receita corrente", null, null, null,

@@ -29,6 +29,11 @@ public class LessonMcpTools {
     private final LessonService lessonService;
     private final McpConcurso mcpConcurso;
     private static final Pattern SOURCE_LINK = Pattern.compile("https?://\\S+");
+    /** Sinais de que a "fonte" não foi lida de fato: isso vai em 'naoConfirmado', não em 'fontes'. */
+    private static final Pattern UNVERIFIED = Pattern.compile(
+            "de mem[óo]ria|n[ãa]o (consegui|confirm|li\\b|lid[oa]|foi poss)|sem confirma|truncad|s[óo] (o )?resumo|apenas (o )?resumo",
+            Pattern.CASE_INSENSITIVE);
+    private static final int MIN_ATTEMPTS = 40;
 
     private final String baseUrl;
 
@@ -59,10 +64,16 @@ public class LessonMcpTools {
                 tópico (norma vigente, súmulas, temas e jurisprudência, autores e conceitos; prefira fontes \\
                 oficiais) e veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
                 banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
-                hoje que ela cobre; em 'fontes', cada fonte com o link (URL) e o que não conseguiu confirmar), no nível dele (use o \\
+                hoje que ela cobre; em 'fontes', só o que você LEU, cada fonte com o link (URL)), no nível dele (use o \\
                 desempenho): explicação direta, exemplos, "como a FCC cobra" (formatos e pegadinhas observados nas \\
                 questões reais), quadro de diferenças entre conceitos que se confundem e um resumo final. Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
+                FONTE QUE NÃO ABRE OU VEM SÓ EM RESUMO. Se a página vier truncada, em resumo, ou o PDF vier ilegível, \\
+                NÃO escreva a aula ainda: baixe o arquivo e extraia o texto (o WebFetch guarda PDFs em disco; use \\
+                Bash com pdftotext ou curl), procure o texto em outro site (Câmara, Senado, LexML, normas.leg.br, \\
+                documentação oficial do produto) e leia em partes (offset). Só dê algo por não confirmado depois de \\
+                pelo menos duas tentativas diferentes, e então use 'naoConfirmado' e 'tentativas' em criar_aula. \\
+                Nunca escreva da memória o que a fonte deveria dizer, nem leve isso para as perguntas do quiz.
 
                 3. QUIZ. Veja erros_quiz_anteriores do assunto e, com criar_quiz (aulaId da aula; o quiz herda a tarefa), crie de 6 a 10 \
                 perguntas baseadas no que a aula ensinou (não em outra \\
@@ -91,8 +102,10 @@ public class LessonMcpTools {
                     + "citações > e listas numeradas). Vincule à disciplina e ao tópico do edital; depois crie o quiz "
                     + "com criar_quiz. ANTES de escrever, confira o tópico no edital (ler_edital / estrutura_do_edital) "
                     + "e pesquise fontes atuais na web (norma vigente, súmulas, temas e jurisprudência, autores e "
-                    + "conceitos); o que não for confirmado deve ficar marcado como tal. A aula só é criada com "
-                    + "'fontes' preenchido e com o link (URL) de cada fonte, e a lista é anexada ao fim dela.",
+                    + "conceitos). 'fontes' lista só o que foi LIDO, com o link de cada um; o que não foi confirmado vai "
+                    + "em 'naoConfirmado', e então 'tentativas' (o que você fez para confirmar: outras fontes, "
+                    + "download e extração do texto) é obrigatório. Se a fonte vier truncada ou em resumo, busque o "
+                    + "texto por outro caminho antes de criar a aula. Tudo é anexado ao fim dela.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public LessonCreated createLesson(
             @McpToolParam(description = "Título da aula.") String titulo,
@@ -102,11 +115,17 @@ public class LessonMcpTools {
             @McpToolParam(description = "Fontes conferidas para esta aula, em Markdown (uma por linha), SEMPRE com "
                     + "o link: [título](https://...) para cada página da web, dispositivo de lei, súmula ou tema "
                     + "verificado, e o item do edital lido (com o nome do arquivo ou o link), com a data da "
-                    + "conferência. Liste também o que NÃO foi confirmado. Obrigatório.") String fontes,
+                    + "conferência. Só o que foi LIDO de fato; \"de memória\", \"não consegui ler\" ou \"só resumo\" "
+                    + "não entram aqui (use naoConfirmado). Obrigatório.") String fontes,
             @McpToolParam(description = "Id da tarefa do cronograma que a aula cobre (a aula fica no concurso da "
                     + "tarefa).", required = false) Long tarefaId,
             @McpToolParam(description = McpConcurso.PARAM + " Ignorado se a tarefa já é de um concurso.",
-                    required = false) String concurso) {
+                    required = false) String concurso,
+            @McpToolParam(description = "O que NÃO foi possível confirmar na fonte (um item por linha). Exige "
+                    + "'tentativas'.", required = false) String naoConfirmado,
+            @McpToolParam(description = "O que foi tentado para confirmar o que está em naoConfirmado (outros sites, "
+                    + "download e extração do texto, leitura em partes) e por que não deu certo.",
+                    required = false) String tentativas) {
         if (McpText.blank(fontes)) {
             throw new IllegalArgumentException("Informe 'fontes': confira o tópico no edital (ler_edital) e pesquise "
                     + "fontes atuais na web antes de criar a aula, e liste o que foi conferido e o que não foi.");
@@ -115,7 +134,20 @@ public class LessonMcpTools {
             throw new IllegalArgumentException("Cada fonte em 'fontes' precisa do link (https://...): use "
                     + "[título](https://...) para as páginas consultadas.");
         }
-        String content = conteudo + "\n\n---\n\n## Fontes conferidas\n" + fontes.strip() + "\n";
+        if (UNVERIFIED.matcher(fontes).find()) {
+            throw new IllegalArgumentException("'fontes' só aceita o que foi lido de fato. Se algo foi de memória, "
+                    + "truncado ou só em resumo, tente antes outro caminho (outro site, baixar e extrair o texto, "
+                    + "ler em partes) e, se não der, mova para 'naoConfirmado' com 'tentativas'.");
+        }
+        boolean hasUnconfirmed = !McpText.blank(naoConfirmado);
+        if (hasUnconfirmed && (McpText.blank(tentativas) || tentativas.strip().length() < MIN_ATTEMPTS)) {
+            throw new IllegalArgumentException("Para deixar algo em 'naoConfirmado', descreva em 'tentativas' o que "
+                    + "você tentou para confirmar (outras fontes, baixar o arquivo e extrair o texto, leitura em "
+                    + "partes) e por que não deu certo.");
+        }
+        String content = conteudo + "\n\n---\n\n## Fontes conferidas\n" + fontes.strip() + "\n"
+                + (hasUnconfirmed ? "\n### Não confirmado\n" + naoConfirmado.strip() + "\n\n### O que foi tentado\n"
+                + tentativas.strip() + "\n" : "");
         Lesson lesson = mcpConcurso.in(concurso,
                 () -> lessonService.create(titulo, disciplina, topicoEdital, content, tarefaId));
         return new LessonCreated(lesson.getId(), lesson.getTitle(), mcpConcurso.name(lesson.getConcursoId()),
@@ -135,7 +167,8 @@ public class LessonMcpTools {
                 1. Chame erros_quiz_anteriores para o mesmo assunto (aulaId, ou disciplina/tópico) e leia cada erro: o \
                 que o usuário marcou e por quê estava errado. Veja também desempenho_quiz.
                 2. Se for de uma aula, leia o conteúdo dela (listar_aulas) e confira na web os pontos de norma, \
-                súmula, tema ou jurisprudência que o quiz vai cobrar; se for avulso, leia o tópico no edital \
+                súmula, tema ou jurisprudência que o quiz vai cobrar (se a fonte vier truncada ou em resumo, baixe e \\
+                extraia o texto ou ache outra fonte antes de desistir); se for avulso, leia o tópico no edital \
                 (ler_edital), pesquise fontes atuais na web e veja como a banca cobra (exemplos_da_banca). Não \
                 cobre o que não conseguiu confirmar.
                 3. Escreva de 6 a 10 perguntas: uma ou mais para cada erro anterior (com outro enunciado, cobrando o \
@@ -187,7 +220,8 @@ public class LessonMcpTools {
                     + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
                     + "ids em errosRetomados. Baseie as perguntas na aula e, em quiz avulso, confira antes o edital e "
-                    + "fontes atuais na web (não cobre o que não foi confirmado). "
+                    + "fontes atuais na web. Não cobre o que não foi confirmado nem o que só estava na memória: "
+                    + "pergunta sem fonte lida não entra no quiz. "
                     + "Cada alternativa precisa da explicação de por que está certa ou errada. "
                     + "Formato certo_errado (Cebraspe): cada pergunta é um item afirmativo; envie 2 alternativas na "
                     + "ordem Certo, Errado (o texto é ignorado; vale a explicação) e correta \"C\" ou \"E\". "
