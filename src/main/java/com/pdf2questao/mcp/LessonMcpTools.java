@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Tutor: aula sobre um topico do edital com quiz ligado a ela, respondido na tela do sistema; o resultado volta para
@@ -27,6 +28,8 @@ public class LessonMcpTools {
 
     private final LessonService lessonService;
     private final McpConcurso mcpConcurso;
+    private static final Pattern SOURCE_LINK = Pattern.compile("https?://\\S+");
+
     private final String baseUrl;
 
     public LessonMcpTools(LessonService lessonService, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
@@ -56,7 +59,7 @@ public class LessonMcpTools {
                 tópico (norma vigente, súmulas, temas e jurisprudência, autores e conceitos; prefira fontes \\
                 oficiais) e veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
                 banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
-                hoje que ela cobre; em 'fontes', o que conferiu e o que não conseguiu confirmar), no nível dele (use o \\
+                hoje que ela cobre; em 'fontes', cada fonte com o link (URL) e o que não conseguiu confirmar), no nível dele (use o \\
                 desempenho): explicação direta, exemplos, "como a FCC cobra" (formatos e pegadinhas observados nas \\
                 questões reais), quadro de diferenças entre conceitos que se confundem e um resumo final. Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
@@ -89,16 +92,17 @@ public class LessonMcpTools {
                     + "com criar_quiz. ANTES de escrever, confira o tópico no edital (ler_edital / estrutura_do_edital) "
                     + "e pesquise fontes atuais na web (norma vigente, súmulas, temas e jurisprudência, autores e "
                     + "conceitos); o que não for confirmado deve ficar marcado como tal. A aula só é criada com "
-                    + "'fontes' preenchido, e a lista é anexada ao fim dela.",
+                    + "'fontes' preenchido e com o link (URL) de cada fonte, e a lista é anexada ao fim dela.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public LessonCreated createLesson(
             @McpToolParam(description = "Título da aula.") String titulo,
             @McpToolParam(description = "Disciplina (como no perfil do edital; use o mesmo nome das aulas já existentes, veja listar_aulas).") String disciplina,
             @McpToolParam(description = "Tópico do conteúdo programático do edital.") String topicoEdital,
             @McpToolParam(description = "Conteúdo da aula em Markdown.") String conteudo,
-            @McpToolParam(description = "Fontes conferidas para esta aula, em Markdown (uma por linha): o item do "
-                    + "edital lido, as páginas da web e os dispositivos de lei, súmulas ou temas verificados, com a "
-                    + "data da conferência. Liste também o que NÃO foi confirmado. Obrigatório.") String fontes,
+            @McpToolParam(description = "Fontes conferidas para esta aula, em Markdown (uma por linha), SEMPRE com "
+                    + "o link: [título](https://...) para cada página da web, dispositivo de lei, súmula ou tema "
+                    + "verificado, e o item do edital lido (com o nome do arquivo ou o link), com a data da "
+                    + "conferência. Liste também o que NÃO foi confirmado. Obrigatório.") String fontes,
             @McpToolParam(description = "Id da tarefa do cronograma que a aula cobre (a aula fica no concurso da "
                     + "tarefa).", required = false) Long tarefaId,
             @McpToolParam(description = McpConcurso.PARAM + " Ignorado se a tarefa já é de um concurso.",
@@ -106,6 +110,10 @@ public class LessonMcpTools {
         if (McpText.blank(fontes)) {
             throw new IllegalArgumentException("Informe 'fontes': confira o tópico no edital (ler_edital) e pesquise "
                     + "fontes atuais na web antes de criar a aula, e liste o que foi conferido e o que não foi.");
+        }
+        if (!SOURCE_LINK.matcher(fontes).find()) {
+            throw new IllegalArgumentException("Cada fonte em 'fontes' precisa do link (https://...): use "
+                    + "[título](https://...) para as páginas consultadas.");
         }
         String content = conteudo + "\n\n---\n\n## Fontes conferidas\n" + fontes.strip() + "\n";
         Lesson lesson = mcpConcurso.in(concurso,

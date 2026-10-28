@@ -67,7 +67,7 @@ class LessonMcpToolsIntegrationTest {
     void aulaComVariosQuizzesQueRetomamOsErros() throws Exception {
         long attemptsBefore = attemptRepository.count();
         var lesson = tools.createLesson("Créditos adicionais", "AFO", "Créditos adicionais",
-                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "Lei 4.320, art. 41 (planalto.gov.br)", null, null);
+                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "[Lei 4.320, art. 41](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", null, null);
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null, null,
                 null, null, List.of(new QuizItem("x", null,
                         List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null),
@@ -158,8 +158,11 @@ class LessonMcpToolsIntegrationTest {
 
         assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", "fonte", 999_999L, null));
         assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", " ", taskId, null));
+        // Fonte sem link é recusada.
+        assertThrows(IllegalArgumentException.class,
+                () -> tools.createLesson("x", "AFO", null, "y", "Lei 4.320 (planalto.gov.br)", taskId, null));
         var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita",
-                "Lei 4.320 (planalto.gov.br)", taskId, null);
+                "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", taskId, null);
         var quiz = tools.createQuiz(lesson.aulaId(), null, null, null, null, null, null,
                 List.of(item("Receita", "B")), null, null, null);
         var loose = tools.createQuiz(null, "Quiz de receita", "AFO", "Receita corrente", null, null, null,
