@@ -52,9 +52,11 @@ public class LessonMcpTools {
                 tópico no conteúdo programático do edital (estrutura_do_edital / ler_edital) e diga ao usuário, em \\
                 3 a 5 linhas, o plano do dia e por quê.
 
-                2. AULA. Antes de escrever, veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
+                2. AULA. Antes de escrever, leia o item do edital (ler_edital), pesquise na web fontes atuais do \\
+                tópico (norma vigente, súmulas, temas e jurisprudência, autores e conceitos; prefira fontes \\
+                oficiais) e veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
                 banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
-                hoje que ela cobre), no nível dele (use o \\
+                hoje que ela cobre; em 'fontes', o que conferiu e o que não conseguiu confirmar), no nível dele (use o \\
                 desempenho): explicação direta, exemplos, "como a FCC cobra" (formatos e pegadinhas observados nas \\
                 questões reais), quadro de diferenças entre conceitos que se confundem e um resumo final. Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
@@ -84,19 +86,30 @@ public class LessonMcpTools {
     @McpTool(name = "criar_aula",
             description = "Cria uma aula no sistema (Markdown: ## títulos, listas, **negrito**, `código`, blocos ``` , "
                     + "citações > e listas numeradas). Vincule à disciplina e ao tópico do edital; depois crie o quiz "
-                    + "com adicionar_quiz.",
+                    + "com criar_quiz. ANTES de escrever, confira o tópico no edital (ler_edital / estrutura_do_edital) "
+                    + "e pesquise fontes atuais na web (norma vigente, súmulas, temas e jurisprudência, autores e "
+                    + "conceitos); o que não for confirmado deve ficar marcado como tal. A aula só é criada com "
+                    + "'fontes' preenchido, e a lista é anexada ao fim dela.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public LessonCreated createLesson(
             @McpToolParam(description = "Título da aula.") String titulo,
             @McpToolParam(description = "Disciplina (como no perfil do edital; use o mesmo nome das aulas já existentes, veja listar_aulas).") String disciplina,
             @McpToolParam(description = "Tópico do conteúdo programático do edital.") String topicoEdital,
             @McpToolParam(description = "Conteúdo da aula em Markdown.") String conteudo,
+            @McpToolParam(description = "Fontes conferidas para esta aula, em Markdown (uma por linha): o item do "
+                    + "edital lido, as páginas da web e os dispositivos de lei, súmulas ou temas verificados, com a "
+                    + "data da conferência. Liste também o que NÃO foi confirmado. Obrigatório.") String fontes,
             @McpToolParam(description = "Id da tarefa do cronograma que a aula cobre (a aula fica no concurso da "
                     + "tarefa).", required = false) Long tarefaId,
             @McpToolParam(description = McpConcurso.PARAM + " Ignorado se a tarefa já é de um concurso.",
                     required = false) String concurso) {
+        if (McpText.blank(fontes)) {
+            throw new IllegalArgumentException("Informe 'fontes': confira o tópico no edital (ler_edital) e pesquise "
+                    + "fontes atuais na web antes de criar a aula, e liste o que foi conferido e o que não foi.");
+        }
+        String content = conteudo + "\n\n---\n\n## Fontes conferidas\n" + fontes.strip() + "\n";
         Lesson lesson = mcpConcurso.in(concurso,
-                () -> lessonService.create(titulo, disciplina, topicoEdital, conteudo, tarefaId));
+                () -> lessonService.create(titulo, disciplina, topicoEdital, content, tarefaId));
         return new LessonCreated(lesson.getId(), lesson.getTitle(), mcpConcurso.name(lesson.getConcursoId()),
                 baseUrl + "/aulas/" + lesson.getId());
     }
@@ -113,8 +126,10 @@ public class LessonMcpTools {
 
                 1. Chame erros_quiz_anteriores para o mesmo assunto (aulaId, ou disciplina/tópico) e leia cada erro: o \
                 que o usuário marcou e por quê estava errado. Veja também desempenho_quiz.
-                2. Se for de uma aula, leia o conteúdo dela (listar_aulas); se for avulso, confira o tópico no \
-                edital e como a banca cobra (exemplos_da_banca).
+                2. Se for de uma aula, leia o conteúdo dela (listar_aulas) e confira na web os pontos de norma, \
+                súmula, tema ou jurisprudência que o quiz vai cobrar; se for avulso, leia o tópico no edital \
+                (ler_edital), pesquise fontes atuais na web e veja como a banca cobra (exemplos_da_banca). Não \
+                cobre o que não conseguiu confirmar.
                 3. Escreva de 6 a 10 perguntas: uma ou mais para cada erro anterior (com outro enunciado, cobrando o \
                 mesmo ponto), as dúvidas do usuário, e o restante no nível pedido (basico = conceito; \
                 intermediario = aplicação; avancado = casos e exceções; prova = estilo e pegadinhas da banca). \
@@ -163,7 +178,9 @@ public class LessonMcpTools {
             description = "Cria um quiz novo: de uma aula (aulaId; uma aula pode ter vários quizzes) ou avulso "
                     + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
-                    + "ids em errosRetomados. Cada alternativa precisa da explicação de por que está certa ou errada. "
+                    + "ids em errosRetomados. Baseie as perguntas na aula e, em quiz avulso, confira antes o edital e "
+                    + "fontes atuais na web (não cobre o que não foi confirmado). "
+                    + "Cada alternativa precisa da explicação de por que está certa ou errada. "
                     + "Formato certo_errado (Cebraspe): cada pergunta é um item afirmativo; envie 2 alternativas na "
                     + "ordem Certo, Errado (o texto é ignorado; vale a explicação) e correta \"C\" ou \"E\". "
                     + "Na tela, cada erro anula um acerto.",

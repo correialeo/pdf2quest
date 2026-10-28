@@ -67,7 +67,7 @@ class LessonMcpToolsIntegrationTest {
     void aulaComVariosQuizzesQueRetomamOsErros() throws Exception {
         long attemptsBefore = attemptRepository.count();
         var lesson = tools.createLesson("Créditos adicionais", "AFO", "Créditos adicionais",
-                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", null, null);
+                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "Lei 4.320, art. 41 (planalto.gov.br)", null, null);
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null, null,
                 null, null, List.of(new QuizItem("x", null,
                         List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null),
@@ -156,8 +156,10 @@ class LessonMcpToolsIntegrationTest {
         task = taskRepository.save(task);
         Long taskId = task.getId();
 
-        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", 999_999L, null));
-        var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita", taskId, null);
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", "fonte", 999_999L, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", " ", taskId, null));
+        var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita",
+                "Lei 4.320 (planalto.gov.br)", taskId, null);
         var quiz = tools.createQuiz(lesson.aulaId(), null, null, null, null, null, null,
                 List.of(item("Receita", "B")), null, null, null);
         var loose = tools.createQuiz(null, "Quiz de receita", "AFO", "Receita corrente", null, null, null,

@@ -104,7 +104,7 @@ class ConcursoWorkspaceIntegrationTest {
 
         // A aula herda o concurso da tarefa.
         var aula = lessonTools.createLesson("ADI e ADC", "Constitucional", "Controle concentrado", "## ADI\n...",
-                hoje.get(0).id(), null);
+                "CF/88, art. 102 (planalto.gov.br)", hoje.get(0).id(), null);
         assertEquals(pge.getNome(), aula.concurso());
         assertEquals(pge.getId(), lessonRepository.findById(aula.aulaId()).orElseThrow().getConcursoId());
         assertEquals(1, lessonTools.listLessons(null, "pge").size());
