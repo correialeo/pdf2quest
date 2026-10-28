@@ -1,5 +1,7 @@
 package com.pdf2questao.study;
 
+import com.pdf2questao.concurso.ConcursoService;
+import com.pdf2questao.concurso.Workspace;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,8 +14,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Resumo do dia: uma pagina por data do cronograma, criada na primeira vez que o usuario abre e guardada dentro de
- * "Resumos do dia". Ja nasce com um titulo para cada tarefa do dia, para anotar o que foi estudado em cada uma.
+ * Resumo do dia: uma pagina por data do cronograma <b>de cada concurso</b> (workspace), criada na primeira vez que o
+ * usuario abre e guardada dentro do "Resumos do dia" daquele concurso. Ja nasce com um titulo para cada tarefa do dia
+ * do concurso, para anotar o que foi estudado em cada uma. Em "Todos" (sem concurso) o resumo e o geral, com as
+ * tarefas de todos os concursos.
  */
 @Service
 public class DaySummaryService {
@@ -24,55 +28,69 @@ public class DaySummaryService {
     private final StudyPageRepository pageRepository;
     private final StudyPageService pageService;
     private final StudyTaskRepository taskRepository;
+    private final ConcursoService concursoService;
+    private final Workspace workspace;
 
     public DaySummaryService(StudyPageRepository pageRepository, StudyPageService pageService,
-                             StudyTaskRepository taskRepository) {
+                             StudyTaskRepository taskRepository, ConcursoService concursoService,
+                             Workspace workspace) {
         this.pageRepository = pageRepository;
         this.pageService = pageService;
         this.taskRepository = taskRepository;
+        this.concursoService = concursoService;
+        this.workspace = workspace;
     }
 
-    /** Resumo ja existente de cada dia do intervalo (data -> id da pagina), para os botoes do cronograma. */
+    /** Resumo ja existente de cada dia do intervalo no concurso em vigor (data -> id da pagina), para os botoes. */
     public Map<LocalDate, Long> existing(LocalDate from, LocalDate to) {
-        return pageRepository.findBySummaryDateBetween(from, to).stream()
+        return pageRepository.summariesBetween(from, to, workspace.currentId()).stream()
                 .collect(Collectors.toMap(StudyPage::getSummaryDate, StudyPage::getId));
     }
 
-    public List<StudyTask> tasks(LocalDate date) {
+    /** Tarefas do dia do concurso (nulo = todas); a tarefa diaria de revisao vale para todos os concursos. */
+    public List<StudyTask> tasks(LocalDate date, Long concursoId) {
+        Map<Long, Long> concursoBy = new java.util.HashMap<>();
+        concursoService.cronogramasById().forEach((id, c) -> concursoBy.put(id, c.getConcursoId()));
         return taskRepository.findByPlannedDate(date).stream()
+                .filter(t -> concursoId == null || t.isReview()
+                        || concursoId.equals(t.getCronogramaId() == null ? null : concursoBy.get(t.getCronogramaId())))
                 .sorted(Comparator.comparing(StudyTask::getId)).toList();
     }
 
-    /** Resumo ja escrito mais proximo antes/depois do dia (navegar nao cria resumos vazios). */
-    public java.util.Optional<StudyPage> previous(LocalDate date) {
-        return pageRepository.findFirstBySummaryDateLessThanOrderBySummaryDateDesc(date);
+    /** Resumo ja escrito mais proximo antes/depois do dia, no mesmo concurso (navegar nao cria resumos vazios). */
+    public java.util.Optional<StudyPage> previous(LocalDate date, Long concursoId) {
+        return pageRepository.summariesBefore(date, concursoId, org.springframework.data.domain.PageRequest.of(0, 1))
+                .stream().findFirst();
     }
 
-    public java.util.Optional<StudyPage> next(LocalDate date) {
-        return pageRepository.findFirstBySummaryDateGreaterThanOrderBySummaryDateAsc(date);
+    public java.util.Optional<StudyPage> next(LocalDate date, Long concursoId) {
+        return pageRepository.summariesAfter(date, concursoId, org.springframework.data.domain.PageRequest.of(0, 1))
+                .stream().findFirst();
     }
 
-    /** Abre o resumo do dia, criando se ainda nao existe. */
+    /** Abre o resumo do dia do concurso em vigor, criando se ainda nao existe. */
     @Transactional
     public StudyPage open(LocalDate date) {
-        return pageRepository.findBySummaryDate(date).orElseGet(() -> create(date));
+        Long concursoId = workspace.currentId();
+        return pageRepository.findSummary(date, concursoId).orElseGet(() -> create(date, concursoId));
     }
 
-    private StudyPage create(LocalDate date) {
+    private StudyPage create(LocalDate date, Long concursoId) {
         StringBuilder html = new StringBuilder();
-        for (StudyTask task : tasks(date)) {
+        for (StudyTask task : tasks(date, concursoId)) {
             html.append("<h2>").append(escape(task.getTitle())).append("</h2><p><br></p>");
         }
         html.append("<h2>Dúvidas e erros do dia</h2><ul><li><br></li></ul>");
-        StudyPage page = pageService.create(parent().getId(), "Resumo – " + title(date), null, html.toString());
+        StudyPage page = pageService.create(parent(concursoId).getId(), "Resumo – " + title(date), null,
+                html.toString());
         page.setSummaryDate(date);
         // Posicao = dia: os resumos ficam em ordem de data dentro de "Resumos do dia".
         page.setPosition((int) date.toEpochDay());
         return pageRepository.save(page);
     }
 
-    private StudyPage parent() {
-        for (Long id : pageRepository.findSummaryParents()) {
+    private StudyPage parent(Long concursoId) {
+        for (Long id : pageRepository.findSummaryParents(concursoId)) {
             var parent = pageRepository.findById(id);
             if (parent.isPresent()) {
                 return parent.get();
@@ -80,8 +98,8 @@ public class DaySummaryService {
         }
         StudyPage created = pageService.create(null, PARENT_TITLE, null,
                 "<p>Um resumo para cada dia do cronograma. Abra pelo botão <strong>Resumo do dia</strong> no cronograma.</p>");
-        // Os resumos do dia sao de todos os concursos (um por dia).
-        created.setConcursoId(null);
+        // Cada concurso tem a sua pasta de resumos (a pagina nasce no concurso em vigor).
+        created.setConcursoId(concursoId);
         return pageRepository.save(created);
     }
 

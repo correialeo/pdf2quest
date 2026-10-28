@@ -20,6 +20,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -220,5 +221,48 @@ class LessonMcpToolsIntegrationTest {
         var result = tools.quizResult(ce.quizId());
         assertEquals("certo_errado", result.formato());
         assertEquals(0, result.liquido(), "1 certo - 1 errado");
+    }
+
+    @Test
+    void certoErradoAceitaEmBrancoQueNaoPontuaNemAnulaAcerto() throws Exception {
+        var ce = tools.createQuiz(null, "C/E em branco", "TI", "Estado", "prova", null, null, List.of(
+                new QuizItem("Item 1.", null, List.of(new QuizAlternative("", "Certo."),
+                        new QuizAlternative("", "Errado.")), "C"),
+                new QuizItem("Item 2.", null, List.of(new QuizAlternative("", "Certo."),
+                        new QuizAlternative("", "Errado.")), "E"),
+                new QuizItem("Item 3.", null, List.of(new QuizAlternative("", "Certo."),
+                        new QuizAlternative("", "Errado.")), "C")), null, null, "certo_errado");
+        var qs = lessonService.questions(ce.quizId());
+
+        mvc.perform(get("/quizzes/" + ce.quizId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("quiz-blank")));
+        answer(ce.quizId(), qs.get(0).getId(), "C");   // acerto
+        answer(ce.quizId(), qs.get(1).getId(), "-");   // em branco
+        var parcial = tools.quizResult(ce.quizId());
+        assertEquals(2, parcial.respondidas());
+        assertEquals(1, parcial.acertos());
+        assertEquals(1, parcial.brancos());
+        assertEquals(1, parcial.liquido(), "o branco nao anula o acerto");
+        assertFalse(parcial.concluido());
+
+        answer(ce.quizId(), qs.get(2).getId(), "E");   // erro
+        var result = tools.quizResult(ce.quizId());
+        assertTrue(result.concluido(), "em branco conta como respondido");
+        assertEquals(0, result.liquido(), "1 certo - 1 errado, o branco nao conta");
+        var branco = result.questoes().get(1);
+        assertTrue(branco.emBranco());
+        assertNull(branco.acertou());
+        assertEquals("em branco", branco.suaResposta());
+
+        // O item em branco volta para revisao como lacuna, marcado como "em branco".
+        var erros = tools.previousErrors(null, "TI", "Estado");
+        assertTrue(erros.stream().anyMatch(e -> "em branco".equals(e.suaResposta())), erros.toString());
+
+        // Na multipla escolha nao existe "em branco".
+        var mc = tools.createQuiz(null, "MC", "Redes", "Camadas", "prova", null, null, List.of(
+                new QuizItem("Pergunta?", null, List.of(new QuizAlternative("A", "a"),
+                        new QuizAlternative("B", "b")), "A")), null, null, null);
+        assertThrows(IllegalArgumentException.class,
+                () -> lessonService.answer(lessonService.questions(mc.quizId()).get(0).getId(), "-"));
     }
 }

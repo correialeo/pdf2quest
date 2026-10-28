@@ -118,10 +118,10 @@ public class StudyPageController {
         model.addAttribute("tasks", taskService.forPage(id));
         if (page.get().getSummaryDate() != null) {
             var date = page.get().getSummaryDate();
-            model.addAttribute("dayTasks", daySummaryService.tasks(date));
+            model.addAttribute("dayTasks", daySummaryService.tasks(date, page.get().getConcursoId()));
             model.addAttribute("dayLabel", StudyTaskService.dayLabel(date, java.time.LocalDate.now()));
-            model.addAttribute("previousSummary", daySummaryService.previous(date).orElse(null));
-            model.addAttribute("nextSummary", daySummaryService.next(date).orElse(null));
+            model.addAttribute("previousSummary", daySummaryService.previous(date, page.get().getConcursoId()).orElse(null));
+            model.addAttribute("nextSummary", daySummaryService.next(date, page.get().getConcursoId()).orElse(null));
         }
         model.addAttribute("subjects", subjects.all());
         return "estudos-pagina";

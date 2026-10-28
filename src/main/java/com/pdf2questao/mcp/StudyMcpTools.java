@@ -381,15 +381,16 @@ public class StudyMcpTools {
     }
 
     @McpTool(name = "anexar_ao_resumo_do_dia",
-            description = "Acrescenta um texto ao fim do resumo do dia (cria o resumo se ainda não existe). Aceita "
-                    + "Markdown simples: '## título', '### subtítulo', listas com '- ' (recuo de 2 espaços = "
+            description = "Acrescenta um texto ao fim do resumo do dia do concurso (cada concurso tem o seu resumo "
+                    + "por dia; cria se ainda não existe). Aceita Markdown simples: '## título', '### subtítulo', listas com '- ' (recuo de 2 espaços = "
                     + "sublista), '**negrito**', '*itálico*' e parágrafos separados por linha em branco.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public SummaryAppended appendToDaySummary(
             @McpToolParam(description = "Texto a acrescentar.") String texto,
-            @McpToolParam(description = "Dia no formato AAAA-MM-DD; vazio = hoje.", required = false) String data) {
+            @McpToolParam(description = "Dia no formato AAAA-MM-DD; vazio = hoje.", required = false) String data,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
         LocalDate date = data == null || data.isBlank() ? LocalDate.now() : LocalDate.parse(data.trim());
-        StudyPage page = daySummaryService.open(date);
+        StudyPage page = mcpConcurso.in(concurso, () -> daySummaryService.open(date));
         String content = (page.getContent() == null ? "" : page.getContent()) + com.pdf2questao.web.SimpleMarkdown.toHtml(texto);
         pageService.saveContent(page.getId(), page.getTitle(), content, page.getVersion());
         return new SummaryAppended(page.getId(), page.getTitle(), baseUrl + "/estudos/paginas/" + page.getId());

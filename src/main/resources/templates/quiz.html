@@ -15,7 +15,7 @@
         <span th:if="${quiz.subject != null}" th:text="${quiz.subject}"></span>
         <span th:if="${quiz.topic != null}" th:text="' · ' + ${quiz.topic}"></span>
         <span th:if="${quiz.level != null}" th:text="' · nível ' + ${quiz.level}"></span>
-        <span th:if="${quiz.certoErrado()}"> · Certo/Errado (Cebraspe): um erro anula um acerto</span>
+        <span th:if="${quiz.certoErrado()}"> · Certo/Errado (Cebraspe): um erro anula um acerto; em branco não pontua</span>
         <span th:if="${task != null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
     </p>
     <div class="card p-3 mb-3 small" th:if="${quiz.doubts != null or (quiz.previousErrors != null and !quiz.previousErrors.isEmpty())}">
@@ -42,6 +42,12 @@
                 </span>
             </button>
         </div>
+        <!-- Certo/Errado: deixar em branco nao pontua nem anula acerto. -->
+        <div class="mt-2" th:if="${quiz.certoErrado()}">
+            <button type="button" class="btn btn-outline-secondary btn-sm quiz-blank" data-letter="-"
+                    title="Não pontua e não anula acerto (atalho: B)"><i class="bi bi-dash-circle me-1"></i>Deixar em branco</button>
+            <span class="small text-muted quiz-blank-note" hidden><i class="bi bi-dash-circle me-1"></i>Em branco: não pontua nem anula acerto.</span>
+        </div>
     </div>
     <!-- Fim do quiz: resultado, o que errou e o proximo passo (concluir a tarefa, outro quiz, proxima tarefa). -->
     <section class="card p-4 mb-3 quiz-done" id="quizDone" hidden>
@@ -66,7 +72,7 @@
 
     <div class="d-flex justify-content-between align-items-center">
         <span class="small text-muted" th:if="${!quiz.certoErrado()}">Atalhos: <kbd>A</kbd>–<kbd>E</kbd> respondem a pergunta atual, <kbd>Enter</kbd> vai para a próxima.</span>
-        <span class="small text-muted" th:if="${quiz.certoErrado()}">Atalhos: <kbd>C</kbd> (Certo) e <kbd>E</kbd> (Errado) respondem o item atual, <kbd>Enter</kbd> vai para o próximo.</span>
+        <span class="small text-muted" th:if="${quiz.certoErrado()}">Atalhos: <kbd>C</kbd> (Certo) e <kbd>E</kbd> (Errado) respondem o item atual, <kbd>B</kbd> deixa em branco, <kbd>Enter</kbd> vai para o próximo.</span>
         <form method="post" th:action="@{/quizzes/{id}/refazer(id=${quiz.id})}">
             <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Refazer</button>
         </form>
@@ -78,6 +84,8 @@
     const cards = Array.from(document.querySelectorAll('.quiz-question'));
     // Certo/Errado (Cebraspe): o placar mostra o liquido, acertos menos erros.
     const certoErrado = document.querySelector('main').dataset.format === 'certo_errado';
+    // Resposta "em branco" (so Certo/Errado): conta como respondido, sem acerto nem erro.
+    const BLANK = '-';
 
     function questionText(card) {
         const lines = [card.querySelector('.quiz-statement').textContent.trim(), ''];
@@ -111,9 +119,11 @@
     function score() {
         const done = cards.filter(c => c.dataset.selected);
         const right = done.filter(c => c.dataset.selected === c.dataset.correct).length;
-        const net = right - (done.length - right);
+        const blanks = done.filter(c => c.dataset.selected === BLANK).length;
+        const net = right - (done.length - right - blanks);
+        const blankText = blanks ? ' · ' + blanks + ' em branco' : '';
         document.getElementById('quizScore').textContent = done.length === 0 ? cards.length + (certoErrado ? ' itens' : ' perguntas')
-            : right + ' de ' + done.length + ' certas' + (certoErrado ? ' · líquido ' + net : '')
+            : right + ' de ' + done.length + ' certas' + (certoErrado ? blankText + ' · líquido ' + net : '')
             + (done.length < cards.length ? ' · ' + (cards.length - done.length) + ' faltando' : '');
         const panel = document.getElementById('quizDone');
         const finished = cards.length > 0 && done.length === cards.length;
@@ -122,7 +132,7 @@
         if (finished) {
             document.getElementById('quizDoneScore').textContent = right + ' de ' + cards.length + ' certas ('
                 + Math.round(right * 100 / cards.length) + '%)'
-                + (certoErrado ? ' · líquido ' + net + ' (cada erro anula um acerto)' : '');
+                + (certoErrado ? blankText + ' · líquido ' + net + ' (cada erro anula um acerto; em branco não pontua)' : '');
             const wrong = [...new Set(done.filter(c => c.dataset.selected !== c.dataset.correct)
                 .map(c => c.dataset.topic).filter(t => t))];
             document.getElementById('quizDoneTopics').textContent = right === cards.length ? 'Gabaritou!'
@@ -146,7 +156,10 @@
         if (e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
         if (document.querySelector('dialog[open]')) return;
         const key = e.key.toUpperCase();
-        if (current && /^[A-E]$/.test(key)) {
+        if (current && certoErrado && key === 'B') {
+            const blank = current.querySelector('.quiz-blank');
+            if (blank) { e.preventDefault(); fromKeyboard = true; blank.click(); }
+        } else if (current && /^[A-E]$/.test(key)) {
             const opt = current.querySelector('.quiz-option[data-letter="' + key + '"]');
             if (opt) { e.preventDefault(); fromKeyboard = true; opt.click(); }
         } else if (e.key === 'Enter' && current) {
@@ -159,6 +172,11 @@
     function reveal(card) {
         const selected = card.dataset.selected, correct = card.dataset.correct;
         card.classList.add('is-answered');
+        const blankBtn = card.querySelector('.quiz-blank');
+        if (blankBtn) {
+            blankBtn.hidden = true;
+            card.querySelector('.quiz-blank-note').hidden = selected !== BLANK;
+        }
         card.querySelectorAll('.quiz-option').forEach(function (opt) {
             const letter = opt.dataset.letter;
             opt.classList.toggle('is-correct', letter === correct);
@@ -166,6 +184,30 @@
             opt.classList.toggle('is-open', letter === selected || letter === correct);
             opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
         });
+    }
+
+    /** Grava a resposta (a letra, ou BLANK) e mostra o resultado. */
+    function send(card, letter) {
+        if (card.dataset.sending) { return; }
+        card.dataset.sending = '1';
+        fetch('/quizzes/' + quizId + '/responder', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({questionId: Number(card.dataset.id), selected: letter})
+        }).then(function (r) {
+            if (!r.ok) { throw new Error(r.status); }
+            return r.json();
+        }).then(function (res) {
+            card.dataset.selected = letter;
+            card.dataset.correct = res.correctAnswer;
+            reveal(card);
+            score();
+            if (current && fromKeyboard) {
+                setTimeout(function () { current.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 600);
+            }
+            fromKeyboard = false;
+        }).catch(function () {
+            window.p2qToast('Não foi possível salvar a resposta. Tente de novo.', 'danger');
+        }).finally(function () { delete card.dataset.sending; });
     }
 
     cards.forEach(function (card) {
@@ -177,28 +219,15 @@
                     opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
                     return;
                 }
-                if (card.dataset.sending) { return; }
-                card.dataset.sending = '1';
-                fetch('/quizzes/' + quizId + '/responder', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({questionId: Number(card.dataset.id), selected: opt.dataset.letter})
-                }).then(function (r) {
-                    if (!r.ok) { throw new Error(r.status); }
-                    return r.json();
-                }).then(function (res) {
-                    card.dataset.selected = opt.dataset.letter;
-                    card.dataset.correct = res.correctAnswer;
-                    reveal(card);
-                    score();
-                    if (current && fromKeyboard) {
-                        setTimeout(function () { current.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 600);
-                    }
-                    fromKeyboard = false;
-                }).catch(function () {
-                    window.p2qToast('Não foi possível salvar a resposta. Tente de novo.', 'danger');
-                }).finally(function () { delete card.dataset.sending; });
+                send(card, opt.dataset.letter);
             });
         });
+        const blankBtn = card.querySelector('.quiz-blank');
+        if (blankBtn) {
+            blankBtn.addEventListener('click', function () {
+                if (!card.dataset.selected) { send(card, BLANK); }
+            });
+        }
     });
     score();
 </script>

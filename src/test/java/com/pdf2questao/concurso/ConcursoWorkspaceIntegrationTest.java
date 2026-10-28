@@ -6,6 +6,8 @@ import com.pdf2questao.mcp.ConcursoMcpTools;
 import com.pdf2questao.mcp.InsightMcpTools;
 import com.pdf2questao.mcp.LessonMcpTools;
 import com.pdf2questao.mcp.StudyMcpTools;
+import com.pdf2questao.study.DaySummaryService;
+import com.pdf2questao.study.StudyPage;
 import com.pdf2questao.study.StudyTask;
 import com.pdf2questao.study.StudyTaskService;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +22,8 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +57,8 @@ class ConcursoWorkspaceIntegrationTest {
     LessonMcpTools lessonTools;
     @Autowired
     InsightMcpTools insightTools;
+    @Autowired
+    DaySummaryService daySummaryService;
 
     @AfterEach
     void reset() {
@@ -148,5 +154,45 @@ class ConcursoWorkspaceIntegrationTest {
         assertTrue(anexado.link().endsWith("/concursos/" + cgu.getId() + "/edital.pdf"));
         assertTrue(java.nio.file.Files.isRegularFile(Path.of(anexado.caminho())));
         assertThrows(IllegalArgumentException.class, () -> concursoTools.attachEdital(txt.toString(), "cgu"));
+    }
+
+    @Test
+    void resumoDoDiaEPorConcursoComPastaESetasProprias() {
+        Concurso sefaz = concurso("SEFAZ Resumo", "Sefaz");
+        Concurso cgu = concurso("CGU Resumo", "CGU");
+        LocalDate day = LocalDate.of(2027, 5, 12);
+        workspace.select(sefaz.getId());
+        taskService.create(new StudyTaskService.TaskForm("Contabilidade", null, "Contab", day, 60, null, null));
+        workspace.select(cgu.getId());
+        taskService.create(new StudyTaskService.TaskForm("Estado e democracia", null, "P1", day, 40, null, null));
+
+        // Cada concurso tem o seu resumo do dia, com so as tarefas dele, numa pasta propria.
+        StudyPage doCgu = daySummaryService.open(day);
+        assertEquals(cgu.getId(), doCgu.getConcursoId());
+        assertTrue(doCgu.getContent().contains("Estado e democracia"), doCgu.getContent());
+        assertFalse(doCgu.getContent().contains("Contabilidade"), doCgu.getContent());
+
+        workspace.select(sefaz.getId());
+        StudyPage doSefaz = daySummaryService.open(day);
+        assertNotEquals(doCgu.getId(), doSefaz.getId());
+        assertNotEquals(doCgu.getParentId(), doSefaz.getParentId());
+        assertEquals(sefaz.getId(), doSefaz.getConcursoId());
+        assertTrue(doSefaz.getContent().contains("Contabilidade") && !doSefaz.getContent().contains("Estado"));
+        assertEquals(java.util.Map.of(day, doSefaz.getId()), daySummaryService.existing(day, day));
+        assertEquals(doSefaz.getId(), daySummaryService.open(day).getId());
+
+        // As setas e os botoes do cronograma so enxergam os resumos do mesmo concurso.
+        assertTrue(daySummaryService.next(day.minusDays(1), sefaz.getId()).map(StudyPage::getId)
+                .filter(doSefaz.getId()::equals).isPresent());
+        assertTrue(daySummaryService.next(day, sefaz.getId()).isEmpty());
+        assertTrue(daySummaryService.previous(day.plusDays(1), cgu.getId()).map(StudyPage::getId)
+                .filter(doCgu.getId()::equals).isPresent());
+        workspace.select(cgu.getId());
+        assertEquals(java.util.Map.of(day, doCgu.getId()), daySummaryService.existing(day, day));
+
+        // anexar_ao_resumo_do_dia no concurso pedido, sem trocar o ativo da tela.
+        var anexado = studyTools.appendToDaySummary("nota da Sefaz", day.toString(), "sefaz resumo");
+        assertEquals(doSefaz.getId(), anexado.paginaId());
+        assertEquals(cgu.getId(), workspace.selectedId());
     }
 }

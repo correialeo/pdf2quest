@@ -29,6 +29,9 @@ import java.util.stream.Stream;
 @Service
 public class LessonService {
 
+    /** Resposta "em branco" (so no Certo/Errado): nao pontua e nao anula acerto. */
+    public static final String BLANK = "-";
+
     public static final Set<String> LEVELS = Set.of("basico", "intermediario", "avancado", "prova");
 
     private final LessonRepository lessonRepository;
@@ -236,8 +239,9 @@ public class LessonService {
                     .collect(Collectors.toMap(Alternative::letra, Function.identity()));
             Quiz quiz = quizzes.get(q.getQuizId());
             out.add(new PreviousError(q.getId(), q.getQuizId(), quiz == null ? null : quiz.getTitle(), q.getTopic(),
-                    q.getStatement(), a.getSelectedAnswer(),
-                    alt.containsKey(a.getSelectedAnswer()) ? alt.get(a.getSelectedAnswer()).explicacao() : null,
+                    q.getStatement(), shown(a.getSelectedAnswer()),
+                    alt.containsKey(a.getSelectedAnswer()) ? alt.get(a.getSelectedAnswer()).explicacao()
+                            : BLANK.equals(a.getSelectedAnswer()) ? "Deixado em branco: não pontua, mas indica lacuna." : null,
                     q.getCorrectAnswer(), alt.containsKey(q.getCorrectAnswer()) ? alt.get(q.getCorrectAnswer()).explicacao() : null,
                     a.getAnsweredAt()));
         }
@@ -273,7 +277,7 @@ public class LessonService {
             }
             Quiz quiz = quizzes.get(q.getQuizId());
             out.add(new OpenError(q, quiz == null ? null : quiz.getTitle(), subjectName(q.getSubject()),
-                    a.getSelectedAnswer(), a.getAnsweredAt()));
+                    shown(a.getSelectedAnswer()), a.getAnsweredAt()));
         }
         out.sort(Comparator.comparing(OpenError::respondidaEm).reversed());
         return out;
@@ -285,6 +289,11 @@ public class LessonService {
                 .collect(Collectors.groupingBy(OpenError::disciplina, LinkedHashMap::new, Collectors.counting()));
         return out.entrySet().stream().sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+    }
+
+    /** O que mostrar da resposta dada: a letra ou "em branco". */
+    private static String shown(String selected) {
+        return BLANK.equals(selected) ? "em branco" : selected;
     }
 
     private static String subjectName(String subject) {
@@ -486,7 +495,8 @@ public class LessonService {
         q.setCorrectAnswer(letter);
         questionRepository.save(q);
         List<QuizAttempt> attempts = attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(List.of(q.getId()));
-        attempts.forEach(a -> a.setCorrect(letter.equals(a.getSelectedAnswer())));
+        attempts.forEach(a -> a.setCorrect(BLANK.equals(a.getSelectedAnswer()) ? null
+                : letter.equals(a.getSelectedAnswer())));
         attemptRepository.saveAll(attempts);
         return q;
     }
@@ -514,17 +524,25 @@ public class LessonService {
         return c;
     }
 
-    public record AnswerResult(boolean correct, String correctAnswer, boolean finished, int correctCount, int total) {
+    public record AnswerResult(boolean correct, boolean blank, String correctAnswer, boolean finished, int correctCount,
+                               int total) {
     }
 
-    /** Responde uma pergunta na tela. Quando todas tem resposta, o quiz fica concluido. */
+    /**
+     * Responde uma pergunta na tela. Quando todas tem resposta, o quiz fica concluido. No Certo/Errado, {@link #BLANK}
+     * deixa o item em branco: conta como respondido, mas sem acerto nem erro.
+     */
     @Transactional
     public AnswerResult answer(Long questionId, String selected) {
         QuizQuestion q = questionRepository.findById(questionId).orElseThrow();
+        boolean blank = selected != null && BLANK.equals(selected.strip());
+        if (blank && !quiz(q.getQuizId()).certoErrado()) {
+            throw new IllegalArgumentException("Só os itens Certo/Errado podem ficar em branco.");
+        }
         QuizAttempt attempt = new QuizAttempt();
         attempt.setQuizQuestionId(questionId);
         attempt.setSelectedAnswer(selected == null ? null : selected.strip().toUpperCase(Locale.ROOT));
-        attempt.setCorrect(q.getCorrectAnswer().equals(attempt.getSelectedAnswer()));
+        attempt.setCorrect(blank ? null : q.getCorrectAnswer().equals(attempt.getSelectedAnswer()));
         attemptRepository.save(attempt);
         Map<Long, QuizAttempt> latest = latest(q.getQuizId());
         List<QuizQuestion> all = questions(q.getQuizId());
@@ -535,7 +553,8 @@ public class LessonService {
             quizRepository.save(quiz);
         }
         int right = (int) latest.values().stream().filter(a -> Boolean.TRUE.equals(a.getCorrect())).count();
-        return new AnswerResult(attempt.getCorrect(), q.getCorrectAnswer(), finished, right, all.size());
+        return new AnswerResult(Boolean.TRUE.equals(attempt.getCorrect()), blank, q.getCorrectAnswer(), finished, right,
+                all.size());
     }
 
     /** Refazer: as respostas antigas ficam no historico, mas a tela volta a ficar em branco. */
@@ -561,13 +580,18 @@ public class LessonService {
         return out;
     }
 
+    /** @param emBranco item Certo/Errado deixado em branco (acertou fica nulo: nao e acerto nem erro). */
     public record QuestionResult(Long perguntaId, int numero, String topico, String enunciado, String suaResposta,
-                                 String correta, Boolean acertou, String explicacaoDaSuaResposta) {
+                                 String correta, Boolean acertou, boolean emBranco, String explicacaoDaSuaResposta) {
     }
 
-    /** @param liquido no Certo/Errado: acertos menos erros (cada erro anula um acerto); null na multipla escolha. */
+    /**
+     * @param brancos itens deixados em branco (contam como respondidos; nao pontuam nem anulam acerto).
+     * @param liquido no Certo/Errado: acertos menos erros (cada erro anula um acerto; branco nao conta); null na
+     *                multipla escolha.
+     */
     public record QuizResult(Long quizId, String titulo, Long aulaId, String disciplina, String topico, String nivel,
-                             int perguntas, int respondidas, int acertos, boolean concluido,
+                             int perguntas, int respondidas, int acertos, int brancos, boolean concluido,
                              List<QuestionResult> questoes, String formato, Integer liquido) {
     }
 
@@ -580,17 +604,21 @@ public class LessonService {
             QuizAttempt a = latest.get(q.getId());
             Map<String, Alternative> byLetter = q.alternativeList().stream()
                     .collect(Collectors.toMap(Alternative::letra, Function.identity()));
+            boolean blank = a != null && BLANK.equals(a.getSelectedAnswer());
             items.add(new QuestionResult(q.getId(), q.getPosition(), q.getTopic(), q.getStatement(),
-                    a == null ? null : a.getSelectedAnswer(), q.getCorrectAnswer(), a == null ? null : a.getCorrect(),
-                    a == null || byLetter.get(a.getSelectedAnswer()) == null ? null
+                    a == null ? null : shown(a.getSelectedAnswer()), q.getCorrectAnswer(),
+                    a == null ? null : a.getCorrect(), blank,
+                    blank ? "Em branco: não pontua nem anula acerto."
+                            : a == null || byLetter.get(a.getSelectedAnswer()) == null ? null
                             : byLetter.get(a.getSelectedAnswer()).explicacao()));
         }
-        int answered = (int) items.stream().filter(i -> i.acertou() != null).count();
+        int blanks = (int) items.stream().filter(QuestionResult::emBranco).count();
+        int answered = (int) items.stream().filter(i -> i.acertou() != null || i.emBranco()).count();
         int right = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.acertou())).count();
         return new QuizResult(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), quiz.getSubject(), quiz.getTopic(),
-                quiz.getLevel(), qs.size(), answered, right, quiz.getFinishedAt() != null, items,
+                quiz.getLevel(), qs.size(), answered, right, blanks, quiz.getFinishedAt() != null, items,
                 quiz.certoErrado() ? Quiz.CERTO_ERRADO : "multipla_escolha",
-                quiz.certoErrado() ? right - (answered - right) : null);
+                quiz.certoErrado() ? right - (answered - blanks - right) : null);
     }
 
     // ---- tela /aulas: tudo agrupado por disciplina ----

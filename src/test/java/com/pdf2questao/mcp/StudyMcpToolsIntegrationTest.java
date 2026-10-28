@@ -81,10 +81,10 @@ class StudyMcpToolsIntegrationTest {
         var marked = tools.markReview(task.getId(), true);
         assertEquals(today.plusDays(3), marked.proximaRevisao());
 
-        var summary = tools.appendToDaySummary("## Treino\n- ponto **chave**", null);
+        var summary = tools.appendToDaySummary("## Treino\n- ponto **chave**", null, null);
         String content = pageRepository.findById(summary.paginaId()).orElseThrow().getContent();
         assertTrue(content.endsWith("<h2>Treino</h2><ul><li>ponto <strong>chave</strong></li></ul>"), content);
-        tools.appendToDaySummary("mais", today.toString());
+        tools.appendToDaySummary("mais", today.toString(), null);
         assertTrue(pageRepository.findById(summary.paginaId()).orElseThrow().getContent().endsWith("<p>mais</p>"));
     }
 
