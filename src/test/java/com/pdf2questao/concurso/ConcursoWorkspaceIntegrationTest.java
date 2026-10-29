@@ -7,8 +7,10 @@ import com.pdf2questao.mcp.InsightMcpTools;
 import com.pdf2questao.mcp.LessonMcpTools;
 import com.pdf2questao.mcp.StudyMcpTools;
 import com.pdf2questao.study.DaySummaryService;
+import com.pdf2questao.study.SpacedRepetitionService;
 import com.pdf2questao.study.StudyPage;
 import com.pdf2questao.study.StudyTask;
+import com.pdf2questao.study.StudyTaskRepository;
 import com.pdf2questao.study.StudyTaskService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,10 @@ class ConcursoWorkspaceIntegrationTest {
     InsightMcpTools insightTools;
     @Autowired
     DaySummaryService daySummaryService;
+    @Autowired
+    SpacedRepetitionService spacedRepetition;
+    @Autowired
+    StudyTaskRepository taskRepository;
 
     @AfterEach
     void reset() {
@@ -194,5 +200,62 @@ class ConcursoWorkspaceIntegrationTest {
         var anexado = studyTools.appendToDaySummary("nota da Sefaz", day.toString(), "sefaz resumo");
         assertEquals(doSefaz.getId(), anexado.paginaId());
         assertEquals(cgu.getId(), workspace.selectedId());
+    }
+
+    /** Conclui a tarefa e a deixa com a revisao vencendo hoje. */
+    private StudyTask dueToday(Concurso concurso, String title, String subject) {
+        workspace.select(concurso.getId());
+        StudyTask t = taskService.create(new StudyTaskService.TaskForm(title, null, subject, LocalDate.now(), 30, null, null));
+        taskService.setDone(t.getId(), true, null);
+        StudyTask saved = taskRepository.findById(t.getId()).orElseThrow();
+        saved.setNextReviewDate(LocalDate.now());
+        return taskRepository.save(saved);
+    }
+
+    @Test
+    void revisaoDoDiaEPorConcursoENaoMisturaOsAssuntos() {
+        Concurso alfa = concurso("Revisao Alfa", "Alfa");
+        Concurso beta = concurso("Revisao Beta", "Beta");
+        LocalDate today = LocalDate.now();
+        StudyTask a = dueToday(alfa, "Assunto so do Alfa", "Contab");
+        StudyTask b = dueToday(beta, "Assunto so do Beta", "Estatistica");
+
+        spacedRepetition.syncReviewTask(today);
+        spacedRepetition.syncReviewTask(today);
+
+        // Cada workspace enxerga so os seus assuntos e a sua tarefa de revisao (uma por concurso).
+        workspace.select(alfa.getId());
+        assertEquals(java.util.List.of(a.getId()), spacedRepetition.due(today).stream().map(StudyTask::getId).toList());
+        var reviewsAlfa = taskService.dueBy(today).stream().filter(StudyTask::isReview).toList();
+        assertEquals(1, reviewsAlfa.size());
+        assertEquals("Revisão · 1 assunto", reviewsAlfa.get(0).getTitle());
+        assertTrue(reviewsAlfa.get(0).getDescription().contains("Assunto so do Alfa"));
+        assertFalse(reviewsAlfa.get(0).getDescription().contains("Beta"));
+        assertEquals(alfa.getId(), concursoService.concursoOfTask(reviewsAlfa.get(0)));
+
+        workspace.select(beta.getId());
+        var reviewsBeta = taskService.dueBy(today).stream().filter(StudyTask::isReview).toList();
+        assertEquals(1, reviewsBeta.size());
+        assertNotEquals(reviewsAlfa.get(0).getId(), reviewsBeta.get(0).getId());
+        assertTrue(reviewsBeta.get(0).getDescription().contains("Assunto so do Beta"));
+        assertFalse(reviewsBeta.get(0).getDescription().contains("Alfa"));
+
+        // As ferramentas MCP respeitam o concurso pedido, sem trocar o ativo da tela.
+        var mcpAlfa = studyTools.todayReviews(String.valueOf(alfa.getId()));
+        assertEquals(java.util.List.of(a.getId()), mcpAlfa.stream().map(StudyMcpTools.ReviewView::id).toList());
+        assertEquals(beta.getId(), workspace.selectedId());
+        assertEquals(0, studyTools.markReview(a.getId(), true).revisoesRestantesHoje());
+        assertEquals(1, spacedRepetition.dueFor(beta.getId(), today).size());
+
+        // Concluir a revisao de um concurso nao avanca os assuntos do outro.
+        workspace.select(alfa.getId());
+        spacedRepetition.syncReviewTask(today);
+        workspace.select(beta.getId());
+        var reviewBeta = taskService.dueBy(today).stream().filter(StudyTask::isReview).findFirst().orElseThrow();
+        taskService.setDone(reviewBeta.getId(), true, null);
+        assertEquals(today.plusDays(3), taskRepository.findById(b.getId()).orElseThrow().getNextReviewDate());
+        assertEquals(2, taskRepository.findById(b.getId()).orElseThrow().getCurrentStep());
+        assertEquals(today.plusDays(3), taskRepository.findById(a.getId()).orElseThrow().getNextReviewDate(),
+                "o assunto do Alfa ja tinha sido marcado antes e nao anda de novo");
     }
 }

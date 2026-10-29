@@ -47,12 +47,12 @@ public class DaySummaryService {
                 .collect(Collectors.toMap(StudyPage::getSummaryDate, StudyPage::getId));
     }
 
-    /** Tarefas do dia do concurso (nulo = todas); a tarefa diaria de revisao vale para todos os concursos. */
+    /** Tarefas do dia do concurso (nulo = todas); a tarefa diaria de revisao tambem e de um concurso so. */
     public List<StudyTask> tasks(LocalDate date, Long concursoId) {
         Map<Long, Long> concursoBy = new java.util.HashMap<>();
         concursoService.cronogramasById().forEach((id, c) -> concursoBy.put(id, c.getConcursoId()));
         return taskRepository.findByPlannedDate(date).stream()
-                .filter(t -> concursoId == null || t.isReview()
+                .filter(t -> concursoId == null
                         || concursoId.equals(t.getCronogramaId() == null ? null : concursoBy.get(t.getCronogramaId())))
                 .sorted(Comparator.comparing(StudyTask::getId)).toList();
     }

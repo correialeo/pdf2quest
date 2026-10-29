@@ -76,7 +76,7 @@ class StudyIntegrationTest {
 
         spacedRepetition.syncReviewTask(today);
         spacedRepetition.syncReviewTask(today);
-        StudyTask review = taskRepository.findByReviewDate(today).orElseThrow();
+        StudyTask review = taskRepository.findAllByReviewDate(today).get(0);
         assertEquals("Revisão · 2 assuntos", review.getTitle());
         assertEquals(25, review.getEstimatedMinutes());
         assertEquals(today, review.getPlannedDate());

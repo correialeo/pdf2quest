@@ -388,6 +388,80 @@ public class LessonService {
         return quiz;
     }
 
+    /**
+     * Nenhum quiz repete pergunta ja feita no mesmo concurso (em outro quiz, revisao ou no mesmo envio): a repeticao
+     * so treina a memoria do enunciado. Reescrever cobrando o mesmo ponto de outro angulo e permitido (e e o que
+     * "retomar erro" pede); trocar so as palavras nao.
+     */
+    private void rejectRepeated(Quiz quiz, List<NewQuestion> questions) {
+        Map<Long, Quiz> quizzes = allQuizzes().stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
+        List<QuizQuestion> existing = questionRepository.findAll().stream()
+                .filter(q -> quizzes.containsKey(q.getQuizId())
+                        && Objects.equals(quizzes.get(q.getQuizId()).getConcursoId(), quiz.getConcursoId())).toList();
+        // No Certo/Errado as alternativas sao sempre as mesmas duas, entao so o enunciado distingue o item.
+        List<QuestionSimilarity.Fingerprint> known = existing.stream().map(q -> QuestionSimilarity.Fingerprint.of(
+                q.getStatement(), quizzes.get(q.getQuizId()).certoErrado() ? null
+                        : q.alternativeList().stream().map(Alternative::texto).toList())).toList();
+        List<QuestionSimilarity.Fingerprint> sent = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        for (int i = 0; i < questions.size(); i++) {
+            NewQuestion n = questions.get(i);
+            QuestionSimilarity.Fingerprint print = QuestionSimilarity.Fingerprint.of(n.statement(),
+                    quiz.certoErrado() ? null : n.texts());
+            int old = -1;
+            for (int k = 0; k < known.size() && old < 0; k++) {
+                old = print.repeats(known.get(k)) ? k : -1;
+            }
+            int twin = -1;
+            for (int k = 0; k < sent.size() && twin < 0; k++) {
+                twin = print.repeats(sent.get(k)) ? k : -1;
+            }
+            if (old >= 0) {
+                QuizQuestion q = existing.get(old);
+                Quiz where = quizzes.get(q.getQuizId());
+                problems.add("Pergunta " + (i + 1) + " repete a #" + q.getId() + " do quiz \""
+                        + (where == null ? q.getQuizId() : where.getTitle()) + "\" (" + clip(q.getStatement(), 80) + ")");
+            } else if (twin >= 0) {
+                problems.add("Pergunta " + (i + 1) + " repete a pergunta " + (twin + 1) + " deste mesmo envio");
+            }
+            sent.add(print);
+        }
+        if (!problems.isEmpty()) {
+            throw new IllegalArgumentException("Pergunta repetida (já feita neste concurso): "
+                    + String.join("; ", problems.stream().limit(5).toList()) + (problems.size() > 5 ? "; ..." : "")
+                    + ". Escreva outra sobre um ponto ou ângulo ainda não cobrado (trocar só as palavras não vale) e, "
+                    + "para ver o que já foi perguntado, use perguntas_ja_feitas.");
+        }
+    }
+
+    /** Pergunta de quiz ja feita, com o resultado da ultima resposta (nulo = ainda nao respondida ou em branco). */
+    public record AskedQuestion(Long perguntaId, Long quizId, String quiz, String disciplina, String topico,
+                                String enunciado, Boolean acertou, LocalDateTime respondidaEm) {
+    }
+
+    /**
+     * Perguntas ja feitas nos quizzes (e revisoes) do concurso em vigor, as mais recentes primeiro: da aula, se
+     * informada, ou da disciplina e/ou topico (parte do nome, sem acento); sem nada, de tudo.
+     */
+    public List<AskedQuestion> askedQuestions(Long lessonId, String subject, String topic, int limit) {
+        String s = blank(subject) == null ? null : ScoringCalculator.normalize(subject);
+        String t = blank(topic) == null ? null : ScoringCalculator.normalize(topic);
+        Map<Long, Quiz> quizzes = visibleQuizzes().stream().collect(Collectors.toMap(Quiz::getId, Function.identity()));
+        List<QuizQuestion> found = questionRepository.findAll().stream()
+                .filter(q -> quizzes.containsKey(q.getQuizId()))
+                .filter(q -> lessonId == null || lessonId.equals(q.getLessonId()))
+                .filter(q -> s == null || q.getSubject() != null && contains(q.getSubject(), s))
+                .filter(q -> t == null || q.getTopic() != null && contains(q.getTopic(), t))
+                .sorted(Comparator.comparing(QuizQuestion::getId).reversed()).limit(Math.max(1, limit)).toList();
+        Map<Long, QuizAttempt> last = new LinkedHashMap<>();
+        attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(found.stream().map(QuizQuestion::getId).toList())
+                .forEach(a -> last.put(a.getQuizQuestionId(), a));
+        return found.stream().map(q -> new AskedQuestion(q.getId(), q.getQuizId(), quizzes.get(q.getQuizId()).getTitle(),
+                q.getSubject(), q.getTopic(), clip(q.getStatement(), 220),
+                last.containsKey(q.getId()) ? last.get(q.getId()).getCorrect() : null,
+                last.containsKey(q.getId()) ? last.get(q.getId()).getAnsweredAt() : null)).toList();
+    }
+
     /** Acrescenta perguntas a um quiz. Toda alternativa precisa de explicacao (por que certa/errada). */
     @Transactional
     public List<QuizQuestion> addQuestions(Long quizId, List<NewQuestion> questions) {
@@ -395,6 +469,7 @@ public class LessonService {
         if (questions == null || questions.isEmpty()) {
             throw new IllegalArgumentException("Envie ao menos uma pergunta.");
         }
+        rejectRepeated(quiz, questions);
         int position = questions(quizId).size();
         List<QuizQuestion> saved = new ArrayList<>();
         for (int i = 0; i < questions.size(); i++) {

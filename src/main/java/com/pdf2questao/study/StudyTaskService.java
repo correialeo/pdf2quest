@@ -79,15 +79,15 @@ public class StudyTaskService {
     }
 
     /**
-     * Tarefas do concurso em vigor (em "Todos", todas). A tarefa diaria de revisao vale para todos os concursos.
+     * Tarefas do concurso em vigor (em "Todos", todas). A tarefa diaria de revisao e de um concurso so, como as demais.
      * Com {@code cronogramaId}, so as daquele cronograma.
      */
     public List<StudyTask> visible(Long cronogramaId) {
         Map<Long, Long> concursoBy = new java.util.HashMap<>();
         concursoService.cronogramasById().forEach((id, c) -> concursoBy.put(id, c.getConcursoId()));
         return taskRepository.findAll().stream()
-                .filter(t -> cronogramaId == null ? t.isReview()
-                        || workspace.matches(t.getCronogramaId() == null ? null : concursoBy.get(t.getCronogramaId()))
+                .filter(t -> cronogramaId == null
+                        ? workspace.matches(t.getCronogramaId() == null ? null : concursoBy.get(t.getCronogramaId()))
                         : cronogramaId.equals(t.getCronogramaId()))
                 .toList();
     }
@@ -294,6 +294,11 @@ public class StudyTaskService {
         return tasks.size();
     }
 
+    /** Concurso da tarefa (o do cronograma dela; nulo na avulsa). */
+    public Long concursoOf(StudyTask task) {
+        return concursoService.concursoOfTask(task);
+    }
+
     /** Nome do cronograma de cada tarefa (para a lista e o MCP). */
     public Map<Long, Cronograma> cronogramas() {
         return concursoService.cronogramasById();
@@ -310,7 +315,7 @@ public class StudyTaskService {
         task.setDone(done);
         task.setDoneAt(done ? LocalDateTime.now() : null);
         if (done && task.isReview()) {
-            spacedRepetition.completeReview(LocalDate.now());
+            spacedRepetition.completeReview(task, LocalDate.now());
         } else if (done) {
             // Reconcluir uma tarefa reaberta mantem a etapa da revisao (desmarcar sem querer nao zera o progresso).
             spacedRepetition.scheduleFirst(task, LocalDate.now());

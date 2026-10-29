@@ -341,20 +341,26 @@ public class StudyMcpTools {
     }
 
     public record ReviewView(Long id, String assunto, String disciplina, LocalDate estudadoEm, LocalDate venceuEm,
-                             int etapa, String materialLink) {
+                             int etapa, String materialLink, List<LessonService.Linked> aulasEQuizzes) {
     }
 
     @McpTool(name = "revisoes_de_hoje",
-            description = "Assuntos da revisão espaçada que vencem hoje (ou já venceram). Para cada um, faça perguntas "
-                    + "rápidas ao usuário e depois chame marcar_revisao com lembrei=true ou false.",
+            description = "Assuntos da revisão espaçada do concurso que vencem hoje (ou já venceram); cada concurso "
+                    + "tem os seus. Traz também as aulas e quizzes que o assunto já teve (aulasEQuizzes). Para montar "
+                    + "um quiz de revisão, use o prompt revisao_do_dia (chame perguntas_ja_feitas antes, para não "
+                    + "repetir questão) e depois chame marcar_revisao com lembrei=true ou false.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public List<ReviewView> todayReviews() {
+    public List<ReviewView> todayReviews(
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
         LocalDate today = LocalDate.now();
         spacedRepetition.syncReviewTask(today);
-        return spacedRepetition.due(today).stream()
+        List<StudyTask> due = mcpConcurso.in(concurso, () -> spacedRepetition.due(today));
+        var linked = lessonService.forTasks(due.stream().map(StudyTask::getId).toList());
+        return due.stream()
                 .map(t -> new ReviewView(t.getId(), t.getTitle(), t.getSubject(), t.getPlannedDate(),
                         t.getNextReviewDate(), t.getCurrentStep(),
-                        t.getPageId() == null ? null : baseUrl + "/estudos/paginas/" + t.getPageId()))
+                        t.getPageId() == null ? null : baseUrl + "/estudos/paginas/" + t.getPageId(),
+                        linked.getOrDefault(t.getId(), List.of())))
                 .toList();
     }
 
@@ -374,7 +380,7 @@ public class StudyMcpTools {
         StudyTask task = lembrei ? spacedRepetition.remembered(id, today) : spacedRepetition.forgot(id, today);
         spacedRepetition.syncReviewTask(today);
         return new ReviewMarked(task.getId(), task.getTitle(), lembrei, task.getNextReviewDate(),
-                spacedRepetition.due(today).size());
+                spacedRepetition.dueFor(taskService.concursoOf(task), today).size());
     }
 
     public record SummaryAppended(Long paginaId, String titulo, String link) {

@@ -2,6 +2,7 @@ package com.pdf2questao.mcp;
 
 import com.pdf2questao.aula.Lesson;
 import com.pdf2questao.aula.LessonService;
+import com.pdf2questao.aula.LessonService.AskedQuestion;
 import com.pdf2questao.aula.LessonService.NewQuestion;
 import com.pdf2questao.aula.LessonService.PreviousError;
 import com.pdf2questao.aula.LessonService.QuizResult;
@@ -86,7 +87,8 @@ public class LessonMcpTools {
                 linhas. Se ele errou um tópico, agende um reforço com criar_tarefa (em 1 a 2 dias, descrição com \\
                 o que confundiu) e confirme com ele. Conclua a tarefa do cronograma com concluir_tarefa (minutos \\
                 informados por ele), registre o resumo com anexar_ao_resumo_do_dia e, se houver revisões do dia, \\
-                faça-as com marcar_revisao. Termine dizendo o que vem amanhã.
+                faça-as pelo prompt revisao_do_dia (quiz difícil, sem repetir pergunta) e marcar_revisao. Termine \\
+                dizendo o que vem amanhã.
                 """.formatted(McpText.blank(foco) ? "" : "Foco pedido: " + foco + ". ",
                 McpText.blank(concurso) ? "Use o concurso ativo (listar_concursos)."
                         : "Concurso: " + concurso + ". Passe concurso=\"" + concurso + "\" em tarefas_de_hoje, "
@@ -165,7 +167,8 @@ public class LessonMcpTools {
                 Crie um quiz novo no pdf2questao sobre: %s. Nível: %s. %s
 
                 1. Chame erros_quiz_anteriores para o mesmo assunto (aulaId, ou disciplina/tópico) e leia cada erro: o \
-                que o usuário marcou e por quê estava errado. Veja também desempenho_quiz.
+                que o usuário marcou e por quê estava errado. Veja também desempenho_quiz e perguntas_ja_feitas \
+                (o sistema recusa pergunta repetida: cubra pontos ainda não perguntados).
                 2. Se for de uma aula, leia o conteúdo dela (listar_aulas) e confira na web os pontos de norma, \
                 súmula, tema ou jurisprudência que o quiz vai cobrar (se a fonte vier truncada ou em resumo, baixe e \\
                 extraia o texto ou ache outra fonte antes de desistir); se for avulso, leia o tópico no edital \
@@ -179,6 +182,47 @@ public class LessonMcpTools {
                 Passe o link ao usuário e não mostre as respostas na conversa.
                 """.formatted(assunto, McpText.blank(nivel) ? "intermediario" : nivel,
                 McpText.blank(duvidas) ? "" : "Dúvidas do usuário: " + duvidas + ".");
+    }
+
+    @McpPrompt(name = "revisao_do_dia", title = "Revisão do dia",
+            description = "Monta o quiz de revisão dos assuntos que vencem hoje, difícil e sem repetir pergunta já feita, "
+                    + "e depois marca as revisões conforme o desempenho.")
+    public String reviewPrompt(
+            @McpArg(name = "concurso", description = "Concurso da revisão (id ou parte do nome; vazio = o ativo).",
+                    required = false) String concurso) {
+        String c = McpText.blank(concurso) ? "" : " Passe concurso=\"" + concurso + "\" em todas as ferramentas.";
+        return """
+                Monte a revisão do dia do usuário no pdf2questao.%s Revisão não é reler a aula: é testar se o que foi \
+                estudado ainda se sustenta, e tem que ser MAIS DIFÍCIL que o quiz da aula.
+
+                1. ASSUNTOS. Chame revisoes_de_hoje (só devolve os do concurso; cada concurso tem os seus). Agrupe por \
+                disciplina e use a etapa: quanto maior, mais difícil e mais misturado com assuntos parecidos. Para cada \
+                disciplina chame erros_quiz_anteriores, desempenho_quiz e perguntas_ja_feitas.
+
+                2. NÃO REPITA. O sistema recusa pergunta já feita no concurso (outro quiz ou revisão anterior), \
+                inclusive reescrita de leve. Não mude só as palavras: cubra um ponto ainda não perguntado, ou o mesmo \
+                ponto errado por outro ângulo (outro cenário, outra pegadinha), sempre com outro enunciado.
+
+                3. DIFICULDADE. Nível "prova", nunca "basico". Nada de definição solta ou "o que é X". Cada pergunta \
+                precisa exigir aplicar a regra a um caso concreto, distinguir dois conceitos parecidos, achar a exceção ou \
+                a assertiva incorreta (use "exceto", "apenas" e I-II-III). Pelo menos metade em afirmativas I-II-III ou \
+                cenário com cálculo/aplicação. Todas as alternativas plausíveis e do mesmo tamanho e estrutura; os \
+                distratores são os erros reais do usuário e as pegadinhas da banca (exemplos_da_banca), não absurdos. \
+                A correta não pode ser a mais longa nem a única com detalhe. Priorize o que ele errou e os tópicos de \
+                menor acerto; o que ele acerta sempre entra só em versão mais difícil.
+
+                4. FONTE. Baseie-se no conteúdo das aulas (listar_aulas com aulaId) e em questões reais; confira na web \
+                o que for norma ou jurisprudência. Não cobre o que não confirmou. Toda alternativa com a explicação de \
+                por que está certa ou errada.
+
+                5. GRAVAR. De 3 a 4 perguntas por assunto, nível "prova", um quiz por disciplina (assim o sistema \
+                retoma os erros dela; informe errosRetomados) ou um só se o usuário pedir um simulado misturado, e \
+                nesse caso leia erros_quiz_anteriores de cada disciplina. Passe o link e não mostre as respostas.
+
+                6. DEPOIS. Leia resultado_quiz. Para cada assunto, marcar_revisao com lembrei=true só se ele acertou \
+                pelo menos 70%% das perguntas daquele assunto (e false, voltando para amanhã, se não); explique em \
+                poucas linhas o que errou.
+                """.formatted(c);
     }
 
     public record QuizAlternative(
@@ -212,6 +256,22 @@ public class LessonMcpTools {
         return lessonService.previousErrors(aulaId, disciplina, topico, null).stream().limit(30).toList();
     }
 
+    @McpTool(name = "perguntas_ja_feitas",
+            description = "Perguntas que o usuário já recebeu nos quizzes e revisões do concurso (enunciado resumido, "
+                    + "quiz, tópico e se acertou na última resposta), as mais recentes primeiro. Chame ANTES de criar "
+                    + "um quiz, principalmente de revisão: o sistema recusa pergunta repetida (mesmo enunciado ou "
+                    + "quase), então escolha pontos ainda não cobertos ou outro ângulo do que ele errou.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
+    public List<AskedQuestion> askedQuestions(
+            @McpToolParam(description = "Id da aula.", required = false) Long aulaId,
+            @McpToolParam(description = "Disciplina (parte do nome).", required = false) String disciplina,
+            @McpToolParam(description = "Tópico (parte do nome).", required = false) String topico,
+            @McpToolParam(description = "Quantas trazer (padrão 60, máximo 200).", required = false) Integer limite,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        int max = limite == null ? 60 : Math.min(Math.max(limite, 1), 200);
+        return mcpConcurso.in(concurso, () -> lessonService.askedQuestions(aulaId, disciplina, topico, max));
+    }
+
     public record QuizCreated(Long quizId, String titulo, Long aulaId, int perguntas, int errosRetomados, String link) {
     }
 
@@ -219,7 +279,9 @@ public class LessonMcpTools {
             description = "Cria um quiz novo: de uma aula (aulaId; uma aula pode ter vários quizzes) ou avulso "
                     + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
-                    + "ids em errosRetomados. Baseie as perguntas na aula e, em quiz avulso, confira antes o edital e "
+                    + "ids em errosRetomados. Pergunta repetida (já feita no concurso, em qualquer quiz ou revisão) é "
+                    + "recusada: veja perguntas_ja_feitas antes. Baseie as perguntas na aula e, em quiz avulso, "
+                    + "confira antes o edital e "
                     + "fontes atuais na web. Não cobre o que não foi confirmado nem o que só estava na memória: "
                     + "pergunta sem fonte lida não entra no quiz. "
                     + "Cada alternativa precisa da explicação de por que está certa ou errada. "

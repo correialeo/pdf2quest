@@ -52,11 +52,17 @@ class LessonMcpToolsIntegrationTest {
     @Autowired
     MockMvc mvc;
 
+    private static final java.util.concurrent.atomic.AtomicInteger SEQ = new java.util.concurrent.atomic.AtomicInteger();
+
+    /** Pergunta sempre diferente das anteriores (o sistema recusa repetida); as explicações são fixas. */
     private static QuizItem item(String topic, String correct) {
-        return new QuizItem("Crédito para despesa sem dotação específica é:", topic, List.of(
-                new QuizAlternative("Suplementar", "Errada: reforça dotação já existente."),
-                new QuizAlternative("Especial", "Certa: despesa sem dotação específica."),
-                new QuizAlternative("Extraordinário", "Errada: despesa urgente e imprevisível.")), correct);
+        int n = SEQ.incrementAndGet();
+        String tag = java.util.stream.IntStream.range(0, 12).mapToObj(i -> "termo" + n + "x" + i)
+                .collect(java.util.stream.Collectors.joining(" "));
+        return new QuizItem("Crédito para despesa sem dotação específica é (" + tag + "):", topic, List.of(
+                new QuizAlternative("Suplementar " + tag.substring(0, 20), "Errada: reforça dotação já existente."),
+                new QuizAlternative("Especial " + tag.substring(20), "Certa: despesa sem dotação específica."),
+                new QuizAlternative("Extraordinário " + tag, "Errada: despesa urgente e imprevisível.")), correct);
     }
 
     private void answer(Long quizId, Long questionId, String letter) throws Exception {
@@ -142,6 +148,51 @@ class LessonMcpToolsIntegrationTest {
                 .andExpect(content().string(containsString("Quizzes avulsos")))
                 .andExpect(content().string(containsString("Aproveitamento")));
         mvc.perform(get("/hoje")).andExpect(status().isOk()).andExpect(content().string(containsString("Créditos adicionais")));
+    }
+
+    private static QuizItem scrum(String statement, String a, String b) {
+        return new QuizItem(statement, "Scrum", List.of(new QuizAlternative(a, "Errada."),
+                new QuizAlternative(b, "Certa.")), "B");
+    }
+
+    @Test
+    void perguntaJaFeitaNoConcursoEhRecusadaEPerguntasJaFeitasMostraOResultado() throws Exception {
+        String enunciado = "No Scrum Guide 2020, quem tem autoridade para cancelar uma Sprint antes do fim do timebox?";
+        var quiz = tools.createQuiz(null, "Scrum 1", "Scrum", "Eventos", "prova", null, null,
+                List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner")), null, null, null);
+
+        // O mesmo enunciado, ou o mesmo reescrito de leve, não entra em outro quiz.
+        var igual = assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Scrum 2", "Scrum", "Eventos",
+                "prova", null, null, List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner")),
+                null, null, null));
+        assertTrue(igual.getMessage().contains("repete a #"), igual.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Scrum 2", "Scrum", "Eventos", "prova",
+                null, null, List.of(scrum("Quem tem autoridade para cancelar uma Sprint antes do fim do timebox, segundo "
+                        + "o Scrum Guide 2020?", "O Scrum Master, ouvido o time", "Somente o Product Owner")), null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.addQuiz(quiz.quizId(),
+                List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner"))));
+
+        // Duas iguais no mesmo envio também não.
+        assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Scrum 3", "Scrum", "Eventos", "prova",
+                null, null, List.of(scrum("A Daily Scrum dura no máximo quantos minutos para os Developers do time?", "30", "15"),
+                        scrum("A Daily Scrum dura no máximo quantos minutos para os Developers do time?", "30", "15")),
+                null, null, null));
+
+        // Outro ponto do mesmo assunto entra normalmente.
+        var outro = tools.createQuiz(null, "Scrum 4", "Scrum", "Eventos", "prova", null, null,
+                List.of(scrum("Em uma Sprint de um mês, qual o limite da Sprint Review segundo o guia?", "Oito horas",
+                        "Quatro horas")), null, null, null);
+        assertEquals(1, lessonService.questions(outro.quizId()).size());
+
+        // perguntas_ja_feitas traz o que já foi perguntado e se acertou.
+        answer(quiz.quizId(), lessonService.questions(quiz.quizId()).get(0).getId(), "A");
+        var asked = tools.askedQuestions(null, "Scrum", null, null, null);
+        assertEquals(2, asked.size());
+        var first = asked.stream().filter(q -> q.quizId().equals(quiz.quizId())).findFirst().orElseThrow();
+        assertEquals(Boolean.FALSE, first.acertou());
+        assertTrue(first.enunciado().startsWith("No Scrum Guide 2020"));
+        assertNull(asked.stream().filter(q -> q.quizId().equals(outro.quizId())).findFirst().orElseThrow().acertou());
+        assertEquals(1, tools.askedQuestions(null, "Scrum", "Scrum", 1, null).size());
     }
 
     @Autowired
