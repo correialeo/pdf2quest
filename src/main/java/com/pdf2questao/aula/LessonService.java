@@ -33,6 +33,10 @@ public class LessonService {
     public static final String BLANK = "-";
 
     public static final Set<String> LEVELS = Set.of("basico", "intermediario", "avancado", "prova");
+    /** Nivel padrao: o usuario quer treinar sempre no nivel da prova. */
+    public static final String PROVA = "prova";
+    static final int MIN_STYLE_CHARS = 300;
+    static final int MIN_STYLE_SOURCES = 2;
 
     private final LessonRepository lessonRepository;
     private final QuizRepository quizRepository;
@@ -342,6 +346,18 @@ public class LessonService {
     @Transactional
     public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
                            List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId, String format) {
+        return createQuiz(lessonId, title, subject, topic, level, doubts, reviewedErrors, questions, taskId, format,
+                null, null);
+    }
+
+    /**
+     * No nivel prova (o padrao), o quiz exige o que o simulado exige: o estilo da banca observado em questoes reais
+     * lidas e essas questoes em {@code styleSources}. Sem isso o quiz sai com cara de livro, nao de prova.
+     */
+    @Transactional
+    public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
+                           List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId, String format,
+                           String styleNotes, String styleSources) {
         String fmt = blank(format) == null ? null : ScoringCalculator.normalize(format).replace(' ', '_')
                 .replace('/', '_').replace('-', '_');
         if (fmt != null && !fmt.equals("multipla_escolha") && !fmt.equals(Quiz.CERTO_ERRADO)) {
@@ -353,9 +369,24 @@ public class LessonService {
         if (lesson == null && subj == null && top == null) {
             throw new IllegalArgumentException("Quiz avulso precisa de disciplina ou tópico.");
         }
-        String lvl = level == null || level.isBlank() ? null : ScoringCalculator.normalize(level);
-        if (lvl != null && !LEVELS.contains(lvl)) {
+        String lvl = level == null || level.isBlank() ? PROVA : ScoringCalculator.normalize(level);
+        if (!LEVELS.contains(lvl)) {
             throw new IllegalArgumentException("Nível: basico, intermediario, avancado ou prova.");
+        }
+        if (PROVA.equals(lvl)) {
+            if (styleNotes == null || styleNotes.strip().length() < MIN_STYLE_CHARS) {
+                throw new IllegalArgumentException("Quiz nível prova: pesquise antes como a banca cobra este tópico "
+                        + "(questões reais na internet e com provas_da_banca/exemplos_da_banca) e descreva em "
+                        + "'estiloDaBanca' o que observou: formato e tamanho dos enunciados, comandos (\"EXCETO\", "
+                        + "I-II-III, caso concreto), distratores e pegadinhas recorrentes (mínimo " + MIN_STYLE_CHARS
+                        + " caracteres).");
+            }
+            long sources = styleSources == null ? 0 : styleSources.lines().filter(l -> !l.isBlank()).count();
+            if (sources < MIN_STYLE_SOURCES) {
+                throw new IllegalArgumentException("Quiz nível prova: informe em 'referencias' ao menos "
+                        + MIN_STYLE_SOURCES + " questões reais da banca que você LEU como modelo, uma por linha (link "
+                        + "da questão ou \"questão local #id\").");
+            }
         }
         List<PreviousError> errors = previousErrors(lessonId, lessonId == null ? subj : null,
                 lessonId == null ? top : null, null);
@@ -376,6 +407,8 @@ public class LessonService {
         quiz.setLevel(lvl);
         quiz.setFormat(Quiz.CERTO_ERRADO.equals(fmt) ? fmt : null);
         quiz.setDoubts(blank(doubts));
+        quiz.setStyleNotes(blank(styleNotes));
+        quiz.setStyleSources(blank(styleSources));
         quiz.setPreviousErrors(errors.stream().filter(e -> reviewed.contains(e.perguntaId()))
                 .map(e -> "#" + e.perguntaId() + " " + (e.topico() == null ? "" : e.topico() + ": ")
                         + clip(e.enunciado(), 120))
@@ -386,6 +419,49 @@ public class LessonService {
         quiz = quizRepository.save(quiz);
         addQuestions(quiz.getId(), questions);
         return quiz;
+    }
+
+    /**
+     * Pistas que deixam acertar sem saber o conteudo, num lote de 4 ou mais: a correta e a alternativa mais longa na
+     * maioria das perguntas, ou o gabarito e sempre a mesma letra (no Certo/Errado, todos C ou todos E).
+     */
+    private void rejectGiveaways(Quiz quiz, List<NewQuestion> questions) {
+        if (questions.size() < 4) {
+            return;
+        }
+        List<String> answers = questions.stream().map(n -> answerLetter(quiz, n.correct())).toList();
+        if (answers.stream().distinct().count() == 1) {
+            throw new IllegalArgumentException("Nível prova: o gabarito é \"" + answers.get(0) + "\" em todas as "
+                    + questions.size() + " perguntas. Distribua as respostas como numa prova real.");
+        }
+        if (quiz.certoErrado()) {
+            return;
+        }
+        List<Integer> longest = new ArrayList<>();
+        for (int i = 0; i < questions.size(); i++) {
+            NewQuestion n = questions.get(i);
+            if (n.texts() == null || n.texts().size() < 2 || answers.get(i).isEmpty()) {
+                continue;
+            }
+            int correct = answers.get(i).charAt(0) - 'A';
+            if (correct < 0 || correct >= n.texts().size()) {
+                continue;
+            }
+            int size = n.texts().get(correct) == null ? 0 : n.texts().get(correct).strip().length();
+            boolean strictlyLongest = true;
+            for (int a = 0; a < n.texts().size(); a++) {
+                strictlyLongest &= a == correct || n.texts().get(a) == null || n.texts().get(a).strip().length() < size;
+            }
+            if (strictlyLongest) {
+                longest.add(i + 1);
+            }
+        }
+        if (longest.size() * 2 > questions.size()) {
+            throw new IllegalArgumentException("Nível prova: a correta é a alternativa mais longa nas perguntas "
+                    + longest.stream().map(String::valueOf).collect(Collectors.joining(", ")) + ". Dá para acertar "
+                    + "sem saber o conteúdo: deixe as alternativas do mesmo tamanho e estrutura (distratores com o "
+                    + "mesmo nível de detalhe).");
+        }
     }
 
     /**
@@ -470,6 +546,9 @@ public class LessonService {
             throw new IllegalArgumentException("Envie ao menos uma pergunta.");
         }
         rejectRepeated(quiz, questions);
+        if (PROVA.equals(quiz.getLevel())) {
+            rejectGiveaways(quiz, questions);
+        }
         int position = questions(quizId).size();
         List<QuizQuestion> saved = new ArrayList<>();
         for (int i = 0; i < questions.size(); i++) {

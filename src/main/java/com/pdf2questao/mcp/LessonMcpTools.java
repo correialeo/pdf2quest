@@ -78,7 +78,9 @@ public class LessonMcpTools {
 
                 3. QUIZ. Veja erros_quiz_anteriores do assunto e, com criar_quiz (aulaId da aula; o quiz herda a tarefa), crie de 6 a 10 \
                 perguntas baseadas no que a aula ensinou (não em outra \\
-                coisa), da mais simples à aplicada, com 4 ou 5 alternativas. Para CADA alternativa, a explicação de \\
+                coisa), no nível da prova (nivel "prova"): siga os passos 3 a 5 do prompt novo_quiz (questões \\
+                reais da banca lidas como modelo, estiloDaBanca, referencias e o teste do chute), com 4 ou 5 \\
+                alternativas. Para CADA alternativa, a explicação de \\
                 por que está certa ou errada (ela aparece quando o usuário clica). Informe o tópico de cada uma. \\
                 Passe o link da aula ao usuário e peça para ele estudar e responder no sistema. Não mostre as \\
                 respostas na conversa.
@@ -161,7 +163,7 @@ public class LessonMcpTools {
                     + "retomando os erros dos quizzes anteriores do assunto.")
     public String newQuizPrompt(
             @McpArg(name = "assunto", description = "Id da aula, ou disciplina/tópico do quiz.", required = true) String assunto,
-            @McpArg(name = "nivel", description = "basico, intermediario, avancado ou prova.", required = false) String nivel,
+            @McpArg(name = "nivel", description = "basico, intermediario, avancado ou prova (padrão: prova).", required = false) String nivel,
             @McpArg(name = "duvidas", description = "Dúvidas que o quiz deve trabalhar.", required = false) String duvidas) {
         return """
                 Crie um quiz novo no pdf2questao sobre: %s. Nível: %s. %s
@@ -174,13 +176,31 @@ public class LessonMcpTools {
                 extraia o texto ou ache outra fonte antes de desistir); se for avulso, leia o tópico no edital \
                 (ler_edital), pesquise fontes atuais na web e veja como a banca cobra (exemplos_da_banca). Não \
                 cobre o que não conseguiu confirmar.
-                3. Escreva de 6 a 10 perguntas: uma ou mais para cada erro anterior (com outro enunciado, cobrando o \
+                3. PESQUISA DA BANCA (nível prova, o padrão). Antes de escrever, ache questões REAIS da banca do \
+                concurso sobre o tópico: provas_da_banca e exemplos_da_banca no sistema e, na internet, provas e \
+                gabaritos da mesma banca (de preferência mesma área e últimos anos; PCI Concursos, sites de \
+                questões, PDFs oficiais). Leia pelo menos 3 questões inteiras do tópico e anote o que OBSERVOU (sem \
+                inventar): tamanho e contextualização do enunciado, comando ("é correto afirmar", "EXCETO", I-II-III, \
+                caso concreto, cálculo), como são os distratores (troca de prazo, de competência, de exceção, de \
+                termo parecido) e as pegadinhas recorrentes. Isso vai em estiloDaBanca; as questões lidas, em \
+                referencias.
+                4. Escreva de 6 a 10 perguntas: uma ou mais para cada erro anterior (com outro enunciado, cobrando o \
                 mesmo ponto), as dúvidas do usuário, e o restante no nível pedido (basico = conceito; \
-                intermediario = aplicação; avancado = casos e exceções; prova = estilo e pegadinhas da banca). \
+                intermediario = aplicação; avancado = casos e exceções; prova = como a banca cobra). No nível prova, \
+                cada pergunta segue uma questão real lida como modelo de estrutura, profundidade e distratores (sem \
+                copiar nem parafrasear): nada de "o que é X" nem definição solta; cobre aplicação a caso concreto, \
+                distinção entre conceitos vizinhos, exceção, prazo/percentual/competência e a assertiva incorreta; \
+                pelo menos metade com afirmativas I-II-III, "EXCETO" ou cenário. Alternativas plausíveis, do mesmo \
+                tamanho e estrutura, com distratores tirados dos erros reais do usuário e das pegadinhas da banca; \
+                a correta não pode ser a mais longa nem a única com detalhe, e varie a letra do gabarito. \
                 Toda alternativa com a explicação de por que está certa ou errada.
-                4. Grave com criar_quiz informando em errosRetomados os ids das perguntas erradas que o quiz retoma. \
-                Passe o link ao usuário e não mostre as respostas na conversa.
-                """.formatted(assunto, McpText.blank(nivel) ? "intermediario" : nivel,
+                5. TESTE DO CHUTE. Antes de gravar, releia cada pergunta como um candidato que NÃO estudou: se der \
+                para acertar por eliminação de absurdos, pela alternativa mais longa ou mais completa, por palavras \
+                como "sempre"/"nunca" só nos distratores, ou se o enunciado entrega a resposta, reescreva. Se fosse \
+                fácil numa prova da banca, está fácil demais.
+                6. Grave com criar_quiz (nivel, estiloDaBanca, referencias) informando em errosRetomados os ids das \
+                perguntas erradas que o quiz retoma. Passe o link ao usuário e não mostre as respostas na conversa.
+                """.formatted(assunto, McpText.blank(nivel) ? "prova" : nivel,
                 McpText.blank(duvidas) ? "" : "Dúvidas do usuário: " + duvidas + ".");
     }
 
@@ -215,7 +235,8 @@ public class LessonMcpTools {
                 o que for norma ou jurisprudência. Não cobre o que não confirmou. Toda alternativa com a explicação de \
                 por que está certa ou errada.
 
-                5. GRAVAR. De 3 a 4 perguntas por assunto, nível "prova", um quiz por disciplina (assim o sistema \
+                5. GRAVAR. De 3 a 4 perguntas por assunto, nível "prova" (com estiloDaBanca e referencias: as \
+                questões reais da banca que você leu como modelo), um quiz por disciplina (assim o sistema \
                 retoma os erros dela; informe errosRetomados) ou um só se o usuário pedir um simulado misturado, e \
                 nesse caso leia erros_quiz_anteriores de cada disciplina. Passe o link e não mostre as respostas.
 
@@ -226,12 +247,14 @@ public class LessonMcpTools {
     }
 
     public record QuizAlternative(
-            @McpToolParam(description = "Texto da alternativa.") String texto,
+            @McpToolParam(description = "Texto da alternativa. Aceita ⟦u⟧sublinhado⟦/u⟧, ⟦b⟧negrito⟦/b⟧ e ⟦i⟧itálico⟦/i⟧.") String texto,
             @McpToolParam(description = "Por que está certa ou errada (mostrado ao clicar).") String explicacao) {
     }
 
     public record QuizItem(
-            @McpToolParam(description = "Enunciado.") String enunciado,
+            @McpToolParam(description = "Enunciado. Para destacar um trecho (a prova sublinha o termo analisado), envolva-o "
+                    + "em ⟦u⟧...⟦/u⟧ (sublinhado), ⟦b⟧...⟦/b⟧ (negrito) ou ⟦i⟧...⟦/i⟧ (itálico): a tela mostra o destaque. "
+                    + "Não escreva \"destacado\" ou \"sublinhado\" sem marcar o trecho.") String enunciado,
             @McpToolParam(description = "Tópico cobrado (para o desempenho por tópico).", required = false) String topico,
             @McpToolParam(description = "Alternativas na ordem A, B, C...") List<QuizAlternative> alternativas,
             @McpToolParam(description = "Letra correta (no certo_errado: \"C\" ou \"E\").") String correta) {
@@ -277,7 +300,12 @@ public class LessonMcpTools {
 
     @McpTool(name = "criar_quiz",
             description = "Cria um quiz novo: de uma aula (aulaId; uma aula pode ter vários quizzes) ou avulso "
-                    + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova. Se houver erros em "
+                    + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova (padrão: prova). No nível prova, "
+                    + "pesquise antes como a banca cobra o tópico (questões reais na internet, provas_da_banca e "
+                    + "exemplos_da_banca), descreva em estiloDaBanca o que observou e liste em referencias as "
+                    + "questões reais lidas (mínimo 2); cada pergunta segue uma delas como modelo de estrutura, "
+                    + "profundidade e distratores, sem copiar. Lotes de 4+ com a correta sempre a mais longa ou o "
+                    + "gabarito todo na mesma letra são recusados. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
                     + "ids em errosRetomados. Pergunta repetida (já feita no concurso, em qualquer quiz ou revisão) é "
                     + "recusada: veja perguntas_ja_feitas antes. Baseie as perguntas na aula e, em quiz avulso, "
@@ -295,7 +323,7 @@ public class LessonMcpTools {
             @McpToolParam(description = "Disciplina (obrigatória no avulso, se não houver tópico).", required = false)
             String disciplina,
             @McpToolParam(description = "Tópico do edital.", required = false) String topico,
-            @McpToolParam(description = "Nível pedido.", required = false) String nivel,
+            @McpToolParam(description = "Nível pedido (vazio = prova).", required = false) String nivel,
             @McpToolParam(description = "Dúvidas do usuário que o quiz trabalha.", required = false) String duvidas,
             @McpToolParam(description = "Ids das perguntas erradas (erros_quiz_anteriores) que este quiz retoma.",
                     required = false) List<Long> errosRetomados,
@@ -305,10 +333,17 @@ public class LessonMcpTools {
             @McpToolParam(description = McpConcurso.PARAM + " Vazio também herda o da aula/tarefa.", required = false)
             String concurso,
             @McpToolParam(description = "multipla_escolha (padrão) ou certo_errado (itens C/E, estilo Cebraspe).",
-                    required = false) String formato) {
+                    required = false) String formato,
+            @McpToolParam(description = "Nível prova (obrigatório): como a banca cobra este tópico, observado nas "
+                    + "questões reais lidas: formato e tamanho dos enunciados, comandos (EXCETO, I-II-III, caso "
+                    + "concreto, cálculo), tipo de distrator e pegadinhas recorrentes. Mínimo 300 caracteres.",
+                    required = false) String estiloDaBanca,
+            @McpToolParam(description = "Nível prova (obrigatório): questões reais da banca lidas como modelo, uma "
+                    + "por linha (link da questão/prova ou \"questão local #id\"). Mínimo 2.",
+                    required = false) String referencias) {
         Quiz quiz = mcpConcurso.in(concurso, () -> lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel,
                 duvidas, errosRetomados, perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(),
-                tarefaId, formato));
+                tarefaId, formato, estiloDaBanca, referencias));
         return new QuizCreated(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), lessonService.questions(quiz.getId()).size(),
                 errosRetomados == null ? 0 : errosRetomados.size(), baseUrl + "/quizzes/" + quiz.getId());
     }

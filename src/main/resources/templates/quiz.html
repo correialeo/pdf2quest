@@ -31,12 +31,12 @@
             <span class="small text-muted" th:text="${q.position} + ' de ' + ${questions.size()} + (${q.topic != null} ? ' · ' + ${q.topic} : '')"></span>
             <button type="button" class="btn-copy" data-copy="question" title="Copiar questão" aria-label="Copiar questão"><i class="bi bi-clipboard"></i></button>
         </div>
-        <div class="quiz-statement" th:text="${q.statement}"></div>
+        <div class="quiz-statement" th:utext="${@richText.html(q.statement)}"></div>
         <div class="quiz-options">
             <button type="button" class="quiz-option" th:each="a : ${q.alternativeList()}" th:attr="data-letter=${a.letra}">
                 <span class="alt-letter" th:text="${a.letra}"></span>
                 <span class="quiz-option-body">
-                    <span th:text="${a.texto}"></span>
+                    <span th:utext="${@richText.html(a.texto)}"></span>
                     <span class="quiz-why" hidden th:text="${a.explicacao}"></span>
                     <span class="btn-copy copy-answer" role="button" tabindex="0" data-copy="answer" title="Copiar resposta" aria-label="Copiar resposta"><i class="bi bi-clipboard-check"></i></span>
                 </span>

@@ -34,12 +34,12 @@
         </div>
         <div class="small text-bad mb-2" th:if="${e.suaResposta != null}"
              th:text="'Da última vez você marcou ' + ${e.suaResposta} + ' (' + ${#temporals.format(e.respondidaEm, 'dd/MM')} + ')'"></div>
-        <div class="quiz-statement" th:text="${e.pergunta.statement}"></div>
+        <div class="quiz-statement" th:utext="${@richText.html(e.pergunta.statement)}"></div>
         <div class="quiz-options">
             <button type="button" class="quiz-option" th:each="a : ${e.pergunta.alternativeList()}" th:attr="data-letter=${a.letra}">
                 <span class="alt-letter" th:text="${a.letra}"></span>
                 <span class="quiz-option-body">
-                    <span th:text="${a.texto}"></span>
+                    <span th:utext="${@richText.html(a.texto)}"></span>
                     <span class="quiz-why" hidden th:text="${a.explicacao}"></span>
                 </span>
             </button>

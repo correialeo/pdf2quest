@@ -44,6 +44,12 @@ public class Quiz {
     /** Erros de quizzes anteriores que este quiz retoma (resumo gravado na criacao). */
     @Lob
     private String previousErrors;
+    /** Nivel prova: como a banca cobra o topico, observado nas questoes reais lidas. */
+    @Lob
+    private String styleNotes;
+    /** Questoes reais lidas como modelo, uma por linha (link ou "questao local #id"). */
+    @Lob
+    private String styleSources;
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime finishedAt;
     /** Refazer: respostas anteriores a isto saem da tela (continuam no historico). */

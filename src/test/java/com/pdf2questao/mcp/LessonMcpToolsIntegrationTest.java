@@ -52,6 +52,13 @@ class LessonMcpToolsIntegrationTest {
     @Autowired
     MockMvc mvc;
 
+    /** Estilo da banca e questões reais lidas: obrigatórios no nível prova (o padrão). */
+    private static final String ESTILO = "FCC cobra créditos adicionais com enunciado curto e direto, comando "
+            + "\"é correto afirmar\" ou \"EXCETO\", e distratores que trocam especial por suplementar, a autorização "
+            + "legislativa e a indicação de recursos; também usa casos concretos de abertura de crédito por decreto, "
+            + "pedindo o instrumento correto e o limite, e pegadinhas com a vigência do crédito extraordinário.";
+    private static final String REFS = "questão local #1\nhttps://www.pciconcursos.com.br/provas/fcc";
+
     private static final java.util.concurrent.atomic.AtomicInteger SEQ = new java.util.concurrent.atomic.AtomicInteger();
 
     /** Pergunta sempre diferente das anteriores (o sistema recusa repetida); as explicações são fixas. */
@@ -77,10 +84,10 @@ class LessonMcpToolsIntegrationTest {
                 "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "[Lei 4.320, art. 41](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", null, null, null, null);
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null, null,
                 null, null, List.of(new QuizItem("x", null,
-                        List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null),
+                        List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null, ESTILO, REFS),
                 "toda alternativa precisa de explicação");
         var quiz1 = tools.createQuiz(lesson.aulaId(), null, null, null, "basico", null, null,
-                List.of(item("Créditos especiais", "B"), item("Créditos suplementares", "B")), null, null, null);
+                List.of(item("Créditos especiais", "B"), item("Créditos suplementares", "B")), null, null, null, ESTILO, REFS);
         assertEquals("Quiz 1", quiz1.titulo());
         var questions = lessonService.questions(quiz1.quizId());
 
@@ -116,10 +123,10 @@ class LessonMcpToolsIntegrationTest {
         assertEquals(1, errors.size());
         assertEquals("A", errors.get(0).suaResposta());
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null,
-                "prova", "confundo especial com suplementar", null, List.of(item("Créditos especiais", "B")), null, null, null),
+                "prova", "confundo especial com suplementar", null, List.of(item("Créditos especiais", "B")), null, null, null, ESTILO, REFS),
                 "sem retomar os erros anteriores");
         var quiz2 = tools.createQuiz(lesson.aulaId(), null, null, null, "prova", "confundo especial com suplementar",
-                List.of(errors.get(0).perguntaId()), List.of(item("Créditos especiais", "B")), null, null, null);
+                List.of(errors.get(0).perguntaId()), List.of(item("Créditos especiais", "B")), null, null, null, ESTILO, REFS);
         assertEquals("Quiz 2", quiz2.titulo());
         assertEquals(2, tools.listLessons(lesson.aulaId(), null).get(0).quizzes().size());
         mvc.perform(get("/quizzes/" + quiz2.quizId())).andExpect(content().string(containsString("Retoma erros anteriores")))
@@ -129,10 +136,10 @@ class LessonMcpToolsIntegrationTest {
 
         // Quiz avulso (sem aula) por disciplina/tópico; também retoma erros do mesmo tópico.
         var loose = tools.createQuiz(null, null, "AFO", "Créditos suplementares", "intermediario", null, null,
-                List.of(item("Créditos suplementares", "A")), null, null, null);
+                List.of(item("Créditos suplementares", "A")), null, null, null, ESTILO, REFS);
         assertEquals(null, tools.quizResult(loose.quizId()).aulaId());
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, null, null, null, null, null, null,
-                List.of(item("x", "A")), null, null, null), "avulso precisa de assunto");
+                List.of(item("x", "A")), null, null, null, ESTILO, REFS), "avulso precisa de assunto");
 
         var perf = tools.quizPerformance(null);
         assertEquals(2, perf.geral().acertos());
@@ -159,16 +166,16 @@ class LessonMcpToolsIntegrationTest {
     void perguntaJaFeitaNoConcursoEhRecusadaEPerguntasJaFeitasMostraOResultado() throws Exception {
         String enunciado = "No Scrum Guide 2020, quem tem autoridade para cancelar uma Sprint antes do fim do timebox?";
         var quiz = tools.createQuiz(null, "Scrum 1", "Scrum", "Eventos", "prova", null, null,
-                List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner")), null, null, null);
+                List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner")), null, null, null, ESTILO, REFS);
 
         // O mesmo enunciado, ou o mesmo reescrito de leve, não entra em outro quiz.
         var igual = assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Scrum 2", "Scrum", "Eventos",
                 "prova", null, null, List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner")),
-                null, null, null));
+                null, null, null, ESTILO, REFS));
         assertTrue(igual.getMessage().contains("repete a #"), igual.getMessage());
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Scrum 2", "Scrum", "Eventos", "prova",
                 null, null, List.of(scrum("Quem tem autoridade para cancelar uma Sprint antes do fim do timebox, segundo "
-                        + "o Scrum Guide 2020?", "O Scrum Master, ouvido o time", "Somente o Product Owner")), null, null, null));
+                        + "o Scrum Guide 2020?", "O Scrum Master, ouvido o time", "Somente o Product Owner")), null, null, null, ESTILO, REFS));
         assertThrows(IllegalArgumentException.class, () -> tools.addQuiz(quiz.quizId(),
                 List.of(scrum(enunciado, "O Scrum Master, ouvido o time", "Somente o Product Owner"))));
 
@@ -176,12 +183,12 @@ class LessonMcpToolsIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Scrum 3", "Scrum", "Eventos", "prova",
                 null, null, List.of(scrum("A Daily Scrum dura no máximo quantos minutos para os Developers do time?", "30", "15"),
                         scrum("A Daily Scrum dura no máximo quantos minutos para os Developers do time?", "30", "15")),
-                null, null, null));
+                null, null, null, ESTILO, REFS));
 
         // Outro ponto do mesmo assunto entra normalmente.
         var outro = tools.createQuiz(null, "Scrum 4", "Scrum", "Eventos", "prova", null, null,
                 List.of(scrum("Em uma Sprint de um mês, qual o limite da Sprint Review segundo o guia?", "Oito horas",
-                        "Quatro horas")), null, null, null);
+                        "Quatro horas")), null, null, null, ESTILO, REFS);
         assertEquals(1, lessonService.questions(outro.quizId()).size());
 
         // perguntas_ja_feitas traz o que já foi perguntado e se acertou.
@@ -193,6 +200,23 @@ class LessonMcpToolsIntegrationTest {
         assertTrue(first.enunciado().startsWith("No Scrum Guide 2020"));
         assertNull(asked.stream().filter(q -> q.quizId().equals(outro.quizId())).findFirst().orElseThrow().acertou());
         assertEquals(1, tools.askedQuestions(null, "Scrum", "Scrum", 1, null).size());
+    }
+
+    @Test
+    void trechoMarcadoNoEnunciadoApareceSublinhadoEOrestoEhEscapado() throws Exception {
+        var quiz = tools.createQuiz(null, "Sintaxe com destaque", "Português", "Sintaxe", "prova", null, null,
+                List.of(new QuizItem("Na frase \"É necessário ⟦u⟧que todos entreguem os documentos⟦/u⟧ até sexta-feira\", "
+                        + "a oração sublinhada é <script>alert(1)</script> subordinada substantiva", "Sintaxe",
+                        List.of(new QuizAlternative("subjetiva, pois é o sujeito de ⟦b⟧é necessário⟦/b⟧", "Certa."),
+                                new QuizAlternative("objetiva direta", "Errada."),
+                                new QuizAlternative("predicativa", "Errada.")), "A")), null, null, null, ESTILO, REFS);
+
+        mvc.perform(get("/quizzes/" + quiz.quizId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("<u>que todos entreguem os documentos</u>")))
+                .andExpect(content().string(containsString("<strong>é necessário</strong>")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("⟦u⟧"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("<script>alert(1)</script>"))))
+                .andExpect(content().string(containsString("&lt;script&gt;alert(1)&lt;/script&gt;")));
     }
 
     @Autowired
@@ -229,9 +253,9 @@ class LessonMcpToolsIntegrationTest {
         var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita",
                 "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", taskId, null, null, null);
         var quiz = tools.createQuiz(lesson.aulaId(), null, null, null, null, null, null,
-                List.of(item("Receita", "B")), null, null, null);
+                List.of(item("Receita", "B")), null, null, null, ESTILO, REFS);
         var loose = tools.createQuiz(null, "Quiz de receita", "AFO", "Receita corrente", null, null, null,
-                List.of(item("Receita corrente", "B")), null, null, null);
+                List.of(item("Receita corrente", "B")), null, null, null, ESTILO, REFS);
         tools.linkTask(taskId, null, loose.quizId());
 
         var linked = lessonService.forTask(taskId);
@@ -270,7 +294,7 @@ class LessonMcpToolsIntegrationTest {
                 new QuizItem("k-fold dispensa o conjunto de teste.", null, List.of(
                         new QuizAlternative("", "Errado: o teste final continua separado."),
                         new QuizAlternative("", "Errado: o teste final continua separado.")), "E")),
-                null, null, "certo_errado");
+                null, null, "certo_errado", ESTILO, REFS);
         var qs = lessonService.questions(ce.quizId());
         assertEquals("C", qs.get(0).getCorrectAnswer());
         assertEquals("E", qs.get(1).getCorrectAnswer());
@@ -295,7 +319,7 @@ class LessonMcpToolsIntegrationTest {
                 new QuizItem("Item 2.", null, List.of(new QuizAlternative("", "Certo."),
                         new QuizAlternative("", "Errado.")), "E"),
                 new QuizItem("Item 3.", null, List.of(new QuizAlternative("", "Certo."),
-                        new QuizAlternative("", "Errado.")), "C")), null, null, "certo_errado");
+                        new QuizAlternative("", "Errado.")), "C")), null, null, "certo_errado", ESTILO, REFS);
         var qs = lessonService.questions(ce.quizId());
 
         mvc.perform(get("/quizzes/" + ce.quizId())).andExpect(status().isOk())
@@ -325,8 +349,44 @@ class LessonMcpToolsIntegrationTest {
         // Na multipla escolha nao existe "em branco".
         var mc = tools.createQuiz(null, "MC", "Redes", "Camadas", "prova", null, null, List.of(
                 new QuizItem("Pergunta?", null, List.of(new QuizAlternative("A", "a"),
-                        new QuizAlternative("B", "b")), "A")), null, null, null);
+                        new QuizAlternative("B", "b")), "A")), null, null, null, ESTILO, REFS);
         assertThrows(IllegalArgumentException.class,
                 () -> lessonService.answer(lessonService.questions(mc.quizId()).get(0).getId(), "-"));
+    }
+
+    @Test
+    void quizNivelProvaExigePesquisaDaBancaERecusaPistas() {
+        var semEstilo = assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Prova", "AFO",
+                "Empenho", null, null, null, List.of(item("Empenho", "B")), null, null, null, null, null));
+        assertTrue(semEstilo.getMessage().contains("estiloDaBanca"), "vazio = nível prova");
+        assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Prova", "AFO", "Empenho", "prova",
+                null, null, List.of(item("Empenho", "B")), null, null, null, ESTILO, "só uma"));
+        var basico = tools.createQuiz(null, "Básico", "AFO", "Empenho", "basico", null, null,
+                List.of(item("Empenho", "B")), null, null, null, null, null);
+        assertEquals("basico", lessonService.quiz(basico.quizId()).getLevel());
+
+        // Correta sempre a mais longa: dá para acertar sem saber.
+        var lotes = List.of(
+                new QuizItem("Na liquidação da despesa municipal, o que se verifica?", "Despesa", List.of(
+                        new QuizAlternative("A dotação", "Errada."),
+                        new QuizAlternative("O direito adquirido do credor, com base nos títulos e documentos", "Certa."),
+                        new QuizAlternative("A cota", "Errada.")), "B"),
+                new QuizItem("Restos a pagar processados são despesas que já passaram por qual estágio?", "Restos",
+                        List.of(new QuizAlternative("Liquidação, faltando apenas o pagamento ao credor no exercício seguinte",
+                                "Certa."), new QuizAlternative("Fixação", "Errada."),
+                                new QuizAlternative("Programação", "Errada.")), "A"),
+                new QuizItem("O empenho por estimativa é usado quando o montante é?", "Empenho", List.of(
+                        new QuizAlternative("Fixo", "Errada."), new QuizAlternative("Nulo", "Errada."),
+                        new QuizAlternative("Impossível de determinar previamente, como contas de água e luz", "Certa.")),
+                        "C"),
+                new QuizItem("Ordem bancária no pagamento de fornecedores da União serve para?", "Pagamento", List.of(
+                        new QuizAlternative("Transferir o valor ao credor pela conta única do Tesouro Nacional", "Certa."),
+                        new QuizAlternative("Empenhar", "Errada."), new QuizAlternative("Orçar", "Errada.")), "A"));
+        var pista = assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(null, "Pista", "AFO",
+                "Liquidação", "prova", null, null, lotes, null, null, null, ESTILO, REFS));
+        assertTrue(pista.getMessage().contains("mais longa"), pista.getMessage());
+        var ok = tools.createQuiz(null, "Prova", "AFO", "Empenho", null, null, null, List.of(item("Empenho", "B")),
+                null, null, null, ESTILO, REFS);
+        assertEquals("prova", lessonService.quiz(ok.quizId()).getLevel());
     }
 }

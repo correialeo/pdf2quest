@@ -1535,6 +1535,8 @@ details[open] > .day-header::before { transform: rotate(90deg); }
 .lesson-content pre { background: var(--bs-tertiary-bg); padding: .75rem 1rem; border-radius: 8px; overflow-x: auto; }
 .lesson-content blockquote { border-left: 3px solid var(--bs-primary); padding: .25rem 0 .25rem 1rem; margin: 1rem 0; color: var(--bs-secondary-color); }
 .quiz-statement { white-space: pre-wrap; margin-bottom: 1rem; line-height: 1.6; }
+/* Trecho destacado pelo enunciado (⟦u⟧...⟦/u⟧), como o sublinhado da prova impressa. */
+.quiz-statement u, .quiz-option-body u { text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .quiz-options { display: flex; flex-direction: column; gap: .5rem; }
 .quiz-option { display: flex; gap: .75rem; align-items: flex-start; text-align: left; width: 100%; padding: .75rem 1rem;
     border: 1px solid var(--bs-border-color); border-radius: 10px; background: var(--bs-body-bg); color: inherit; }
