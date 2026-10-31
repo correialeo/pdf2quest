@@ -64,12 +64,18 @@ public class LessonController {
         model.addAttribute("lesson", lesson);
         model.addAttribute("task", lessonService.task(lesson.getTaskId()));
         model.addAttribute("contentHtml", SimpleMarkdown.toHtml(lesson.getContent()));
+        model.addAttribute("slides", LessonSlides.parse(lesson.getContent()));
+        Quiz fixation = lessonService.fixation(id);
+        model.addAttribute("fixation", fixation);
+        model.addAttribute("fixationQuestions", fixation == null ? Map.of() : lessonService.questions(fixation.getId())
+                .stream().collect(Collectors.toMap(QuizQuestion::getPosition, q -> q)));
+        model.addAttribute("fixationAnswers", fixation == null ? Map.of() : lessonService.latest(fixation.getId()));
         model.addAttribute("quizzes", lessonService.quizzes(id));
         Map<Long, LessonService.QuizResult> results = lessonService.quizzes(id).stream()
                 .collect(Collectors.toMap(Quiz::getId, q -> lessonService.result(q.getId())));
         model.addAttribute("results", results);
         model.addAttribute("pendingQuiz", lessonService.quizzes(id).stream()
-                .filter(q -> !results.get(q.getId()).concluido()).findFirst().orElse(null));
+                .filter(q -> !q.isEmbedded() && !results.get(q.getId()).concluido()).findFirst().orElse(null));
         model.addAttribute("next", next(lesson.getTaskId()));
         return "aula";
     }

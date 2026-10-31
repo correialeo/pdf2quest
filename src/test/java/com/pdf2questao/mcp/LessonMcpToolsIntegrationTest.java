@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Aula com quiz: criada pelo MCP, respondida na tela, resultado e desempenho separados das provas. */
 @SpringBootTest(classes = Pdf2QuestaoApplication.class)
 @AutoConfigureMockMvc
-class LessonMcpToolsIntegrationTest {
+public class LessonMcpToolsIntegrationTest {
 
     @TempDir
     static Path tempDir;
@@ -53,16 +53,29 @@ class LessonMcpToolsIntegrationTest {
     MockMvc mvc;
 
     /** Estilo da banca e questões reais lidas: obrigatórios no nível prova (o padrão). */
-    private static final String ESTILO = "FCC cobra créditos adicionais com enunciado curto e direto, comando "
+    public static final String ESTILO = "FCC cobra créditos adicionais com enunciado curto e direto, comando "
             + "\"é correto afirmar\" ou \"EXCETO\", e distratores que trocam especial por suplementar, a autorização "
             + "legislativa e a indicação de recursos; também usa casos concretos de abertura de crédito por decreto, "
             + "pedindo o instrumento correto e o limite, e pegadinhas com a vigência do crédito extraordinário.";
-    private static final String REFS = "questão local #1\nhttps://www.pciconcursos.com.br/provas/fcc";
+    public static final String REFS = "questão local #1\nhttps://www.pciconcursos.com.br/provas/fcc";
+
+    /** Aula em slides mínima aceita pelo criar_aula: 2 slides e 3 questões de fixação. */
+    public static final String SLIDES = "=== Regra\nTexto.\n[[questão 1]]\n=== Exceção\nTexto.\n[[questão 2]]\n[[questão 3]]";
+
+    public static List<QuizItem> fixacao() {
+        return List.of(item("Fixação", "A"), item("Fixação", "B"), item("Fixação", "C"));
+    }
+
+    /** Aula de página única (formato antigo), gravada direto no serviço para testar os quizzes dela. */
+    private LessonMcpTools.LessonCreated plain(String title, String subject, String topic, String content, Long taskId) {
+        var l = lessonService.create(title, subject, topic, content, taskId);
+        return new LessonMcpTools.LessonCreated(l.getId(), l.getTitle(), null, 0, 0, null);
+    }
 
     private static final java.util.concurrent.atomic.AtomicInteger SEQ = new java.util.concurrent.atomic.AtomicInteger();
 
     /** Pergunta sempre diferente das anteriores (o sistema recusa repetida); as explicações são fixas. */
-    private static QuizItem item(String topic, String correct) {
+    public static QuizItem item(String topic, String correct) {
         int n = SEQ.incrementAndGet();
         String tag = java.util.stream.IntStream.range(0, 12).mapToObj(i -> "termo" + n + "x" + i)
                 .collect(java.util.stream.Collectors.joining(" "));
@@ -80,8 +93,8 @@ class LessonMcpToolsIntegrationTest {
     @Test
     void aulaComVariosQuizzesQueRetomamOsErros() throws Exception {
         long attemptsBefore = attemptRepository.count();
-        var lesson = tools.createLesson("Créditos adicionais", "AFO", "Créditos adicionais",
-                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", "[Lei 4.320, art. 41](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", null, null, null, null);
+        var lesson = plain("Créditos adicionais", "AFO", "Créditos adicionais",
+                "## Créditos\n> A FCC troca **especial** e **suplementar**\n```\nLei 4.320, art. 41\n```", null);
         assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(lesson.aulaId(), null, null, null, null,
                 null, null, List.of(new QuizItem("x", null,
                         List.of(new QuizAlternative("a", ""), new QuizAlternative("b", "ok")), "A")), null, null, null, ESTILO, REFS),
@@ -232,26 +245,29 @@ class LessonMcpToolsIntegrationTest {
         task = taskRepository.save(task);
         Long taskId = task.getId();
 
-        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", "fonte", 999_999L, null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", " ", taskId, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", "fonte", 999_999L, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y", " ", taskId, null, null, null, null, null, null, null));
         // Fonte sem link é recusada.
         assertThrows(IllegalArgumentException.class,
-                () -> tools.createLesson("x", "AFO", null, "y", "Lei 4.320 (planalto.gov.br)", taskId, null, null, null));
+                () -> tools.createLesson("x", "AFO", null, "y", "Lei 4.320 (planalto.gov.br)", taskId, null, null, null, null, null, null, null));
         // Fonte "de memória" ou "só resumo" não entra em 'fontes'; o que não foi confirmado exige 'tentativas'.
         String link = "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)";
         assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y",
-                link + "\nart. 43 de memória", taskId, null, null, null));
+                link + "\nart. 43 de memória", taskId, null, null, null, null, null, null, null));
         assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y",
-                link, taskId, null, "art. 43, §3º", null));
+                link, taskId, null, "art. 43, §3º", null, null, null, null, null));
         assertThrows(IllegalArgumentException.class, () -> tools.createLesson("x", "AFO", null, "y",
-                link, taskId, null, "art. 43, §3º", "não abriu"));
-        var comPendencia = tools.createLesson("Com pendência", "AFO", "Receita", "y", link, null, null,
+                link, taskId, null, "art. 43, §3º", "não abriu", null, null, null, null));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> tools.createLesson("Página única", "AFO",
+                "Receita", "## Sem slides", link, null, null, null, null, null, null, null, null)).getMessage()
+                .contains("slides"), "aula nova sem slides é recusada");
+        var comPendencia = tools.createLesson("Com pendência", "AFO", "Receita", SLIDES, link, null, null,
                 "art. 43, §3º",
-                "Tentei o Planalto (resumo apenas), baixei o PDF da UFSM e extraí o texto com pdftotext.");
+                "Tentei o Planalto (resumo apenas), baixei o PDF da UFSM e extraí o texto com pdftotext.", fixacao(),
+                ESTILO, REFS, null);
         assertTrue(lessonService.find(comPendencia.aulaId()).getContent()
                 .contains("### Não confirmado"));
-        var lesson = tools.createLesson("Receita pública", "AFO", "Receita", "Estágios da receita",
-                "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)", taskId, null, null, null);
+        var lesson = plain("Receita pública", "AFO", "Receita", "Estágios da receita", taskId);
         var quiz = tools.createQuiz(lesson.aulaId(), null, null, null, null, null, null,
                 List.of(item("Receita", "B")), null, null, null, ESTILO, REFS);
         var loose = tools.createQuiz(null, "Quiz de receita", "AFO", "Receita corrente", null, null, null,
@@ -388,5 +404,61 @@ class LessonMcpToolsIntegrationTest {
         var ok = tools.createQuiz(null, "Prova", "AFO", "Empenho", null, null, null, List.of(item("Empenho", "B")),
                 null, null, null, ESTILO, REFS);
         assertEquals("prova", lessonService.quiz(ok.quizId()).getLevel());
+    }
+
+    @Test
+    void excluirQuizApagaPerguntasERespostasSoComConfirmacao() throws Exception {
+        var quiz = tools.createQuiz(null, "Para apagar", "AFO", "Excluir", "basico", null, null,
+                List.of(item("Excluir", "B")), null, null, null, null, null);
+        answer(quiz.quizId(), lessonService.questions(quiz.quizId()).get(0).getId(), "A");
+        assertEquals(1, tools.previousErrors(null, "AFO", "Excluir").size());
+
+        assertThrows(IllegalArgumentException.class, () -> tools.deleteQuiz(quiz.quizId(), null));
+        var deleted = tools.deleteQuiz(quiz.quizId(), true);
+        assertEquals(1, deleted.perguntas());
+        assertEquals(1, deleted.respostas());
+        assertTrue(lessonService.questions(quiz.quizId()).isEmpty());
+        assertTrue(tools.previousErrors(null, "AFO", "Excluir").isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> tools.deleteQuiz(quiz.quizId(), true));
+    }
+
+    @Test
+    void aulaEmSlidesComQuestoesDeFixacaoNoMeio() throws Exception {
+        String link = "[NBC TSP 12](https://www.legisweb.com.br/legislacao/?id=492485)";
+        String slides = "=== DFC\nFluxos de **investimento**.\n[[questão 1]]\n=== DMPL\nMutações do PL.\n[[questão 2]]\n[[questão 3]]";
+        var semQuestoes = assertThrows(IllegalArgumentException.class, () -> tools.createLesson("Slides", "Contabilidade",
+                "DCASP", slides, link, null, null, null, null, null, null, null, null));
+        assertTrue(semQuestoes.getMessage().contains("perguntasDaAula"), semQuestoes.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> tools.createLesson("Slides", "Contabilidade", "DCASP",
+                slides, link, null, null, null, null, List.of(item("DFC", "B"), item("DFC", "B"), item("DMPL", "B"),
+                        item("DMPL", "B")), ESTILO, REFS, null), "a questão 4 não aparece na aula");
+
+        var aula = tools.createLesson("Slides", "Contabilidade", "DCASP", slides, link, null, null, null, null,
+                List.of(item("DFC", "B"), item("DMPL", "B"), item("DMPL", "A")), ESTILO, REFS, null);
+        assertEquals(3, aula.slides(), "DFC, DMPL e Fontes");
+        assertEquals(3, aula.questoesDeFixacao());
+        var fixacao = lessonService.fixation(aula.aulaId());
+        assertTrue(fixacao.isEmbedded());
+        assertEquals("prova", fixacao.getLevel());
+
+        var perguntas = lessonService.questions(fixacao.getId());
+        mvc.perform(get("/aulas/" + aula.aulaId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("lesson-deck")))
+                .andExpect(content().string(containsString(">DFC<")))
+                .andExpect(content().string(containsString(">Fontes<")))
+                .andExpect(content().string(containsString("data-id=\"" + perguntas.get(1).getId() + "\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("<p>[[questão"))));
+        answer(fixacao.getId(), perguntas.get(0).getId(), "A");
+
+        // Reescrever troca o conteúdo e a fixação; o erro da fixação anterior precisa ser retomado.
+        String novo = "=== DFC\nCaixa e equivalentes.\n[[questão 1]]\n=== PL\nResidual.\n[[questão 2]]\n[[questão 3]]";
+        assertThrows(IllegalArgumentException.class, () -> tools.rewriteLesson(aula.aulaId(), null, novo, link, null,
+                null, fixacao(), ESTILO, REFS, null, null));
+        var errosAntes = tools.previousErrors(aula.aulaId(), null, null);
+        var reescrita = tools.rewriteLesson(aula.aulaId(), "Slides v2", novo, link, null, null,
+                fixacao(), ESTILO, REFS, null, List.of(errosAntes.get(0).perguntaId()));
+        assertEquals("Slides v2", reescrita.titulo());
+        assertEquals(1, lessonService.quizzes(aula.aulaId()).size(), "a fixação antiga saiu");
+        assertTrue(lessonService.find(aula.aulaId()).getContent().contains("Caixa e equivalentes"));
     }
 }

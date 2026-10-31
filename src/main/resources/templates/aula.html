@@ -17,7 +17,44 @@
     </div>
     <textarea id="lessonMarkdown" hidden th:text="${lesson.content}"></textarea>
 
-    <article class="card p-4 rich-text lesson-content" th:utext="${contentHtml}"></article>
+    <article class="card p-4 rich-text lesson-content" th:if="${slides.isEmpty()}" th:utext="${contentHtml}"></article>
+
+    <!-- Aula em slides: uma pagina por assunto, com questoes de fixacao no meio (respondidas aqui mesmo). -->
+    <section class="lesson-deck" th:unless="${slides.isEmpty()}" th:attr="data-quiz=${fixation != null} ? ${fixation.id} : ''">
+        <nav class="lesson-deck-tabs" aria-label="Slides">
+            <button type="button" class="lesson-deck-tab" th:each="s, it : ${slides}" th:attr="data-slide=${it.index}"
+                    th:text="${s.title}"></button>
+        </nav>
+        <article class="card p-4 rich-text lesson-content lesson-slide" th:each="s, it : ${slides}"
+                 th:attr="data-slide=${it.index}" th:hidden="${it.index > 0}">
+            <div class="small text-muted mb-1" th:text="'Slide ' + ${it.count} + ' de ' + ${slides.size()}"></div>
+            <h2 class="h3" th:text="${s.title}"></h2>
+            <th:block th:each="p : ${s.parts}">
+                <div th:if="${p.html != null}" th:utext="${p.html}"></div>
+                <div class="quiz-question lesson-question" th:if="${p.question != null and fixationQuestions[p.question] != null}"
+                     th:with="q=${fixationQuestions[p.question]}, a=${fixationAnswers[fixationQuestions[p.question].id]}"
+                     th:attr="data-id=${q.id},data-correct=${a != null} ? ${q.correctAnswer} : '',data-selected=${a != null} ? ${a.selectedAnswer} : ''">
+                    <div class="small text-muted mb-1"><i class="bi bi-pencil-square me-1"></i>Fixação<span th:if="${q.topic != null}" th:text="' · ' + ${q.topic}"></span></div>
+                    <div class="quiz-statement" th:utext="${@richText.html(q.statement)}"></div>
+                    <div class="quiz-options">
+                        <button type="button" class="quiz-option" th:each="alt : ${q.alternativeList()}" th:attr="data-letter=${alt.letra}">
+                            <span class="alt-letter" th:text="${alt.letra}"></span>
+                            <span class="quiz-option-body">
+                                <span th:utext="${@richText.html(alt.texto)}"></span>
+                                <span class="quiz-why" hidden th:text="${alt.explicacao}"></span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </th:block>
+        </article>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="slidePrev"><i class="bi bi-arrow-left me-1"></i>Anterior</button>
+            <span class="small text-muted" id="deckScore"></span>
+            <button type="button" class="btn btn-primary btn-sm" id="slideNext">Próximo<i class="bi bi-arrow-right ms-1"></i></button>
+        </div>
+        <div class="small text-muted mt-1">Atalhos: <kbd>←</kbd> <kbd>→</kbd> mudam de slide.</div>
+    </section>
 
     <!-- Proximo passo depois de ler: fazer o quiz, concluir a tarefa ou seguir para a proxima de hoje. -->
     <section class="card p-3 mt-3 next-step">
@@ -67,11 +104,8 @@
         });
     });
     document.addEventListener('DOMContentLoaded', function() {
-        const content = document.querySelector('.lesson-content');
-        if (!content) return;
-    
-        // Seleciona blocos que podem conter a tabela: parágrafos e blocos de código
-        const blocks = Array.from(content.querySelectorAll('p, pre'));
+        // Seleciona blocos que podem conter a tabela: parágrafos e blocos de código (em todos os slides)
+        const blocks = Array.from(document.querySelectorAll('.lesson-content p, .lesson-content pre'));
     
         blocks.forEach(function(block) {
             // Evita processar blocos que já estão dentro de uma tabela
@@ -155,5 +189,80 @@
         });
     });
     </script>
+<script>
+    (function () {
+        const deck = document.querySelector('.lesson-deck');
+        if (!deck) return;
+        const slides = Array.from(deck.querySelectorAll('.lesson-slide'));
+        const tabs = Array.from(deck.querySelectorAll('.lesson-deck-tab'));
+        const key = 'aula-slide-' + location.pathname;
+        let index = Math.min(Number(localStorage.getItem(key)) || 0, slides.length - 1);
+
+        function show(i) {
+            index = Math.max(0, Math.min(i, slides.length - 1));
+            slides.forEach((s, k) => { s.hidden = k !== index; });
+            tabs.forEach((t, k) => t.classList.toggle('is-current', k === index));
+            document.getElementById('slidePrev').disabled = index === 0;
+            document.getElementById('slideNext').disabled = index === slides.length - 1;
+            localStorage.setItem(key, index);
+        }
+        function go(i) { show(i); deck.scrollIntoView({behavior: 'smooth', block: 'start'}); }
+        tabs.forEach((t, k) => t.addEventListener('click', () => go(k)));
+        document.getElementById('slidePrev').addEventListener('click', () => go(index - 1));
+        document.getElementById('slideNext').addEventListener('click', () => go(index + 1));
+        document.addEventListener('keydown', function (e) {
+            const t = e.target;
+            if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable) return;
+            if (e.key === 'ArrowRight') { go(index + 1); } else if (e.key === 'ArrowLeft') { go(index - 1); }
+        });
+
+        // Questoes de fixacao: mesmo comportamento do quiz (clicar responde e mostra o porque).
+        const quizId = deck.dataset.quiz;
+        const cards = Array.from(deck.querySelectorAll('.lesson-question'));
+        function score() {
+            const done = cards.filter(c => c.dataset.selected);
+            const right = done.filter(c => c.dataset.selected === c.dataset.correct).length;
+            document.getElementById('deckScore').textContent = cards.length === 0 ? ''
+                : 'Fixação: ' + right + ' de ' + done.length + ' certas' + (done.length < cards.length ? ' · ' + (cards.length - done.length) + ' faltando' : '');
+        }
+        function reveal(card) {
+            const selected = card.dataset.selected, correct = card.dataset.correct;
+            card.classList.add('is-answered');
+            card.querySelectorAll('.quiz-option').forEach(function (opt) {
+                const letter = opt.dataset.letter;
+                opt.classList.toggle('is-correct', letter === correct);
+                opt.classList.toggle('is-wrong', letter === selected && selected !== correct);
+                opt.classList.toggle('is-open', letter === selected || letter === correct);
+                opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
+            });
+        }
+        cards.forEach(function (card) {
+            if (card.dataset.selected) { reveal(card); }
+            card.querySelectorAll('.quiz-option').forEach(function (opt) {
+                opt.addEventListener('click', function () {
+                    if (card.dataset.selected) {
+                        opt.classList.toggle('is-open');
+                        opt.querySelector('.quiz-why').hidden = !opt.classList.contains('is-open');
+                        return;
+                    }
+                    if (card.dataset.sending) return;
+                    card.dataset.sending = '1';
+                    fetch('/quizzes/' + quizId + '/responder', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({questionId: Number(card.dataset.id), selected: opt.dataset.letter})
+                    }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (res) {
+                        card.dataset.selected = opt.dataset.letter;
+                        card.dataset.correct = res.correctAnswer;
+                        reveal(card);
+                        score();
+                    }).catch(() => window.p2qToast('Não foi possível salvar a resposta. Tente de novo.', 'danger'))
+                      .finally(() => { delete card.dataset.sending; });
+                });
+            });
+        });
+        show(index);
+        score();
+    })();
+</script>
 </body>
 </html>

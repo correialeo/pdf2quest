@@ -1824,3 +1824,12 @@ html.sidebar-collapsed .workspace-switch {
 /* ---- quiz: pergunta atual e fim ---- */
 .quiz-question.is-current { outline: 2px solid var(--accent-soft); }
 .quiz-done { border-left: 4px solid var(--accent); }
+
+/* Aula em slides */
+.lesson-deck-tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .75rem; }
+.lesson-deck-tab { border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); border-radius: 999px;
+    padding: .25rem .75rem; font-size: .85rem; color: var(--bs-secondary-color); }
+.lesson-deck-tab:hover { border-color: var(--bs-primary); }
+.lesson-deck-tab.is-current { background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; }
+.lesson-question { border: 1px dashed var(--bs-border-color); border-radius: 10px; padding: 1rem; margin: 1.25rem 0; }
+

@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /** Home do concurso: o que fazer hoje, como esta indo nos simulados/quizzes e quanto do edital ja foi estudado. */
@@ -156,9 +157,10 @@ public class ConcursoHomeService {
             return List.of();
         }
         List<String> studied = Stream.concat(
-                        lessonService.visible().stream().map(Lesson::getEditalTopic),
+                        lessonService.visible().stream().flatMap(l -> Stream.of(l.getEditalTopic(), l.getTitle())),
                         lessonService.visibleQuizzes().stream().map(Quiz::getTopic))
                 .filter(Objects::nonNull).map(ScoringCalculator::normalize).filter(t -> t.length() >= 4).toList();
+        List<Set<String>> studiedWords = studied.stream().map(t -> words(t, Set.of())).toList();
         Map<String, List<EditalTopic>> bySubject = new LinkedHashMap<>();
         topicRepository.findByScoringProfileIdOrderByPosition(concurso.getScoringProfileId())
                 .forEach(t -> bySubject.computeIfAbsent(t.getSubject(), k -> new ArrayList<>()).add(t));
@@ -168,7 +170,9 @@ public class ConcursoHomeService {
             int done = 0;
             for (EditalTopic t : topics) {
                 String topic = ScoringCalculator.normalize(t.getTopic());
-                if (studied.stream().anyMatch(s -> topic.contains(s) || s.contains(topic))) {
+                Set<String> own = words(topic, words(ScoringCalculator.normalize(subject), Set.of()));
+                if (studied.stream().anyMatch(s -> topic.contains(s) || s.contains(topic))
+                        || studiedWords.stream().anyMatch(w -> overlaps(own, w))) {
                     done++;
                 } else {
                     missing.add(t.getTopic());
@@ -177,5 +181,31 @@ public class ConcursoHomeService {
             out.add(new Coverage(subject, topics.size(), done, missing));
         });
         return out;
+    }
+
+    private static final Set<String> STOP = Set.of("para", "pela", "pelo", "como", "entre", "sobre", "sob", "com",
+            "sem", "das", "dos", "nas", "nos", "uma", "geral", "conceito", "conceitos", "nocoes");
+
+    /** Palavras de 4+ letras do texto (sem as genericas e as do nome da disciplina). */
+    static Set<String> words(String normalized, Set<String> ignore) {
+        Set<String> out = new java.util.LinkedHashSet<>();
+        for (String w : normalized.split("[^a-z0-9]+")) {
+            if (w.length() >= 4 && !STOP.contains(w) && !ignore.contains(w)) {
+                out.add(w);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Topico do edital coberto por uma aula/quiz: metade ou mais das palavras proprias do topico aparecem no texto
+     * estudado (os nomes nunca batem inteiros: "DCASP (BO, BF, ... DFC) e notas explicativas" x "DCASP: DFC e DMPL").
+     */
+    static boolean overlaps(Set<String> topic, Set<String> studied) {
+        if (topic.isEmpty()) {
+            return false;
+        }
+        long hit = topic.stream().filter(studied::contains).count();
+        return hit * 2 >= topic.size();
     }
 }

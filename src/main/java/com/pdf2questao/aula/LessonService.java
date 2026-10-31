@@ -100,6 +100,103 @@ public class LessonService {
         return lessonRepository.save(lesson);
     }
 
+    /** Minimo de uma aula nova: slides de conteudo (fora o de fontes) e questoes de fixacao no meio deles. */
+    public static final int MIN_SLIDES = 2;
+    public static final int MIN_FIXATION = 3;
+
+    /**
+     * Toda aula nova (ou reescrita) e em slides, com questoes de fixacao no meio: a de pagina unica virava um texto
+     * longo lido sem pratica. Validado antes de gravar, para nao sobrar aula sem as questoes.
+     */
+    public static void requireSlides(String content, int questions) {
+        long slides = LessonSlides.parse(content).stream().filter(s -> !s.title().equalsIgnoreCase("Fontes")).count();
+        if (slides < MIN_SLIDES || questions < MIN_FIXATION) {
+            throw new IllegalArgumentException("A aula precisa ser em slides: ao menos " + MIN_SLIDES + " slides "
+                    + "(linhas \"=== Título\", um por assunto do tópico) e ao menos " + MIN_FIXATION + " questões de "
+                    + "fixação em perguntasDaAula, cada uma citada como [[questão N]] logo depois do que ela fixa "
+                    + "(nível prova, com estiloDaBanca e referencias). Recebido: " + slides + " slides e " + questions
+                    + " questões. Se a ferramenta não tem o campo perguntasDaAula, reconecte o servidor MCP (/mcp).");
+        }
+    }
+
+    /** Cria a aula e as questoes de fixacao juntas (falhando uma, nenhuma fica gravada). */
+    @Transactional
+    public Lesson createWithFixation(String title, String subject, String editalTopic, String content, Long taskId,
+                                     List<NewQuestion> questions, String format, String styleNotes, String styleSources) {
+        requireSlides(content, questions == null ? 0 : questions.size());
+        Lesson lesson = create(title, subject, editalTopic, content, taskId);
+        replaceFixation(lesson.getId(), questions, format, styleNotes, styleSources, null);
+        return lesson;
+    }
+
+    /** Reescreve a aula e troca as questoes de fixacao juntas. */
+    @Transactional
+    public Lesson rewriteWithFixation(Long lessonId, String title, String content, List<NewQuestion> questions,
+                                      String format, String styleNotes, String styleSources, List<Long> reviewedErrors) {
+        requireSlides(content, questions == null ? 0 : questions.size());
+        Lesson lesson = rewrite(lessonId, title, content);
+        replaceFixation(lessonId, questions, format, styleNotes, styleSources, reviewedErrors);
+        return lesson;
+    }
+
+    /** Troca o conteudo da aula (titulo vazio = mantem). Os quizzes dela continuam. */
+    @Transactional
+    public Lesson rewrite(Long lessonId, String title, String content) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("A aula precisa de conteúdo.");
+        }
+        Lesson lesson = find(lessonId);
+        if (blank(title) != null) {
+            lesson.setTitle(title.strip());
+        }
+        lesson.setContent(content.strip());
+        return lessonRepository.save(lesson);
+    }
+
+    /** Quiz embutido com as questoes de fixacao da aula em slides (nulo = a aula nao tem). */
+    public Quiz fixation(Long lessonId) {
+        return quizzes(lessonId).stream().filter(Quiz::isEmbedded).reduce((a, b) -> b).orElse(null);
+    }
+
+    /**
+     * Grava as questoes de fixacao da aula em slides, no nivel prova, substituindo as anteriores (e as respostas
+     * delas). Cada "[[questao N]]" do conteudo precisa de uma questao, e toda questao precisa aparecer num slide.
+     */
+    @Transactional
+    public Quiz replaceFixation(Long lessonId, List<NewQuestion> questions, String format, String styleNotes,
+                                String styleSources, List<Long> reviewedErrors) {
+        Lesson lesson = find(lessonId);
+        List<Integer> refs = LessonSlides.questionRefs(lesson.getContent());
+        int n = questions == null ? 0 : questions.size();
+        List<Integer> outOfRange = refs.stream().filter(r -> r < 1 || r > n).distinct().toList();
+        if (!outOfRange.isEmpty()) {
+            throw new IllegalArgumentException("A aula cita [[questão " + outOfRange.get(0) + "]], mas há " + n
+                    + " questões de fixação.");
+        }
+        List<Integer> missing = java.util.stream.IntStream.rangeClosed(1, n).filter(i -> !refs.contains(i)).boxed().toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("As questões de fixação " + missing + " não aparecem na aula: ponha "
+                    + "[[questão N]] no slide em que cada uma deve ser respondida.");
+        }
+        // Os erros da fixacao antiga somem com ela: exige que a nova os retome antes de apagar.
+        List<PreviousError> errors = previousErrors(lessonId, null, null, null);
+        List<Long> reviewed = reviewedErrors == null ? List.of() : reviewedErrors;
+        if (!errors.isEmpty() && errors.stream().noneMatch(e -> reviewed.contains(e.perguntaId()))) {
+            throw new IllegalArgumentException("Há " + errors.size() + " erros em quizzes anteriores desta aula "
+                    + "(perguntas " + errors.stream().limit(10).map(e -> "#" + e.perguntaId())
+                    .collect(Collectors.joining(", ")) + "). Leia com erros_quiz_anteriores, crie questões de "
+                    + "fixação que retomem esses pontos e informe os ids em errosRetomados.");
+        }
+        Quiz old = fixation(lessonId);
+        if (old != null) {
+            deleteQuiz(old.getId());
+        }
+        Quiz quiz = createQuiz(lessonId, "Fixação da aula", null, null, PROVA, null, reviewedErrors, questions, null,
+                format, styleNotes, styleSources);
+        quiz.setEmbedded(true);
+        return quizRepository.save(quiz);
+    }
+
     // ---- ligacao com o cronograma ----
 
     /** Aula ou quiz ligado a uma tarefa, com o andamento para mostrar na tarefa. */
@@ -595,6 +692,22 @@ public class LessonService {
             quizRepository.save(quiz);
         }
         return saved;
+    }
+
+    public record DeletedQuiz(Long quizId, String title, int questions, int answers) {
+    }
+
+    /** Apaga o quiz com as perguntas e todas as respostas (saem do desempenho e dos erros anteriores). */
+    @Transactional
+    public DeletedQuiz deleteQuiz(Long quizId) {
+        Quiz quiz = quiz(quizId);
+        List<QuizQuestion> questions = questions(quizId);
+        List<QuizAttempt> attempts = attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(
+                questions.stream().map(QuizQuestion::getId).toList());
+        attemptRepository.deleteAll(attempts);
+        questionRepository.deleteAll(questions);
+        quizRepository.delete(quiz);
+        return new DeletedQuiz(quizId, quiz.getTitle(), questions.size(), attempts.size());
     }
 
     /**

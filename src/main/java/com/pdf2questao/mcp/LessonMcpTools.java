@@ -55,19 +55,25 @@ public class LessonMcpTools {
         return """
                 Seja o tutor do usuário hoje, usando o servidor MCP pdf2questao. %s%s
 
-                1. PLANEJAMENTO. Consulte tarefas_de_hoje, revisoes_de_hoje, desempenho_quiz (quizzes, por tópico), \\
+                1. PLANEJAMENTO. Consulte prioridades (o que dá mais ponto estudar agora), tarefas_de_hoje, \\
+                revisoes_de_hoje, desempenho_quiz (quizzes, por tópico), \\
                 resumo_de_erros e desempenho_por_disciplina (questões de prova/simulado). Escolha o tópico principal \\
                 (tarefa do cronograma de hoje) e, se couber, um reforço do que o usuário vem errando. Confira o \\
                 tópico no conteúdo programático do edital (estrutura_do_edital / ler_edital) e diga ao usuário, em \\
-                3 a 5 linhas, o plano do dia e por quê.
+                3 a 5 linhas, o plano do dia e por quê; se prioridades apontar algo mais rentável que a tarefa do dia, \\
+                mostre a sugestão e deixe o usuário decidir (não mude o cronograma sozinho).
 
                 2. AULA. Antes de escrever, leia o item do edital (ler_edital), pesquise na web fontes atuais do \\
                 tópico (norma vigente, súmulas, temas e jurisprudência, autores e conceitos; prefira fontes \\
                 oficiais) e veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
                 banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
                 hoje que ela cobre; em 'fontes', só o que você LEU, cada fonte com o link (URL)), no nível dele (use o \\
-                desempenho): explicação direta, exemplos, "como a FCC cobra" (formatos e pegadinhas observados nas \\
-                questões reais), quadro de diferenças entre conceitos que se confundem e um resumo final. Para lei \\
+                desempenho), EM SLIDES: um slide ("=== Título") por assunto do tópico (ex.: DFC num, DMPL noutro), \\
+                cada um com a regra, a exceção e a pegadinha da banca, do que mais cai ao que menos cai (sem número \\
+                de item de norma que a banca não cobra, sem o que está fora do edital e sem bastidor da pesquisa), e \\
+                logo depois de cada explicação uma questão de fixação no nível da prova ("[[questão N]]", enviadas \\
+                em perguntasDaAula com estiloDaBanca e referencias). Feche com um slide de quadro comparativo e um \\
+                de resumo de meia página (é ele que volta na revisão). Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
                 FONTE QUE NÃO ABRE OU VEM SÓ EM RESUMO. Se a página vier truncada, em resumo, ou o PDF vier ilegível, \\
                 NÃO escreva a aula ainda: baixe o arquivo e extraia o texto (o WebFetch guarda PDFs em disco; use \\
@@ -98,8 +104,16 @@ public class LessonMcpTools {
                         + "listar_erros; o perfil do edital é o perfilId dele em listar_concursos.");
     }
 
-    public record LessonCreated(Long aulaId, String titulo, String concurso, String link) {
+    public record LessonCreated(Long aulaId, String titulo, String concurso, int slides, int questoesDeFixacao,
+                                String link) {
     }
+
+    private static final String SLIDES_HELP = "Aula em SLIDES (obrigatório: ao menos 2 slides e 3 questões de "
+            + "fixação): cada linha \"=== Título\" abre um slide, "
+            + "uma página por assunto (ex.: \"=== DFC\", \"=== DMPL\"); dentro do slide, a linha \"[[questão N]]\" "
+            + "põe ali a questão N de 'perguntasDaAula' para fixar o que acabou de ser explicado (nível prova, com "
+            + "estiloDaBanca e referencias). Toda questão precisa aparecer em algum slide. As fontes viram o último "
+            + "slide sozinhas: não escreva bastidor (ferramenta que falhou, como leu o PDF) no conteúdo.";
 
     @McpTool(name = "criar_aula",
             description = "Cria uma aula no sistema (Markdown: ## títulos, listas, **negrito**, `código`, blocos ``` , "
@@ -109,7 +123,7 @@ public class LessonMcpTools {
                     + "conceitos). 'fontes' lista só o que foi LIDO, com o link de cada um; o que não foi confirmado vai "
                     + "em 'naoConfirmado', e então 'tentativas' (o que você fez para confirmar: outras fontes, "
                     + "download e extração do texto) é obrigatório. Se a fonte vier truncada ou em resumo, busque o "
-                    + "texto por outro caminho antes de criar a aula. Tudo é anexado ao fim dela.",
+                    + "texto por outro caminho antes de criar a aula. Tudo é anexado ao fim dela. " + SLIDES_HELP,
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public LessonCreated createLesson(
             @McpToolParam(description = "Título da aula.") String titulo,
@@ -129,7 +143,64 @@ public class LessonMcpTools {
                     + "'tentativas'.", required = false) String naoConfirmado,
             @McpToolParam(description = "O que foi tentado para confirmar o que está em naoConfirmado (outros sites, "
                     + "download e extração do texto, leitura em partes) e por que não deu certo.",
-                    required = false) String tentativas) {
+                    required = false) String tentativas,
+            @McpToolParam(description = "Questões de fixação citadas no conteúdo como [[questão N]] (aula em slides).",
+                    required = false) List<QuizItem> perguntasDaAula,
+            @McpToolParam(description = "Com perguntasDaAula: como a banca cobra o tópico, observado nas questões "
+                    + "reais lidas (mínimo 300 caracteres).", required = false) String estiloDaBanca,
+            @McpToolParam(description = "Com perguntasDaAula: questões reais lidas como modelo, uma por linha "
+                    + "(mínimo 2).", required = false) String referencias,
+            @McpToolParam(description = "Com perguntasDaAula: multipla_escolha (padrão) ou certo_errado.",
+                    required = false) String formato) {
+        String content = withSources(conteudo, fontes, naoConfirmado, tentativas);
+        Lesson lesson = mcpConcurso.in(concurso, () -> lessonService.createWithFixation(titulo, disciplina,
+                topicoEdital, content, tarefaId, toNew(perguntasDaAula), formato, estiloDaBanca, referencias));
+        return lessonCreated(lesson);
+    }
+
+    @McpTool(name = "reescrever_aula",
+            description = "Reescreve o conteúdo de uma aula já criada (os quizzes dela continuam). Mesmas regras de "
+                    + "criar_aula para fontes, naoConfirmado e tentativas. " + SLIDES_HELP + " Enviar perguntasDaAula "
+                    + "substitui as questões de fixação anteriores (e as respostas delas); se a aula tem erros em "
+                    + "quizzes anteriores, retome-os em errosRetomados.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true, idempotentHint = false))
+    public LessonCreated rewriteLesson(
+            @McpToolParam(description = "Id da aula.") Long aulaId,
+            @McpToolParam(description = "Novo título (vazio = mantém).", required = false) String titulo,
+            @McpToolParam(description = "Novo conteúdo em Markdown.") String conteudo,
+            @McpToolParam(description = "Fontes conferidas, com o link de cada uma (como em criar_aula).") String fontes,
+            @McpToolParam(description = "O que não foi confirmado (exige 'tentativas').", required = false)
+            String naoConfirmado,
+            @McpToolParam(description = "O que foi tentado para confirmar.", required = false) String tentativas,
+            @McpToolParam(description = "Questões de fixação citadas como [[questão N]].", required = false)
+            List<QuizItem> perguntasDaAula,
+            @McpToolParam(description = "Como a banca cobra o tópico (mínimo 300 caracteres).", required = false)
+            String estiloDaBanca,
+            @McpToolParam(description = "Questões reais lidas como modelo, uma por linha (mínimo 2).", required = false)
+            String referencias,
+            @McpToolParam(description = "multipla_escolha (padrão) ou certo_errado.", required = false) String formato,
+            @McpToolParam(description = "Ids das perguntas erradas (erros_quiz_anteriores da aula) que a fixação "
+                    + "retoma.", required = false) List<Long> errosRetomados) {
+        String content = withSources(conteudo, fontes, naoConfirmado, tentativas);
+        Lesson lesson = lessonService.rewriteWithFixation(aulaId, titulo, content, toNew(perguntasDaAula), formato,
+                estiloDaBanca, referencias, errosRetomados);
+        return lessonCreated(lesson);
+    }
+
+    private static List<NewQuestion> toNew(List<QuizItem> items) {
+        return items == null ? null : items.stream().map(QuizItem::toNew).toList();
+    }
+
+    private LessonCreated lessonCreated(Lesson lesson) {
+        Quiz fixation = lessonService.fixation(lesson.getId());
+        return new LessonCreated(lesson.getId(), lesson.getTitle(), mcpConcurso.name(lesson.getConcursoId()),
+                com.pdf2questao.aula.LessonSlides.parse(lesson.getContent()).size(),
+                fixation == null ? 0 : lessonService.questions(fixation.getId()).size(),
+                baseUrl + "/aulas/" + lesson.getId());
+    }
+
+    /** Valida as fontes e as anexa ao fim (em aula de slides, como o ultimo slide). */
+    private static String withSources(String conteudo, String fontes, String naoConfirmado, String tentativas) {
         if (McpText.blank(fontes)) {
             throw new IllegalArgumentException("Informe 'fontes': confira o tópico no edital (ler_edital) e pesquise "
                     + "fontes atuais na web antes de criar a aula, e liste o que foi conferido e o que não foi.");
@@ -149,13 +220,10 @@ public class LessonMcpTools {
                     + "você tentou para confirmar (outras fontes, baixar o arquivo e extrair o texto, leitura em "
                     + "partes) e por que não deu certo.");
         }
-        String content = conteudo + "\n\n---\n\n## Fontes conferidas\n" + fontes.strip() + "\n"
+        boolean slides = com.pdf2questao.aula.LessonSlides.isSlides(conteudo);
+        return conteudo + (slides ? "\n\n=== Fontes\n" : "\n\n---\n\n## Fontes conferidas\n") + fontes.strip() + "\n"
                 + (hasUnconfirmed ? "\n### Não confirmado\n" + naoConfirmado.strip() + "\n\n### O que foi tentado\n"
                 + tentativas.strip() + "\n" : "");
-        Lesson lesson = mcpConcurso.in(concurso,
-                () -> lessonService.create(titulo, disciplina, topicoEdital, content, tarefaId));
-        return new LessonCreated(lesson.getId(), lesson.getTitle(), mcpConcurso.name(lesson.getConcursoId()),
-                baseUrl + "/aulas/" + lesson.getId());
     }
 
     @McpPrompt(name = "novo_quiz", title = "Novo quiz",
@@ -404,6 +472,25 @@ public class LessonMcpTools {
         int answered = (int) lessonService.result(quizId).questoes().stream()
                 .filter(r -> r.perguntaId().equals(q.getId()) && r.suaResposta() != null).count();
         return new QuizFixed(quizId, q.getPosition(), q.getCorrectAnswer(), answered, baseUrl + "/quizzes/" + quizId);
+    }
+
+    public record QuizDeleted(Long quizId, String titulo, int perguntas, int respostas) {
+    }
+
+    @McpTool(name = "excluir_quiz",
+            description = "Apaga um quiz de vez: as perguntas e todas as respostas dadas (saem do desempenho, dos "
+                    + "erros anteriores e de perguntas_ja_feitas). Não tem volta: confirme com o usuário antes e "
+                    + "envie confirmar=true.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true, idempotentHint = false))
+    public QuizDeleted deleteQuiz(
+            @McpToolParam(description = "Id do quiz.") Long quizId,
+            @McpToolParam(description = "true depois que o usuário confirmou a exclusão.") Boolean confirmar) {
+        if (!Boolean.TRUE.equals(confirmar)) {
+            throw new IllegalArgumentException("Confirme com o usuário e envie confirmar=true para apagar o quiz "
+                    + quizId + ".");
+        }
+        var d = lessonService.deleteQuiz(quizId);
+        return new QuizDeleted(d.quizId(), d.title(), d.questions(), d.answers());
     }
 
     @McpTool(name = "resultado_quiz",

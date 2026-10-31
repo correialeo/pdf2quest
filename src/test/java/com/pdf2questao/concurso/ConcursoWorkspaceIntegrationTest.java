@@ -115,8 +115,12 @@ class ConcursoWorkspaceIntegrationTest {
         assertTrue(studyTools.todayTasks("câmara", null).isEmpty());
 
         // A aula herda o concurso da tarefa.
-        var aula = lessonTools.createLesson("ADI e ADC", "Constitucional", "Controle concentrado", "## ADI\n...",
-                "[CF/88, art. 102](https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm)", hoje.get(0).id(), null, null, null);
+        var aula = lessonTools.createLesson("ADI e ADC", "Constitucional", "Controle concentrado",
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.SLIDES,
+                "[CF/88, art. 102](https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm)", hoje.get(0).id(),
+                null, null, null, com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.fixacao(),
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.ESTILO,
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.REFS, null);
         assertEquals(pge.getNome(), aula.concurso());
         assertEquals(pge.getId(), lessonRepository.findById(aula.aulaId()).orElseThrow().getConcursoId());
         assertEquals(1, lessonTools.listLessons(null, "pge").size());

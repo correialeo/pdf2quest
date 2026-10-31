@@ -50,6 +50,8 @@ public class Quiz {
     /** Questoes reais lidas como modelo, uma por linha (link ou "questao local #id"). */
     @Lob
     private String styleSources;
+    /** Questoes de fixacao no meio de uma aula em slides (respondidas na propria aula, nao numa tela de quiz). */
+    private boolean embedded;
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime finishedAt;
     /** Refazer: respostas anteriores a isto saem da tela (continuam no historico). */
