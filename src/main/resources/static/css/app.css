@@ -1910,3 +1910,21 @@ html.sidebar-collapsed .workspace-switch {
 /* Desempenho por conceito na aula: linha fraca (sem pergunta ou abaixo de 70%) em destaque. */
 .lesson-coverage tr.is-weak td { color: var(--bs-danger-text-emphasis); }
 .lesson-coverage tr.is-weak td:last-child { font-weight: 600; }
+
+/* Placar do quiz sempre visivel: fixo no canto, nao rola com a pagina nem cobre as questoes. */
+#quizScore {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1030;
+    padding: .4rem .75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+    background-color: var(--bs-body-bg);
+    box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .12);
+    color: var(--bs-body-color);
+    font-weight: 500;
+}
+@media (max-width: 767.98px) {
+    #quizScore { top: 3.6rem; right: .5rem; font-size: .75rem; }
+}
