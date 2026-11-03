@@ -35,6 +35,7 @@ public class LessonMcpTools {
             "de mem[óo]ria|n[ãa]o (consegui|confirm|li\\b|lid[oa]|foi poss)|sem confirma|truncad|s[óo] (o )?resumo|apenas (o )?resumo",
             Pattern.CASE_INSENSITIVE);
     private static final int MIN_ATTEMPTS = 40;
+    private static final int MAX_EXCERPT_SHOWN = 2500;
 
     private final String baseUrl;
 
@@ -73,19 +74,26 @@ public class LessonMcpTools {
                 cada um com a regra, a exceção e a pegadinha da banca, do que mais cai ao que menos cai (sem número \\
                 de item de norma que a banca não cobra, sem o que está fora do edital e sem bastidor da pesquisa), e \\
                 logo depois de cada explicação uma questão de fixação no nível da prova ("[[questão N]]", enviadas \\
-                em perguntasDaAula com estiloDaBanca e referencias). Feche com um slide de quadro comparativo e um \\
+                em perguntasDaAula com estiloDaBanca e referencias, cada uma com 'conceitos' = o {#id} do slide, e \\
+                com números, nomes e estrutura de dados DIFERENTES do exemplo do slide). Cada conceito tem definição \\
+                curta, o porquê, um exemplo com dados e a pegadinha de prova; nenhuma regra solta. Feche com um slide de quadro comparativo e um \\
                 de resumo de meia página (é ele que volta na revisão). Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
-                FONTE QUE NÃO ABRE OU VEM SÓ EM RESUMO. Se a página vier truncada, em resumo, ou o PDF vier ilegível, \\
-                NÃO escreva a aula ainda: baixe o arquivo e extraia o texto (o WebFetch guarda PDFs em disco; use \\
-                Bash com pdftotext ou curl), procure o texto em outro site (Câmara, Senado, LexML, normas.leg.br, \\
-                documentação oficial do produto) e leia em partes (offset). Só dê algo por não confirmado depois de \\
-                pelo menos duas tentativas diferentes, e então use 'naoConfirmado' e 'tentativas' em criar_aula. \\
-                Nunca escreva da memória o que a fonte deveria dizer, nem leve isso para as perguntas do quiz.
+                COLETA DA FONTE EM TEXTO LITERAL (antes de escrever). O WebFetch devolve um RESUMO da página, não o \\
+                texto: não escreva a aula a partir dele. Para cada fonte: baixe com Bash (curl -sL URL > f.html; PDF: \\
+                curl -sLo f.pdf URL && pdftotext -layout f.pdf f.txt), leia o arquivo em partes (várias páginas e \\
+                seções, não só o começo), recorte o texto literal de cada dispositivo ou seção que a aula vai usar \\
+                (artigo inteiro, com parágrafos e incisos) e grave com registrar_trecho; passe os ids em 'trechos' \\
+                de criar_aula. Todo artigo citado precisa de um trecho gravado. Se a fonte não abrir, procure outro \\
+                site oficial (Câmara, Senado, LexML, normas.leg.br, documentação oficial do produto); só dê algo por \\
+                não confirmado depois de pelo menos duas tentativas diferentes, em 'naoConfirmado' e 'tentativas'. \\
+                Escreva cada conceito a partir do trecho: definição curta, o porquê, um exemplo com dados e a \\
+                pegadinha. Nunca escreva da memória o que a fonte deveria dizer, nem leve isso para o quiz.
 
                 3. QUIZ. Veja erros_quiz_anteriores do assunto e, com criar_quiz (aulaId da aula; o quiz herda a tarefa), crie de 6 a 10 \
                 perguntas baseadas no que a aula ensinou (não em outra \\
-                coisa), no nível da prova (nivel "prova"): siga os passos 3 a 5 do prompt novo_quiz (questões \\
+                coisa: cada uma com 'conceitos' = o {#id} do slide que cobra; veja cobertura_aula e prefira os \\
+                conceitos ainda sem pergunta; o que for além da aula só com ampliacao=true), no nível da prova (nivel "prova"): siga os passos 3 a 5 do prompt novo_quiz (questões \\
                 reais da banca lidas como modelo, estiloDaBanca, referencias e o teste do chute), com 4 ou 5 \\
                 alternativas. Para CADA alternativa, a explicação de \\
                 por que está certa ou errada (ela aparece quando o usuário clica). Informe o tópico de cada uma. \\
@@ -120,14 +128,48 @@ public class LessonMcpTools {
             + "TODO exemplo é concreto: mostre os DADOS de entrada (tabelas pequenas, 3 a 4 linhas, com nomes do "
             + "contexto do concurso, ex.: contribuinte e debitos) e o RESULTADO, lado a lado com \"+++\" entre as "
             + "colunas da caixa; nunca use nome solto (esq, dir, df, x) sem mostrar o que tem dentro. Explique a regra "
-            + "a partir do exemplo, não o contrário.";
+            + "a partir do exemplo, não o contrário. "
+            + "CONCEITOS: todo slide declara o conceito que ensina no fim do título, \"=== Desbloqueio de RP "
+            + "{#rp-desbloqueio}\" (minúsculas, números e hífen); uma caixa pode declarar um conceito próprio, "
+            + "\":::pegadinha Prazo {#rp-prazo}\". Cada questão de fixação e cada pergunta de quiz da aula diz em "
+            + "'conceitos' o(s) id(s) que cobra; o sistema recusa conceito que não está na aula. "
+            + "CADA CONCEITO TEM: definição curta, o porquê da regra, um exemplo com dados e a pegadinha de prova; "
+            + "nenhuma regra solta, sem o caso que a mostra. "
+            + "DADOS DIFERENTES: a questão de fixação não reaproveita os valores, os nomes de entidade nem a mesma "
+            + "estrutura de dados do exemplo do slide (o aluno tem de aplicar a regra a um caso novo, não "
+            + "reconhecer o exemplo). O sistema recusa a questão que repete mais de "
+            + com.pdf2questao.aula.DataOverlap.MAX_SHARED + " valor do slide do conceito (0, 1, 2, 100 e números "
+            + "de artigo/lei não contam). "
+            + "CÁLCULO (Matemática Financeira, Contabilidade, Economia, Estatística): cartão de fórmula em "
+            + "```formula {#id} com JSON {titulo, formula (TeX), simbolos: [{simbolo, significado, unidade}], "
+            + "quandoUsar, pegadinha}; exercício guiado em ```calculo com JSON {titulo, conceito, enunciado (com {var}), "
+            + "variaveis: {var: {min, max, passo}}, restricoes: [\"expr\"], exemplo: {var: valor usado no slide}, "
+            + "etapas: [{titulo, pergunta, resposta: \"expr\", unidade, tolerancia, dica, errosTipicos: [{resposta: "
+            + "\"expr\", mensagem}]}], resposta: \"expr\", interpretacao}. Expressões: + - * / ^ %, parênteses, ln, "
+            + "log10, exp, sqrt, abs, round(x, casas), min, max; a etapa k usa as variáveis e e1..e(k-1). Etapas "
+            + "típicas: identificar dados, converter a taxa, montar a fórmula, calcular, interpretar; cada erro típico "
+            + "é a conta errada que o aluno costuma fazer (ex.: taxa mensal com prazo em anos). Na criação o gerador "
+            + "roda 40 vezes: a resposta tem de fechar com a última etapa e os números nunca repetem o exemplo. "
+            + "Exercício guiado e tarefa de código contam como questão de fixação. "
+            + "CÓDIGO (SQL, pandas, PySpark): tabelas pequenas em \":::dados nome\" (CSV, fechado com \":::\"; no "
+            + "SQL vira a tabela nome, no Python o arquivo dados/nome.csv); exemplo executável em ```sql run, "
+            + "```python run ou ```pyspark run, seguido de ```saida com a saída exata (o valor da última linha é "
+            + "mostrado, como no Jupyter; SQL: cabeçalho e linhas com | entre as colunas). Tarefa em ```tarefa "
+            + "python|sql|pyspark com seções ### enunciado, ### codigo (inicial, que ainda não resolve), ### teste "
+            + "(asserts Python) ou ### esperado (SQL: o resultado), ### dica e ### solucao. Na criação, o servidor "
+            + "roda cada exemplo e cada solução (mesmo Pyodide/sql.js do navegador): a aula só é criada se rodar e "
+            + "der a saída declarada. PySpark roda numa SIMULAÇÃO didática (pandas, sem JVM): show, count, collect, "
+            + "explain, groupBy/agg, join, orderBy, cache/persist, contagem de jobs e stages; não use RDD API, UDF, "
+            + "SQL em texto nem write. R não roda na aula (use bloco ``` comum).";
 
     @McpTool(name = "criar_aula",
             description = "Cria uma aula no sistema (Markdown: ## títulos, listas, **negrito**, `código`, blocos ``` , "
                     + "citações > e listas numeradas). Vincule à disciplina e ao tópico do edital; depois crie o quiz "
                     + "com criar_quiz. ANTES de escrever, confira o tópico no edital (ler_edital / estrutura_do_edital) "
                     + "e pesquise fontes atuais na web (norma vigente, súmulas, temas e jurisprudência, autores e "
-                    + "conceitos). 'fontes' lista só o que foi LIDO, com o link de cada um; o que não foi confirmado vai "
+                    + "conceitos). TEXTO LITERAL: baixe cada fonte (curl/pdftotext) e grave o texto de cada dispositivo "
+                    + "com registrar_trecho antes de escrever; passe os ids em 'trechos' (o resumo do WebFetch não "
+                    + "serve). 'fontes' lista só o que foi LIDO, com o link de cada um; o que não foi confirmado vai "
                     + "em 'naoConfirmado', e então 'tentativas' (o que você fez para confirmar: outras fontes, "
                     + "download e extração do texto) é obrigatório. Se a fonte vier truncada ou em resumo, busque o "
                     + "texto por outro caminho antes de criar a aula. Tudo é anexado ao fim dela. " + SLIDES_HELP,
@@ -158,11 +200,54 @@ public class LessonMcpTools {
             @McpToolParam(description = "Com perguntasDaAula: questões reais lidas como modelo, uma por linha "
                     + "(mínimo 2).", required = false) String referencias,
             @McpToolParam(description = "Com perguntasDaAula: multipla_escolha (padrão) ou certo_errado.",
-                    required = false) String formato) {
-        String content = withSources(conteudo, fontes, naoConfirmado, tentativas);
+                    required = false) String formato,
+            @McpToolParam(description = "Ids dos trechos LITERAIS gravados com registrar_trecho (mínimo 1): todo "
+                    + "artigo citado na aula precisa estar num deles (ou em naoConfirmado).") List<Long> trechos) {
+        return createLesson(titulo, disciplina, topicoEdital, conteudo, fontes, tarefaId, concurso, naoConfirmado,
+                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, trechos, true);
+    }
+
+    /** Sem trechos (chamadas antigas e testes): so confere os artigos citados. */
+    public LessonCreated createLesson(String titulo, String disciplina, String topicoEdital, String conteudo,
+                                      String fontes, Long tarefaId, String concurso, String naoConfirmado,
+                                      String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
+                                      String referencias, String formato) {
+        return createLesson(titulo, disciplina, topicoEdital, conteudo, fontes, tarefaId, concurso, naoConfirmado,
+                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, null, false);
+    }
+
+    private LessonCreated createLesson(String titulo, String disciplina, String topicoEdital, String conteudo,
+                                       String fontes, Long tarefaId, String concurso, String naoConfirmado,
+                                       String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
+                                       String referencias, String formato, List<Long> trechos, boolean requireExcerpts) {
+        List<com.pdf2questao.aula.SourceExcerpt> excerpts = checkExcerpts(conteudo, trechos, naoConfirmado,
+                requireExcerpts);
+        String content = withSources(conteudo, fontes, naoConfirmado, tentativas, excerpts);
         Lesson lesson = mcpConcurso.in(concurso, () -> lessonService.createWithFixation(titulo, disciplina,
                 topicoEdital, content, tarefaId, toNew(perguntasDaAula), formato, estiloDaBanca, referencias));
+        lessonService.linkExcerpts(lesson.getId(), trechos);
         return lessonCreated(lesson);
+    }
+
+    private List<com.pdf2questao.aula.SourceExcerpt> checkExcerpts(String conteudo, List<Long> trechos,
+                                                                  String naoConfirmado, boolean required) {
+        if (required && (trechos == null || trechos.isEmpty())) {
+            throw new IllegalArgumentException("Informe 'trechos': antes de escrever, baixe cada fonte (Bash: curl "
+                    + "do HTML oficial, ou curl + pdftotext do PDF), recorte o texto LITERAL de cada dispositivo ou "
+                    + "seção que a aula usa e grave com registrar_trecho. O texto devolvido pelo WebFetch é um resumo "
+                    + "e não serve de fonte.");
+        }
+        List<com.pdf2questao.aula.SourceExcerpt> excerpts = lessonService.excerpts(trechos);
+        List<String> missing = LessonService.articlesWithoutExcerpt(conteudo, excerpts, naoConfirmado);
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("A aula cita " + String.join(", ", missing) + " sem trecho literal "
+                    + "gravado daquela norma. Grave o texto do artigo (com o cabeçalho \"Art. N.\") com "
+                    + "registrar_trecho, dizendo a norma no 'dispositivo' (ex.: \"LRF, art. 42\"), e inclua o id em "
+                    + "'trechos'; mencionar o artigo dentro de outro trecho não conta. Cite sempre com a norma "
+                    + "(\"art. 42 da LRF\") quando o slide tratar de mais de uma lei. Se não conseguiu o texto depois "
+                    + "de tentar, ponha o dispositivo em 'naoConfirmado'.");
+        }
+        return excerpts;
     }
 
     @McpTool(name = "reescrever_aula",
@@ -187,11 +272,57 @@ public class LessonMcpTools {
             String referencias,
             @McpToolParam(description = "multipla_escolha (padrão) ou certo_errado.", required = false) String formato,
             @McpToolParam(description = "Ids das perguntas erradas (erros_quiz_anteriores da aula) que a fixação "
-                    + "retoma.", required = false) List<Long> errosRetomados) {
-        String content = withSources(conteudo, fontes, naoConfirmado, tentativas);
+                    + "retoma.", required = false) List<Long> errosRetomados,
+            @McpToolParam(description = "Ids dos trechos literais (registrar_trecho), como em criar_aula.")
+            List<Long> trechos) {
+        return rewriteLesson(aulaId, titulo, conteudo, fontes, naoConfirmado, tentativas, perguntasDaAula,
+                estiloDaBanca, referencias, formato, errosRetomados, trechos, true);
+    }
+
+    /** Sem trechos (chamadas antigas e testes). */
+    public LessonCreated rewriteLesson(Long aulaId, String titulo, String conteudo, String fontes, String naoConfirmado,
+                                       String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
+                                       String referencias, String formato, List<Long> errosRetomados) {
+        return rewriteLesson(aulaId, titulo, conteudo, fontes, naoConfirmado, tentativas, perguntasDaAula,
+                estiloDaBanca, referencias, formato, errosRetomados, null, false);
+    }
+
+    private LessonCreated rewriteLesson(Long aulaId, String titulo, String conteudo, String fontes, String naoConfirmado,
+                                        String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
+                                        String referencias, String formato, List<Long> errosRetomados,
+                                        List<Long> trechos, boolean requireExcerpts) {
+        List<com.pdf2questao.aula.SourceExcerpt> excerpts = checkExcerpts(conteudo, trechos, naoConfirmado,
+                requireExcerpts);
+        String content = withSources(conteudo, fontes, naoConfirmado, tentativas, excerpts);
         Lesson lesson = lessonService.rewriteWithFixation(aulaId, titulo, content, toNew(perguntasDaAula), formato,
                 estiloDaBanca, referencias, errosRetomados);
+        lessonService.linkExcerpts(lesson.getId(), trechos);
         return lessonCreated(lesson);
+    }
+
+    public record ExcerptSaved(Long trechoId, String dispositivo, int caracteres, String sha256) {
+    }
+
+    @McpTool(name = "registrar_trecho",
+            description = "Grava o texto LITERAL de um dispositivo de lei/norma ou de uma seção de documentação, ANTES "
+                    + "de escrever a aula. Colete assim: (1) baixe a fonte oficial com Bash (curl -sL URL; PDF: curl "
+                    + "-sLo f.pdf URL && pdftotext -layout f.pdf -); (2) recorte o trecho de cada dispositivo que a aula "
+                    + "vai usar (artigo inteiro com parágrafos e incisos; na documentação, a seção inteira); (3) grave "
+                    + "aqui, um trecho por dispositivo. Leia várias páginas/seções, não só a primeira. NÃO use o texto "
+                    + "do WebFetch: ele devolve um resumo, não o texto. Depois passe os ids em 'trechos' de "
+                    + "criar_aula/reescrever_aula; os trechos aparecem no slide de Fontes.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
+    public ExcerptSaved registerExcerpt(
+            @McpToolParam(description = "URL de onde o texto foi baixado (fonte oficial).") String url,
+            @McpToolParam(description = "Dispositivo ou seção, SEMPRE com a norma quando for lei (ex.: \"LRF, art. "
+                    + "42\", \"Lei 4.320, art. 36\", \"CF, art. 165\", \"PySpark: DataFrame.persist\"). Um trecho "
+                    + "por artigo, com o cabeçalho \"Art. N.\" do texto.") String dispositivo,
+            @McpToolParam(description = "Texto literal, copiado do arquivo baixado (sem resumir nem reescrever).")
+            String texto,
+            @McpToolParam(description = "Como foi obtido (ex.: \"curl do HTML do Planalto, recorte do art. 42\").")
+            String comoObtido) {
+        var e = lessonService.registerExcerpt(url, dispositivo, texto, comoObtido);
+        return new ExcerptSaved(e.getId(), e.getDispositivo(), e.getTexto().length(), e.getSha256());
     }
 
     private static List<NewQuestion> toNew(List<QuizItem> items) {
@@ -207,7 +338,8 @@ public class LessonMcpTools {
     }
 
     /** Valida as fontes e as anexa ao fim (em aula de slides, como o ultimo slide). */
-    private static String withSources(String conteudo, String fontes, String naoConfirmado, String tentativas) {
+    private static String withSources(String conteudo, String fontes, String naoConfirmado, String tentativas,
+                                      List<com.pdf2questao.aula.SourceExcerpt> excerpts) {
         if (McpText.blank(fontes)) {
             throw new IllegalArgumentException("Informe 'fontes': confira o tópico no edital (ler_edital) e pesquise "
                     + "fontes atuais na web antes de criar a aula, e liste o que foi conferido e o que não foi.");
@@ -228,7 +360,18 @@ public class LessonMcpTools {
                     + "partes) e por que não deu certo.");
         }
         boolean slides = com.pdf2questao.aula.LessonSlides.isSlides(conteudo);
+        StringBuilder literal = new StringBuilder();
+        if (excerpts != null && !excerpts.isEmpty()) {
+            literal.append("\n### Trechos literais conferidos\n");
+            for (var e : excerpts) {
+                String text = e.getTexto().length() > MAX_EXCERPT_SHOWN
+                        ? e.getTexto().substring(0, MAX_EXCERPT_SHOWN) + " […]" : e.getTexto();
+                literal.append("\n**").append(e.getDispositivo()).append("** — [fonte](").append(e.getUrl()).append(")\n");
+                text.lines().forEach(l -> literal.append("> ").append(l).append('\n'));
+            }
+        }
         return conteudo + (slides ? "\n\n=== Fontes\n" : "\n\n---\n\n## Fontes conferidas\n") + fontes.strip() + "\n"
+                + literal
                 + (hasUnconfirmed ? "\n### Não confirmado\n" + naoConfirmado.strip() + "\n\n### O que foi tentado\n"
                 + tentativas.strip() + "\n" : "");
     }
@@ -246,7 +389,9 @@ public class LessonMcpTools {
                 1. Chame erros_quiz_anteriores para o mesmo assunto (aulaId, ou disciplina/tópico) e leia cada erro: o \
                 que o usuário marcou e por quê estava errado. Veja também desempenho_quiz e perguntas_ja_feitas \
                 (o sistema recusa pergunta repetida: cubra pontos ainda não perguntados).
-                2. Se for de uma aula, leia o conteúdo dela (listar_aulas) e confira na web os pontos de norma, \
+                2. Se for de uma aula, leia o conteúdo dela (listar_aulas) e cobertura_aula: cada pergunta cobra \
+                um conceito {#id} que está nos slides (informe em 'conceitos'); o que a aula não ensinou só entra \
+                com ampliacao=true. Não reaproveite números, nomes nem a estrutura dos exemplos dos slides. Confira na web os pontos de norma, \
                 súmula, tema ou jurisprudência que o quiz vai cobrar (se a fonte vier truncada ou em resumo, baixe e \\
                 extraia o texto ou ache outra fonte antes de desistir); se for avulso, leia o tópico no edital \
                 (ler_edital), pesquise fontes atuais na web e veja como a banca cobra (exemplos_da_banca). Não \
@@ -332,13 +477,23 @@ public class LessonMcpTools {
                     + "Não escreva \"destacado\" ou \"sublinhado\" sem marcar o trecho.") String enunciado,
             @McpToolParam(description = "Tópico cobrado (para o desempenho por tópico).", required = false) String topico,
             @McpToolParam(description = "Alternativas na ordem A, B, C...") List<QuizAlternative> alternativas,
-            @McpToolParam(description = "Letra correta (no certo_errado: \"C\" ou \"E\").") String correta) {
+            @McpToolParam(description = "Letra correta (no certo_errado: \"C\" ou \"E\").") String correta,
+            @McpToolParam(description = "Quiz de aula: id(s) do conceito da aula que a pergunta cobra (o {#id} do "
+                    + "slide ou da caixa, ex.: [\"rp-desbloqueio\"]). Obrigatório quando a aula declara conceitos; "
+                    + "conceito que não está na aula é recusado.", required = false) List<String> conceitos,
+            @McpToolParam(description = "true = a pergunta vai além da aula de propósito (dispensa conceito da "
+                    + "aula; aparece como \"além da aula\" no resultado). Não vale para questão de fixação.",
+                    required = false) Boolean ampliacao) {
+
+        public QuizItem(String enunciado, String topico, List<QuizAlternative> alternativas, String correta) {
+            this(enunciado, topico, alternativas, correta, null, null);
+        }
 
         NewQuestion toNew() {
             return new NewQuestion(enunciado, topico,
                     alternativas == null ? null : alternativas.stream().map(QuizAlternative::texto).toList(),
                     alternativas == null ? null : alternativas.stream().map(QuizAlternative::explicacao).toList(),
-                    correta);
+                    correta, conceitos, Boolean.TRUE.equals(ampliacao));
         }
     }
 
@@ -383,7 +538,12 @@ public class LessonMcpTools {
                     + "gabarito todo na mesma letra são recusados. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
                     + "ids em errosRetomados. Pergunta repetida (já feita no concurso, em qualquer quiz ou revisão) é "
-                    + "recusada: veja perguntas_ja_feitas antes. Baseie as perguntas na aula e, em quiz avulso, "
+                    + "recusada: veja perguntas_ja_feitas antes. QUIZ DE AULA: o quiz nasce depois da aula e só cobra "
+                    + "o que ela ensinou; cada pergunta diz em 'conceitos' o {#id} do slide/caixa que cobra (veja "
+                    + "cobertura_aula), e conceito que não está na aula é recusado. Para ir além de propósito, marque "
+                    + "ampliacao=true (o resultado lista essas perguntas e sugere incluí-las na aula). Não reaproveite "
+                    + "os números, nomes e a estrutura de dados do exemplo do slide (recusado se repetir mais de um "
+                    + "valor). Baseie as perguntas na aula e, em quiz avulso, "
                     + "confira antes o edital e "
                     + "fontes atuais na web. Não cobre o que não foi confirmado nem o que só estava na memória: "
                     + "pergunta sem fonte lida não entra no quiz. "
@@ -444,7 +604,8 @@ public class LessonMcpTools {
 
     @McpTool(name = "adicionar_quiz",
             description = "Acrescenta perguntas a um quiz já criado (criar_quiz). Cada alternativa precisa da "
-                    + "explicação de por que está certa ou errada.",
+                    + "explicação de por que está certa ou errada. Em quiz de aula, mesmas regras de criar_quiz para "
+                    + "'conceitos', ampliacao e dados diferentes do exemplo do slide.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public QuizAdded addQuiz(
             @McpToolParam(description = "Id do quiz.") Long quizId,
@@ -460,7 +621,8 @@ public class LessonMcpTools {
             description = "Corrige uma pergunta de quiz (número da pergunta no quiz; veja resultado_quiz): enunciado, "
                     + "tópico, alternativas com explicações e/ou a correta. O que não for enviado fica como está. Para "
                     + "trocar só as explicações, envie 'explicacoes' na ordem das alternativas. As respostas já dadas "
-                    + "são recorrigidas pela nova correta.",
+                    + "são recorrigidas pela nova correta. 'conceitos'/'ampliacao' trocam o que a pergunta cobra (use "
+                    + "depois de reescrever_aula para trazer uma pergunta \"além da aula\" para dentro dela).",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true))
     public QuizFixed fixQuizQuestion(
             @McpToolParam(description = "Id do quiz.") Long quizId,
@@ -471,14 +633,24 @@ public class LessonMcpTools {
             List<QuizAlternative> alternativas,
             @McpToolParam(description = "Só as explicações novas, na ordem das alternativas atuais.", required = false)
             List<String> explicacoes,
-            @McpToolParam(description = "Nova letra correta.", required = false) String correta) {
+            @McpToolParam(description = "Nova letra correta.", required = false) String correta,
+            @McpToolParam(description = "Conceitos da aula que a pergunta cobra ({#id}), substituindo os atuais.",
+                    required = false) List<String> conceitos,
+            @McpToolParam(description = "true/false: marca ou desmarca a pergunta como além da aula.",
+                    required = false) Boolean ampliacao) {
         var q = lessonService.fixQuestion(quizId, numero, enunciado, topico,
                 alternativas == null ? null : alternativas.stream().map(QuizAlternative::texto).toList(),
                 alternativas != null ? alternativas.stream().map(QuizAlternative::explicacao).toList() : explicacoes,
-                correta);
+                correta, conceitos, ampliacao);
         int answered = (int) lessonService.result(quizId).questoes().stream()
                 .filter(r -> r.perguntaId().equals(q.getId()) && r.suaResposta() != null).count();
         return new QuizFixed(quizId, q.getPosition(), q.getCorrectAnswer(), answered, baseUrl + "/quizzes/" + quizId);
+    }
+
+    /** Sem conceitos (chamadas antigas). */
+    public QuizFixed fixQuizQuestion(Long quizId, Integer numero, String enunciado, String topico,
+                                     List<QuizAlternative> alternativas, List<String> explicacoes, String correta) {
+        return fixQuizQuestion(quizId, numero, enunciado, topico, alternativas, explicacoes, correta, null, null);
     }
 
     public record QuizDeleted(Long quizId, String titulo, int perguntas, int respostas) {
@@ -530,6 +702,16 @@ public class LessonMcpTools {
                         l.getCreatedAt().toLocalDate(), lessonService.quizzes(l.getId()).stream()
                         .map(q -> new QuizSummary(q.getId(), q.getTitle(), q.getLevel(), q.getFinishedAt() != null)).toList(),
                         aulaId == null ? null : l.getContent(), baseUrl + "/aulas/" + l.getId())).toList();
+    }
+
+    @McpTool(name = "cobertura_aula",
+            description = "Cobertura de uma aula pelos quizzes dela (fixação incluída): cada conceito {#id} com o slide "
+                    + "e quantas perguntas o cobram, os conceitos sem nenhuma pergunta, as perguntas sem conceito "
+                    + "(quizzes antigos) e as perguntas além da aula. Use antes de criar um quiz da aula (escolha os "
+                    + "conceitos ainda não cobrados) e depois de resultado_quiz.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
+    public LessonService.LessonCoverage lessonCoverage(@McpToolParam(description = "Id da aula.") Long aulaId) {
+        return lessonService.coverage(aulaId);
     }
 
     public record QuizPerformance(Totals geral, List<TopicStat> porTopico) {

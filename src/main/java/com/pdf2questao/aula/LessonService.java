@@ -45,11 +45,16 @@ public class LessonService {
     private final StudyTaskRepository taskRepository;
     private final com.pdf2questao.concurso.Workspace workspace;
     private final com.pdf2questao.concurso.ConcursoService concursoService;
+    private final LessonBlockValidator blockValidator;
+    private final SourceExcerptRepository excerptRepository;
 
     public LessonService(LessonRepository lessonRepository, QuizRepository quizRepository,
                          QuizQuestionRepository questionRepository, QuizAttemptRepository attemptRepository,
                          StudyTaskRepository taskRepository, com.pdf2questao.concurso.Workspace workspace,
-                         com.pdf2questao.concurso.ConcursoService concursoService) {
+                         com.pdf2questao.concurso.ConcursoService concursoService,
+                         LessonBlockValidator blockValidator, SourceExcerptRepository excerptRepository) {
+        this.blockValidator = blockValidator;
+        this.excerptRepository = excerptRepository;
         this.workspace = workspace;
         this.concursoService = concursoService;
         this.taskRepository = taskRepository;
@@ -108,15 +113,28 @@ public class LessonService {
      * Toda aula nova (ou reescrita) e em slides, com questoes de fixacao no meio: a de pagina unica virava um texto
      * longo lido sem pratica. Validado antes de gravar, para nao sobrar aula sem as questoes.
      */
-    public static void requireSlides(String content, int questions) {
+    public static void requireSlides(String content, int multipleChoice) {
+        int questions = multipleChoice + (int) LessonSlides.parseAll(content).blocks().stream()
+                .filter(LessonBlocks.Block::graded).count();
         long slides = LessonSlides.parse(content).stream().filter(s -> !s.title().equalsIgnoreCase("Fontes")).count();
         if (slides < MIN_SLIDES || questions < MIN_FIXATION) {
             throw new IllegalArgumentException("A aula precisa ser em slides: ao menos " + MIN_SLIDES + " slides "
                     + "(linhas \"=== Título\", um por assunto do tópico) e ao menos " + MIN_FIXATION + " questões de "
-                    + "fixação em perguntasDaAula, cada uma citada como [[questão N]] logo depois do que ela fixa "
+                    + "fixação (perguntasDaAula citadas como [[questão N]] logo depois do que cada uma fixa, "
+                    + "exercícios ```calculo ou tarefas ```tarefa) "
                     + "(nível prova, com estiloDaBanca e referencias). Recebido: " + slides + " slides e " + questions
                     + " questões. Se a ferramenta não tem o campo perguntasDaAula, reconecte o servidor MCP (/mcp).");
         }
+        List<String> untagged = LessonSlides.parse(content).stream()
+                .filter(s -> !s.title().equalsIgnoreCase("Fontes") && s.concept() == null).map(LessonSlides.Slide::title)
+                .toList();
+        if (!untagged.isEmpty()) {
+            throw new IllegalArgumentException("Todo slide declara o conceito que ensina, no fim do título: "
+                    + "\"=== Título {#id-do-conceito}\" (minúsculas, números e hífen; caixas também aceitam "
+                    + "\":::regra Título {#id}\"). Sem conceito: " + untagged.stream().map(t -> "\"" + t + "\"")
+                    .collect(Collectors.joining(", ")) + ". As perguntas dizem em 'conceitos' qual cobram.");
+        }
+        LessonSlides.concepts(content);   // recusa id repetido
     }
 
     /** Cria a aula e as questoes de fixacao juntas (falhando uma, nenhuma fica gravada). */
@@ -124,6 +142,7 @@ public class LessonService {
     public Lesson createWithFixation(String title, String subject, String editalTopic, String content, Long taskId,
                                      List<NewQuestion> questions, String format, String styleNotes, String styleSources) {
         requireSlides(content, questions == null ? 0 : questions.size());
+        blockValidator.validate(content);
         Lesson lesson = create(title, subject, editalTopic, content, taskId);
         replaceFixation(lesson.getId(), questions, format, styleNotes, styleSources, null);
         return lesson;
@@ -134,6 +153,7 @@ public class LessonService {
     public Lesson rewriteWithFixation(Long lessonId, String title, String content, List<NewQuestion> questions,
                                       String format, String styleNotes, String styleSources, List<Long> reviewedErrors) {
         requireSlides(content, questions == null ? 0 : questions.size());
+        blockValidator.validate(content);
         Lesson lesson = rewrite(lessonId, title, content);
         replaceFixation(lessonId, questions, format, styleNotes, styleSources, reviewedErrors);
         return lesson;
@@ -192,9 +212,210 @@ public class LessonService {
             deleteQuiz(old.getId());
         }
         Quiz quiz = createQuiz(lessonId, "Fixação da aula", null, null, PROVA, null, reviewedErrors, questions, null,
-                format, styleNotes, styleSources);
-        quiz.setEmbedded(true);
-        return quizRepository.save(quiz);
+                format, styleNotes, styleSources, true);
+        addExerciseRows(quiz, lesson);
+        return quiz;
+    }
+
+    /**
+     * Exercicios guiados e tarefas de codigo da aula viram itens da fixacao (sem alternativas): o resultado de cada
+     * tentativa entra no desempenho por topico como uma pergunta, com as dicas usadas.
+     */
+    private void addExerciseRows(Quiz quiz, Lesson lesson) {
+        LessonSlides.Parsed parsed = LessonSlides.parseAll(lesson.getContent());
+        int position = questions(quiz.getId()).size();
+        for (LessonBlocks.Block b : parsed.blocks()) {
+            if (!b.graded()) {
+                continue;
+            }
+            LessonSlides.Slide slide = parsed.slides().get(b.slide() - 1);
+            QuizQuestion q = new QuizQuestion();
+            q.setQuizId(quiz.getId());
+            q.setLessonId(lesson.getId());
+            q.setPosition(++position);
+            q.setSubject(quiz.getSubject());
+            q.setTopic(quiz.getTopic());
+            q.setAlternativeList(List.of());
+            q.setCorrectAnswer(EXERCISE_OK);
+            q.setBlockIndex(b.index());
+            String concept = slide.concept();
+            if (b.kind() == LessonBlocks.Kind.CALCULO) {
+                LessonBlocks.Calc c = LessonBlocks.calc(b.body());
+                q.setKind("calculo");
+                q.setStatement("Exercício guiado (slide " + b.slide() + "): " + (c.titulo() != null ? c.titulo() + " — " : "")
+                        + clip(c.enunciado(), 400));
+                concept = c.conceito() != null ? conceptId(c.conceito()) : concept;
+            } else {
+                q.setKind("codigo");
+                q.setStatement("Tarefa de código " + b.langLabel() + " (slide " + b.slide() + "): "
+                        + clip(LessonBlocks.task(b.body()).enunciado(), 400));
+            }
+            q.setConcepts(concept);
+            questionRepository.save(q);
+        }
+    }
+
+    /** Resposta gravada para um exercicio guiado/tarefa: concluiu sozinho (OK) ou nao (X). */
+    public static final String EXERCISE_OK = "OK";
+
+    public record ExerciseResult(boolean correct, int hints, boolean finished) {
+    }
+
+    /**
+     * Resultado de uma tentativa de exercicio guiado ou tarefa de codigo da aula. Acerto = concluiu sem ver a
+     * resolucao; as dicas ficam registradas mesmo quando acertou.
+     */
+    @Transactional
+    public ExerciseResult recordExercise(Long lessonId, int blockIndex, boolean correct, int hints) {
+        Quiz fixation = fixation(lessonId);
+        QuizQuestion q = fixation == null ? null : questions(fixation.getId()).stream()
+                .filter(x -> Integer.valueOf(blockIndex).equals(x.getBlockIndex())).findFirst().orElse(null);
+        if (q == null) {
+            throw new IllegalArgumentException("A aula " + lessonId + " não tem o exercício " + blockIndex + ".");
+        }
+        AnswerResult r = answer(q.getId(), correct ? EXERCISE_OK : "X");
+        QuizAttempt last = latest(fixation.getId()).get(q.getId());
+        last.setHintsUsed(Math.max(0, hints));
+        attemptRepository.save(last);
+        return new ExerciseResult(r.correct(), last.getHintsUsed(), r.finished());
+    }
+
+    /** Ultima tentativa de cada exercicio da aula: indice do bloco -> [acertou, dicas]. */
+    public Map<Integer, Map<String, Object>> exerciseStatus(Long lessonId) {
+        Map<Integer, Map<String, Object>> out = new LinkedHashMap<>();
+        Quiz fixation = fixation(lessonId);
+        if (fixation == null) {
+            return out;
+        }
+        Map<Long, QuizAttempt> latest = latest(fixation.getId());
+        for (QuizQuestion q : questions(fixation.getId())) {
+            QuizAttempt a = latest.get(q.getId());
+            if (q.getBlockIndex() != null && a != null) {
+                out.put(q.getBlockIndex(), Map.of("acertou", Boolean.TRUE.equals(a.getCorrect()), "dicas", a.getHintsUsed()));
+            }
+        }
+        return out;
+    }
+
+    // ---- trechos literais das fontes ----
+
+    static final int MIN_EXCERPT_CHARS = 80;
+
+    /**
+     * Grava o texto literal de um dispositivo/trecho de fonte. O mesmo texto (hash) nao duplica: devolve o ja gravado.
+     */
+    @Transactional
+    public SourceExcerpt registerExcerpt(String url, String dispositivo, String texto, String comoObtido) {
+        if (blank(url) == null || !url.strip().matches("https?://\\S+")) {
+            throw new IllegalArgumentException("Informe a 'url' (https://...) de onde o texto foi baixado.");
+        }
+        if (blank(dispositivo) == null) {
+            throw new IllegalArgumentException("Informe o 'dispositivo' (ex.: \"LRF, art. 42\" ou \"PySpark: "
+                    + "DataFrame.persist\").");
+        }
+        if (texto == null || texto.strip().length() < MIN_EXCERPT_CHARS) {
+            throw new IllegalArgumentException("'texto' precisa do trecho LITERAL da fonte (mínimo " + MIN_EXCERPT_CHARS
+                    + " caracteres), copiado do arquivo baixado, não um resumo.");
+        }
+        if (blank(comoObtido) == null || comoObtido.matches("(?is).*(webfetch|resum|mem[óo]ria|parafrase).*")) {
+            throw new IllegalArgumentException("'comoObtido' diz como o texto literal foi extraído (ex.: \"curl do "
+                    + "HTML do Planalto + recorte do art. 42\", \"pdftotext do PDF oficial\"). Resumo de ferramenta de "
+                    + "leitura (WebFetch) ou memória não servem: baixe o arquivo e extraia o texto.");
+        }
+        if (NormCitations.hasArticle(texto) && NormCitations.first(dispositivo) == null) {
+            throw new IllegalArgumentException("O trecho tem texto de artigo: diga a norma no 'dispositivo' (ex.: \"LRF, "
+                    + "art. 42\", \"Lei 4.320, art. 36\", \"CF, art. 165\"), para a aula não confundir artigos de "
+                    + "mesmo número em leis diferentes.");
+        }
+        String sha = sha256(texto.strip());
+        List<SourceExcerpt> same = excerptRepository.findBySha256(sha);
+        if (!same.isEmpty()) {
+            return same.get(0);
+        }
+        SourceExcerpt e = new SourceExcerpt();
+        e.setConcursoId(workspace.currentId());
+        e.setUrl(url.strip());
+        e.setDispositivo(dispositivo.strip());
+        e.setTexto(texto.strip());
+        e.setComoObtido(comoObtido.strip());
+        e.setSha256(sha);
+        return excerptRepository.save(e);
+    }
+
+    public List<SourceExcerpt> excerpts(List<Long> ids) {
+        List<SourceExcerpt> out = new ArrayList<>();
+        for (Long id : ids == null ? List.<Long>of() : ids) {
+            out.add(excerptRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Trecho " + id
+                    + " não existe: grave com registrar_trecho.")));
+        }
+        return out;
+    }
+
+    public List<SourceExcerpt> lessonExcerpts(Long lessonId) {
+        return excerptRepository.findByLessonIdOrderById(lessonId);
+    }
+
+    @Transactional
+    public void linkExcerpts(Long lessonId, List<Long> ids) {
+        for (SourceExcerpt e : excerpts(ids)) {
+            e.setLessonId(lessonId);
+            excerptRepository.save(e);
+        }
+    }
+
+    /**
+     * Artigos citados no conteudo sem trecho literal da MESMA norma que contenha o texto deles (nem mencao em
+     * naoConfirmado). A norma vem da citacao ("art. 42 da LRF"); sem ela, do titulo do slide; sem ele, da unica norma
+     * dos trechos enviados. Se nem assim da para saber, a citacao e devolvida pedindo a norma.
+     */
+    public static List<String> articlesWithoutExcerpt(String content, List<SourceExcerpt> excerpts, String unconfirmed) {
+        java.util.Set<String> covered = new java.util.HashSet<>();
+        java.util.Set<String> norms = new java.util.LinkedHashSet<>();
+        for (SourceExcerpt e : excerpts) {
+            covered.addAll(NormCitations.proven(e));
+            NormCitations.Norm n = NormCitations.first(e.getDispositivo());
+            if (n != null) {
+                norms.add(n.key() + "|" + n.label());
+            }
+        }
+        NormCitations.Norm only = norms.size() == 1 ? new NormCitations.Norm(norms.iterator().next().split("\\|")[0],
+                norms.iterator().next().split("\\|", 2)[1]) : null;
+        java.util.Set<String> admitted = new java.util.HashSet<>();   // naoConfirmado: com norma, ou so o numero
+        for (NormCitations.Citation c : NormCitations.cited(unconfirmed, null)) {
+            admitted.add(c.norm() == null ? "*:" + c.article() : c.key());
+        }
+        java.util.Set<String> missing = new java.util.LinkedHashSet<>();
+        List<LessonSlides.Slide> slides = LessonSlides.parse(content);
+        List<String[]> parts = new ArrayList<>();   // [titulo, texto]
+        if (slides.isEmpty()) {
+            parts.add(new String[]{"", content});
+        } else {
+            slides.forEach(sl -> parts.add(new String[]{sl.title(), sl.source()}));
+        }
+        for (String[] part : parts) {
+            NormCitations.Norm fromTitle = NormCitations.first(part[0]);
+            for (NormCitations.Citation c : NormCitations.cited(part[1], fromTitle != null ? fromTitle : only)) {
+                if (admitted.contains("*:" + c.article()) || admitted.contains(c.key())) {
+                    continue;
+                }
+                if (c.norm() == null) {
+                    missing.add("art. " + c.article() + " (de que norma? escreva \"art. " + c.article()
+                            + " da LRF\", \"da Lei 4.320\", \"da CF\"...)");
+                } else if (!covered.contains(c.key())) {
+                    missing.add(c.label());
+                }
+            }
+        }
+        return List.copyOf(missing);
+    }
+
+    private static String sha256(String text) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ---- ligacao com o cronograma ----
@@ -425,8 +646,17 @@ public class LessonService {
         return v.contains(normalizedWanted) || normalizedWanted.contains(v);
     }
 
+    /**
+     * @param concepts     conceitos da aula que a pergunta cobra ({#id} dos slides/caixas)
+     * @param beyondLesson pergunta que vai alem da aula de proposito
+     */
     public record NewQuestion(String statement, String topic, List<String> texts, List<String> explanations,
-                              String correct) {
+                              String correct, List<String> concepts, boolean beyondLesson) {
+
+        public NewQuestion(String statement, String topic, List<String> texts, List<String> explanations,
+                           String correct) {
+            this(statement, topic, texts, explanations, correct, null, false);
+        }
     }
 
     /**
@@ -455,6 +685,13 @@ public class LessonService {
     public Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
                            List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId, String format,
                            String styleNotes, String styleSources) {
+        return createQuiz(lessonId, title, subject, topic, level, doubts, reviewedErrors, questions, taskId, format,
+                styleNotes, styleSources, false);
+    }
+
+    private Quiz createQuiz(Long lessonId, String title, String subject, String topic, String level, String doubts,
+                            List<Long> reviewedErrors, List<NewQuestion> questions, Long taskId, String format,
+                            String styleNotes, String styleSources, boolean embedded) {
         String fmt = blank(format) == null ? null : ScoringCalculator.normalize(format).replace(' ', '_')
                 .replace('/', '_').replace('-', '_');
         if (fmt != null && !fmt.equals("multipla_escolha") && !fmt.equals(Quiz.CERTO_ERRADO)) {
@@ -513,8 +750,11 @@ public class LessonService {
         int number = lessonId == null ? 0 : quizzes(lessonId).size();
         quiz.setTitle(blank(title) != null ? title.strip()
                 : (lesson != null ? "Quiz " + (number + 1) : "Quiz – " + (top != null ? top : subj)));
+        quiz.setEmbedded(embedded);
         quiz = quizRepository.save(quiz);
-        addQuestions(quiz.getId(), questions);
+        if (!embedded || questions != null && !questions.isEmpty()) {
+            addQuestions(quiz.getId(), questions);   // fixacao so com exercicios guiados/tarefas nao tem pergunta aqui
+        }
         return quiz;
     }
 
@@ -559,6 +799,153 @@ public class LessonService {
                     + "sem saber o conteúdo: deixe as alternativas do mesmo tamanho e estrutura (distratores com o "
                     + "mesmo nível de detalhe).");
         }
+    }
+
+    /** "{#rp-x}", "#rp-x" ou "rp-x" viram "rp-x". */
+    static String conceptId(String raw) {
+        return raw == null ? "" : raw.strip().replaceAll("^\\{?#?|}$", "").strip();
+    }
+
+    /**
+     * Quiz de aula com conceitos declarados: cada pergunta diz o que cobra, e o conceito tem de estar na aula (o
+     * quiz nao cobra o que nao foi ensinado), salvo ampliacao=true, que fica marcada como "alem da aula". E a
+     * questao nao reaproveita os dados do exemplo do slide desse conceito (nem do slide em que a fixacao aparece):
+     * com os mesmos numeros, o acerto mede reconhecimento, nao raciocinio. Aula antiga, sem conceitos, nao e checada.
+     */
+    private void checkConcepts(Quiz quiz, Lesson lesson, List<NewQuestion> questions) {
+        Map<String, LessonSlides.Concept> concepts = LessonSlides.concepts(lesson.getContent());
+        if (concepts.isEmpty()) {
+            return;
+        }
+        List<LessonSlides.Slide> slides = LessonSlides.parse(lesson.getContent());
+        Map<Integer, Integer> placed = quiz.isEmbedded() ? LessonSlides.questionSlides(lesson.getContent()) : Map.of();
+        int offset = questions(quiz.getId()).size();
+        String available = concepts.values().stream().map(c -> c.id() + " (slide " + c.slide() + ": " + c.slideTitle() + ")")
+                .collect(Collectors.joining(", "));
+        List<String> problems = new ArrayList<>();
+        for (int i = 0; i < questions.size(); i++) {
+            NewQuestion n = questions.get(i);
+            String label = "Pergunta " + (i + 1);
+            List<String> ids = n.concepts() == null ? List.of()
+                    : n.concepts().stream().map(LessonService::conceptId).filter(c -> !c.isEmpty()).toList();
+            if (n.beyondLesson()) {
+                if (quiz.isEmbedded()) {
+                    problems.add(label + ": questão de fixação não pode ser ampliacao; ela fixa o que o slide acabou "
+                            + "de ensinar");
+                }
+                continue;
+            }
+            if (ids.isEmpty()) {
+                problems.add(label + ": informe em 'conceitos' o que ela cobra (um dos ids da aula) ou marque "
+                        + "ampliacao=true se for além da aula de propósito");
+                continue;
+            }
+            List<String> unknown = ids.stream().filter(id -> !concepts.containsKey(id)).toList();
+            if (!unknown.isEmpty()) {
+                problems.add(label + " cobra " + unknown.stream().map(u -> "{#" + u + "}").collect(Collectors.joining(", "))
+                        + ", que não está em nenhum slide da aula: falta um slide ou caixa que ensine isso (inclua "
+                        + "com reescrever_aula) ou marque ampliacao=true");
+                continue;
+            }
+            StringBuilder example = new StringBuilder();
+            ids.forEach(id -> example.append(concepts.get(id).source()).append('\n'));
+            Integer at = placed.get(offset + i + 1);
+            if (at != null && at >= 1 && at <= slides.size()) {
+                example.append(slides.get(at - 1).source());
+            }
+            String asked = n.statement() + "\n" + (n.texts() == null ? "" : String.join("\n",
+                    n.texts().stream().map(t -> t == null ? "" : t).toList()));
+            java.util.Set<java.math.BigDecimal> shared = DataOverlap.shared(example.toString(), asked);
+            if (shared.size() > DataOverlap.MAX_SHARED) {
+                LessonSlides.Concept c = concepts.get(ids.get(0));
+                problems.add(label + " repete os valores " + shared.stream().map(DataOverlap::show)
+                        .collect(Collectors.joining(", ")) + " do exemplo do slide " + c.slide() + " (\"" + c.slideTitle()
+                        + "\"): troque os números, os nomes e a estrutura dos dados, para o aluno aplicar a regra a um "
+                        + "caso novo em vez de reconhecer o exemplo");
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new IllegalArgumentException(String.join("; ", problems.stream().limit(6).toList())
+                    + (problems.size() > 6 ? "; ..." : "") + ". Conceitos da aula: " + available + ".");
+        }
+    }
+
+    /**
+     * @param respondidas perguntas do conceito com resposta (ultima tentativa; branco nao conta)
+     * @param acertos     dessas, quantas certas
+     * @param percentual  acerto (nulo = nada respondido)
+     */
+    public record ConceptCoverage(String conceito, int slide, String titulo, int perguntas, int respondidas,
+                                  int acertos, Double percentual) {
+
+        /** Precisa reler: sem pergunta, ou respondido com menos de 70% de acerto. */
+        public boolean fraco() {
+            return perguntas == 0 || percentual != null && percentual < 70;
+        }
+    }
+
+    public record QuestionRef(Long quizId, String quiz, int numero, String enunciado, List<String> conceitos) {
+    }
+
+    /**
+     * Cobertura de uma aula pelos quizzes dela (fixacao incluida): conceitos sem pergunta, perguntas sem conceito
+     * (quizzes antigos) e perguntas alem da aula.
+     */
+    public record LessonCoverage(Long aulaId, String titulo, List<ConceptCoverage> conceitos,
+                                 List<ConceptCoverage> semPergunta, List<QuestionRef> perguntasSemConceito,
+                                 List<QuestionRef> alemDaAula) {
+    }
+
+    public LessonCoverage coverage(Long lessonId) {
+        Lesson lesson = find(lessonId);
+        Map<String, LessonSlides.Concept> concepts = LessonSlides.concepts(lesson.getContent());
+        Map<String, Integer> count = new LinkedHashMap<>();
+        Map<String, Integer> answered = new LinkedHashMap<>();
+        Map<String, Integer> right = new LinkedHashMap<>();
+        List<QuestionRef> untagged = new ArrayList<>();
+        List<QuestionRef> beyond = new ArrayList<>();
+        for (Quiz quiz : quizzes(lessonId)) {
+            Map<Long, QuizAttempt> latest = latest(quiz.getId());
+            for (QuizQuestion q : questions(quiz.getId())) {
+                QuizAttempt a = latest.get(q.getId());
+                if (a != null && a.getCorrect() != null) {
+                    q.conceptList().forEach(c -> {
+                        answered.merge(c, 1, Integer::sum);
+                        right.merge(c, Boolean.TRUE.equals(a.getCorrect()) ? 1 : 0, Integer::sum);
+                    });
+                }
+                QuestionRef ref = new QuestionRef(quiz.getId(), quiz.getTitle(), q.getPosition(),
+                        clip(q.getStatement(), 160), q.conceptList());
+                if (q.isBeyondLesson()) {
+                    beyond.add(ref);
+                } else if (q.conceptList().isEmpty()) {
+                    untagged.add(ref);
+                }
+                q.conceptList().forEach(c -> count.merge(c, 1, Integer::sum));
+            }
+        }
+        List<ConceptCoverage> all = concepts.values().stream()
+                .map(c -> {
+                    int n = answered.getOrDefault(c.id(), 0);
+                    int ok = right.getOrDefault(c.id(), 0);
+                    return new ConceptCoverage(c.id(), c.slide(), c.slideTitle(), count.getOrDefault(c.id(), 0), n, ok,
+                            n == 0 ? null : Math.round(ok * 1000.0 / n) / 10.0);
+                }).toList();
+        return new LessonCoverage(lessonId, lesson.getTitle(), all,
+                all.stream().filter(c -> c.perguntas() == 0).toList(), untagged, beyond);
+    }
+
+    /** Slide de cada conceito da aula da pergunta, para o "Revise: slide X" (vazio se a aula nao tem conceitos). */
+    public Map<Long, List<LessonSlides.Concept>> conceptsOf(Long lessonId, List<QuizQuestion> questions) {
+        Map<Long, List<LessonSlides.Concept>> out = new LinkedHashMap<>();
+        if (lessonId == null) {
+            return out;
+        }
+        Map<String, LessonSlides.Concept> concepts = LessonSlides.concepts(find(lessonId).getContent());
+        for (QuizQuestion q : questions) {
+            out.put(q.getId(), q.conceptList().stream().map(concepts::get).filter(Objects::nonNull).toList());
+        }
+        return out;
     }
 
     /**
@@ -643,6 +1030,9 @@ public class LessonService {
             throw new IllegalArgumentException("Envie ao menos uma pergunta.");
         }
         rejectRepeated(quiz, questions);
+        if (quiz.getLessonId() != null) {
+            checkConcepts(quiz, find(quiz.getLessonId()), questions);
+        }
         if (PROVA.equals(quiz.getLevel())) {
             rejectGiveaways(quiz, questions);
         }
@@ -685,6 +1075,10 @@ public class LessonService {
             q.setStatement(n.statement().strip());
             q.setAlternativeList(alternatives);
             q.setCorrectAnswer(correct);
+            q.setConcepts(n.concepts() == null || n.concepts().isEmpty() ? null
+                    : n.concepts().stream().map(LessonService::conceptId).filter(c -> !c.isEmpty()).distinct()
+                    .collect(Collectors.joining(",")));
+            q.setBeyondLesson(n.beyondLesson() && !quiz.isEmbedded());
             saved.add(questionRepository.save(q));
         }
         if (quiz.getFinishedAt() != null) {
@@ -708,6 +1102,36 @@ public class LessonService {
         questionRepository.deleteAll(questions);
         quizRepository.delete(quiz);
         return new DeletedQuiz(quizId, quiz.getTitle(), questions.size(), attempts.size());
+    }
+
+    /**
+     * Corrige a pergunta e, se enviados, os conceitos que ela cobra (precisam existir na aula) ou a marca de
+     * ampliacao; e o fecho do "incluir na aula": reescrever_aula com o conceito novo e depois isto.
+     */
+    @Transactional
+    public QuizQuestion fixQuestion(Long quizId, int number, String statement, String topic, List<String> texts,
+                                    List<String> explanations, String correct, List<String> concepts,
+                                    Boolean beyondLesson) {
+        QuizQuestion q = fixQuestion(quizId, number, statement, topic, texts, explanations, correct);
+        if (concepts == null && beyondLesson == null) {
+            return q;
+        }
+        List<String> ids = concepts == null ? q.conceptList()
+                : concepts.stream().map(LessonService::conceptId).filter(c -> !c.isEmpty()).distinct().toList();
+        boolean beyond = beyondLesson != null ? beyondLesson : q.isBeyondLesson();
+        Quiz quiz = quiz(quizId);
+        if (quiz.getLessonId() != null && !beyond) {
+            Map<String, LessonSlides.Concept> known = LessonSlides.concepts(find(quiz.getLessonId()).getContent());
+            List<String> unknown = ids.stream().filter(id -> !known.containsKey(id)).toList();
+            if (!known.isEmpty() && (ids.isEmpty() || !unknown.isEmpty())) {
+                throw new IllegalArgumentException("Conceito " + unknown + " não está na aula " + quiz.getLessonId()
+                        + " (conceitos: " + String.join(", ", known.keySet()) + "). Inclua com reescrever_aula ou "
+                        + "envie ampliacao=true.");
+            }
+        }
+        q.setConcepts(ids.isEmpty() ? null : String.join(",", ids));
+        q.setBeyondLesson(beyond && !quiz.isEmbedded());
+        return questionRepository.save(q);
     }
 
     /**
@@ -848,8 +1272,14 @@ public class LessonService {
     }
 
     /** @param emBranco item Certo/Errado deixado em branco (acertou fica nulo: nao e acerto nem erro). */
+    /**
+     * @param revise    slides da aula que ensinam o que a pergunta cobra ("slide 3: Titulo")
+     * @param alemDaAula pergunta marcada como ampliacao (vai alem do que a aula ensinou)
+     */
     public record QuestionResult(Long perguntaId, int numero, String topico, String enunciado, String suaResposta,
-                                 String correta, Boolean acertou, boolean emBranco, String explicacaoDaSuaResposta) {
+                                 String correta, Boolean acertou, boolean emBranco, String explicacaoDaSuaResposta,
+                                 List<String> conceitos, List<String> revise, boolean alemDaAula, String tipo,
+                                 int dicasUsadas) {
     }
 
     /**
@@ -859,13 +1289,15 @@ public class LessonService {
      */
     public record QuizResult(Long quizId, String titulo, Long aulaId, String disciplina, String topico, String nivel,
                              int perguntas, int respondidas, int acertos, int brancos, boolean concluido,
-                             List<QuestionResult> questoes, String formato, Integer liquido) {
+                             List<QuestionResult> questoes, String formato, Integer liquido,
+                             List<Integer> alemDaAula, String incluirNaAula) {
     }
 
     public QuizResult result(Long quizId) {
         Quiz quiz = quiz(quizId);
         List<QuizQuestion> qs = questions(quizId);
         Map<Long, QuizAttempt> latest = latest(quizId);
+        Map<Long, List<LessonSlides.Concept>> where = conceptsOf(quiz.getLessonId(), qs);
         List<QuestionResult> items = new ArrayList<>();
         for (QuizQuestion q : qs) {
             QuizAttempt a = latest.get(q.getId());
@@ -877,15 +1309,23 @@ public class LessonService {
                     a == null ? null : a.getCorrect(), blank,
                     blank ? "Em branco: não pontua nem anula acerto."
                             : a == null || byLetter.get(a.getSelectedAnswer()) == null ? null
-                            : byLetter.get(a.getSelectedAnswer()).explicacao()));
+                            : byLetter.get(a.getSelectedAnswer()).explicacao(),
+                    q.conceptList(), where.getOrDefault(q.getId(), List.of()).stream()
+                    .map(c -> "slide " + c.slide() + ": " + c.slideTitle()).distinct().toList(), q.isBeyondLesson(),
+                    q.getKind() == null ? "pergunta" : q.getKind(), a == null ? 0 : a.getHintsUsed()));
         }
+        List<Integer> beyond = items.stream().filter(QuestionResult::alemDaAula).map(QuestionResult::numero).toList();
         int blanks = (int) items.stream().filter(QuestionResult::emBranco).count();
         int answered = (int) items.stream().filter(i -> i.acertou() != null || i.emBranco()).count();
         int right = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.acertou())).count();
         return new QuizResult(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), quiz.getSubject(), quiz.getTopic(),
                 quiz.getLevel(), qs.size(), answered, right, blanks, quiz.getFinishedAt() != null, items,
                 quiz.certoErrado() ? Quiz.CERTO_ERRADO : "multipla_escolha",
-                quiz.certoErrado() ? right - (answered - blanks - right) : null);
+                quiz.certoErrado() ? right - (answered - blanks - right) : null, beyond,
+                beyond.isEmpty() || quiz.getLessonId() == null ? null
+                        : "As perguntas " + beyond + " foram além da aula " + quiz.getLessonId() + ". Para incluí-las, "
+                        + "chame reescrever_aula acrescentando um slide (ou caixa) com {#id} para cada ponto e depois "
+                        + "corrigir_pergunta_quiz com esses conceitos.");
     }
 
     // ---- tela /aulas: tudo agrupado por disciplina ----

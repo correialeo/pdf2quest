@@ -43,9 +43,22 @@ public class QuizQuestion {
     @Lob
     private String alternatives;
     private String correctAnswer;
+    /** Conceitos da aula que a pergunta cobra ({#id} dos slides/caixas), separados por virgula. */
+    private String concepts;
+    /** Pergunta que vai alem da aula de proposito (nao precisa de conceito da aula). */
+    private boolean beyondLesson;
+    /** Nulo = multipla escolha/Certo-Errado; "calculo" = exercicio guiado; "codigo" = tarefa de codigo. */
+    private String kind;
+    /** Bloco da aula (ordem) do exercicio guiado ou da tarefa de codigo. */
+    private Integer blockIndex;
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public record Alternative(String letra, String texto, String explicacao) {
+    }
+
+    public List<String> conceptList() {
+        return concepts == null || concepts.isBlank() ? List.of()
+                : java.util.Arrays.stream(concepts.split(",")).map(String::strip).filter(c -> !c.isEmpty()).toList();
     }
 
     public List<Alternative> alternativeList() {

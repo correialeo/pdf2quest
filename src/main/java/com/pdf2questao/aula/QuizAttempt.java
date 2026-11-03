@@ -24,5 +24,7 @@ public class QuizAttempt {
     private Long quizQuestionId;
     private String selectedAnswer;
     private Boolean correct;
+    /** Dicas usadas (exercicio guiado/tarefa de codigo); conta no registro mesmo quando acertou. */
+    private int hintsUsed;
     private LocalDateTime answeredAt = LocalDateTime.now();
 }

@@ -20,13 +20,13 @@
     <article class="card p-4 rich-text lesson-content" th:if="${slides.isEmpty()}" th:utext="${contentHtml}"></article>
 
     <!-- Aula em slides: uma pagina por assunto, com questoes de fixacao no meio (respondidas aqui mesmo). -->
-    <section class="lesson-deck" th:unless="${slides.isEmpty()}" th:attr="data-quiz=${fixation != null} ? ${fixation.id} : ''">
+    <section class="lesson-deck" th:unless="${slides.isEmpty()}" th:attr="data-quiz=${fixation != null} ? ${fixation.id} : '',data-lesson=${lesson.id},data-datasets=${datasetsJson},data-exercises=${exerciseJson}">
         <nav class="lesson-deck-tabs" aria-label="Slides">
             <button type="button" class="lesson-deck-tab" th:each="s, it : ${slides}" th:attr="data-slide=${it.index}"
                     th:text="${s.title}"></button>
         </nav>
         <article class="card p-4 rich-text lesson-content lesson-slide" th:each="s, it : ${slides}"
-                 th:attr="data-slide=${it.index}" th:hidden="${it.index > 0}">
+                 th:attr="data-slide=${it.index},id=${s.concept != null} ? 'c-' + ${s.concept} : null" th:hidden="${it.index > 0}">
             <div class="small text-muted mb-1" th:text="'Slide ' + ${it.count} + ' de ' + ${slides.size()}"></div>
             <h2 class="h3" th:text="${s.title}"></h2>
             <th:block th:each="p : ${s.parts}">
@@ -54,6 +54,32 @@
             <button type="button" class="btn btn-primary btn-sm" id="slideNext">Próximo<i class="bi bi-arrow-right ms-1"></i></button>
         </div>
         <div class="small text-muted mt-1">Atalhos: <kbd>←</kbd> <kbd>→</kbd> mudam de slide.</div>
+    </section>
+
+    <!-- Cobertura por conceito: o que os quizzes cobrem de cada slide e o acerto (fraco = reler). -->
+    <section class="card p-3 mt-3 lesson-coverage" th:if="${coverage != null and !coverage.conceitos.isEmpty()}">
+        <div class="d-flex align-items-baseline gap-2 mb-2">
+            <h2 class="h6 mb-0">Desempenho por conceito</h2>
+            <span class="small text-muted">fixação e quizzes desta aula, última resposta de cada pergunta</span>
+        </div>
+        <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Conceito</th><th class="text-end">Perguntas</th><th class="text-end">Acerto</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="c : ${coverage.conceitos}" th:classappend="${c.fraco()} ? 'is-weak'">
+                <td><a th:href="'#c-' + ${c.conceito}" class="text-decoration-none">
+                    <span class="text-muted small" th:text="'Slide ' + ${c.slide} + ' · '"></span><span th:text="${c.titulo}"></span>
+                    <code class="small ms-1" th:text="'#' + ${c.conceito}"></code></a></td>
+                <td class="text-end" th:text="${c.perguntas}"></td>
+                <td class="text-end text-nowrap" th:text="${c.percentual == null} ? '—' : ${c.acertos} + ' de ' + ${c.respondidas} + ' (' + ${#numbers.formatDecimal(c.percentual, 1, 0)} + '%)'"></td>
+                <td class="small text-nowrap" th:text="${c.perguntas == 0} ? 'sem pergunta' : (${c.percentual != null and c.percentual < 70} ? 'reler' : '')"></td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="small text-muted mt-2" th:if="${!coverage.alemDaAula.isEmpty() or !coverage.perguntasSemConceito.isEmpty()}">
+            <span th:if="${!coverage.alemDaAula.isEmpty()}" th:text="${coverage.alemDaAula.size()} + ' pergunta(s) além da aula'"></span>
+            <span th:if="${!coverage.alemDaAula.isEmpty() and !coverage.perguntasSemConceito.isEmpty()}"> · </span>
+            <span th:if="${!coverage.perguntasSemConceito.isEmpty()}" th:text="${coverage.perguntasSemConceito.size()} + ' pergunta(s) sem conceito (quizzes antigos)'"></span>
+        </div>
     </section>
 
     <!-- Proximo passo depois de ler: fazer o quiz, concluir a tarefa ou seguir para a proxima de hoje. -->
@@ -93,6 +119,15 @@
     </section>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
+<!-- Aula interativa: KaTeX (local, de instalar-runtimes.sh), exercicio guiado e codigo executavel. -->
+<th:block th:if="${hasMath}">
+    <link rel="stylesheet" href="/vendor/katex/katex.min.css"/>
+    <script src="/vendor/katex/katex.min.js"></script>
+</th:block>
+<th:block th:if="${hasMath or hasCode}">
+    <script src="/js/calc-expr.js"></script>
+    <script src="/js/lesson-interactive.js"></script>
+</th:block>
 <script>
     document.getElementById('copyLesson').addEventListener('click', function () {
         const btn = this;
@@ -197,6 +232,10 @@
         const tabs = Array.from(deck.querySelectorAll('.lesson-deck-tab'));
         const key = 'aula-slide-' + location.pathname;
         let index = Math.min(Number(localStorage.getItem(key)) || 0, slides.length - 1);
+        // Link "Revise: slide X" do quiz (#c-conceito): abre o slide do conceito (ou da caixa dele).
+        const target = location.hash.startsWith('#c-') ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+        const targetSlide = target ? target.closest('.lesson-slide') : null;
+        if (targetSlide) { index = slides.indexOf(targetSlide); }
 
         function show(i) {
             index = Math.max(0, Math.min(i, slides.length - 1));
@@ -262,6 +301,18 @@
         });
         show(index);
         score();
+        function openHash() {
+            const t = location.hash.startsWith('#c-') ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+            const sl = t ? t.closest('.lesson-slide') : null;
+            if (!sl) return;
+            show(slides.indexOf(sl));
+            t.classList.remove('is-review-target');
+            void t.offsetWidth;
+            t.classList.add('is-review-target');
+            t.scrollIntoView({block: 'start'});
+        }
+        if (target) { openHash(); }
+        window.addEventListener('hashchange', openHash);
     })();
 </script>
 </body>

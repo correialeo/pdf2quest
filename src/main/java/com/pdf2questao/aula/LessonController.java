@@ -64,7 +64,17 @@ public class LessonController {
         model.addAttribute("lesson", lesson);
         model.addAttribute("task", lessonService.task(lesson.getTaskId()));
         model.addAttribute("contentHtml", SimpleMarkdown.toHtml(lesson.getContent()));
-        model.addAttribute("slides", LessonSlides.parse(lesson.getContent()));
+        LessonSlides.Parsed parsed = LessonSlides.parseAll(lesson.getContent());
+        model.addAttribute("slides", parsed.slides());
+        // Aula interativa: tabelas :::dados para o runner, ultima tentativa dos exercicios e se ha o que carregar.
+        model.addAttribute("datasetsJson", toJson(parsed.datasets()));
+        // Cobertura por conceito: quantas perguntas cobrem cada slide e o acerto nelas (o que reler antes da prova).
+        model.addAttribute("coverage", lessonService.coverage(id));
+        model.addAttribute("exerciseJson", toJson(lessonService.exerciseStatus(id)));
+        model.addAttribute("hasCode", parsed.blocks().stream().anyMatch(b -> b.kind() == LessonBlocks.Kind.RUN
+                || b.kind() == LessonBlocks.Kind.TAREFA));
+        model.addAttribute("hasMath", parsed.blocks().stream().anyMatch(b -> b.kind() == LessonBlocks.Kind.FORMULA
+                || b.kind() == LessonBlocks.Kind.CALCULO));
         Quiz fixation = lessonService.fixation(id);
         model.addAttribute("fixation", fixation);
         model.addAttribute("fixationQuestions", fixation == null ? Map.of() : lessonService.questions(fixation.getId())
@@ -80,6 +90,14 @@ public class LessonController {
         return "aula";
     }
 
+    private static String toJson(Object value) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(value);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "{}";
+        }
+    }
+
     @GetMapping("/quizzes/{id}")
     public String quiz(@PathVariable Long id, Model model) {
         Quiz quiz = lessonService.quiz(id);
@@ -88,6 +106,8 @@ public class LessonController {
         model.addAttribute("lesson", quiz.getLessonId() == null ? null : lessonService.find(quiz.getLessonId()));
         model.addAttribute("questions", lessonService.questions(id));
         model.addAttribute("answers", lessonService.latest(id));
+        // "Revise: slide X" de cada pergunta: o slide da aula que ensina o conceito que ela cobra.
+        model.addAttribute("reviewSlides", lessonService.conceptsOf(quiz.getLessonId(), lessonService.questions(id)));
         Long taskId = lessonService.effectiveTaskId(quiz);
         model.addAttribute("next", next(taskId));
         // Outro quiz da mesma aula ainda por fazer (para seguir direto).
@@ -97,6 +117,20 @@ public class LessonController {
     }
 
     public record AnswerRequest(Long questionId, String selected) {
+    }
+
+    public record ExerciseRequest(Integer block, Boolean correct, Integer hints) {
+    }
+
+    /** Fim de uma tentativa de exercicio guiado/tarefa de codigo da aula (conta no desempenho, com as dicas). */
+    @PostMapping("/aulas/{id}/exercicio")
+    @ResponseBody
+    public LessonService.ExerciseResult exercise(@PathVariable Long id, @RequestBody ExerciseRequest request) {
+        if (request.block() == null) {
+            throw new IllegalArgumentException("Informe o bloco.");
+        }
+        return lessonService.recordExercise(id, request.block(), Boolean.TRUE.equals(request.correct()),
+                request.hints() == null ? 0 : request.hints());
     }
 
     @PostMapping("/quizzes/{id}/responder")

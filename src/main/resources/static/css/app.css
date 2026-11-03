@@ -1862,3 +1862,51 @@ html.sidebar-collapsed .workspace-switch {
 .lesson-col > h3, .lesson-col > p:first-child { font-size: .85rem; font-weight: 600; margin: 0 0 .25rem; color: var(--bs-secondary-color); }
 .lesson-box-intro { margin-bottom: .75rem; }
 .lesson-box-intro > :last-child { margin-bottom: 0; }
+
+/* Link do quiz para o slide do conceito: realce rapido de onde rever. */
+.is-review-target { animation: review-flash 2s ease-out 1; }
+@keyframes review-flash { from { box-shadow: 0 0 0 3px var(--bs-warning); } to { box-shadow: 0 0 0 3px transparent; } }
+.quiz-review a { text-decoration: none; }
+
+/* ---- Aula interativa: formula, exercicio guiado, codigo executavel ---- */
+.lesson-box-formula { border-left: 4px solid #6f42c1; background: rgba(111, 66, 193, .06); }
+.lesson-box-formula .formula-tex { font-size: 1.25rem; text-align: center; margin: .5rem 0 .75rem; overflow-x: auto; }
+.lesson-box-formula .formula-when, .lesson-box-formula .formula-trap { margin-top: .4rem; }
+.lesson-box-formula .formula-trap { color: var(--bs-danger-text-emphasis); }
+.calc-block { border: 1px solid var(--bs-border-color); border-left: 4px solid var(--bs-primary); border-radius: .5rem;
+    padding: .9rem 1rem; margin: 1rem 0; background: var(--bs-body-bg); }
+.calc-statement { font-weight: 500; margin: .5rem 0; }
+.calc-step { padding: .5rem .6rem; border-radius: .4rem; margin-bottom: .35rem; opacity: .6; }
+.calc-step.is-current, .calc-step.is-ok, .calc-step.is-shown, .calc-step.is-wrong { opacity: 1; }
+.calc-step.is-current { background: var(--bs-tertiary-bg); }
+.calc-step.is-ok .calc-feedback { color: var(--bs-success-text-emphasis); }
+.calc-step.is-shown .calc-feedback { color: var(--bs-warning-text-emphasis); }
+.calc-step.is-wrong .calc-feedback { color: var(--bs-danger-text-emphasis); }
+.calc-step-title { font-weight: 600; font-size: .9rem; }
+.calc-input { max-width: 12rem; }
+.calc-interpretation { font-style: italic; }
+.code-run, .code-task { border: 1px solid var(--bs-border-color); border-radius: .5rem; margin: 1rem 0; overflow: hidden; }
+.code-task { border-left: 4px solid var(--bs-success); }
+.code-run-head { display: flex; align-items: center; padding: .35rem .7rem; background: var(--bs-tertiary-bg);
+    font-size: .8rem; font-weight: 600; }
+.code-task-statement { padding: .6rem .8rem 0; }
+.code-src { display: block; width: 100%; border: 0; border-top: 1px solid var(--bs-border-color); resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; line-height: 1.45;
+    padding: .6rem .8rem; background: var(--bs-body-bg); color: var(--bs-body-color); tab-size: 4; white-space: pre;
+    overflow-x: auto; }
+.code-src:focus { outline: 2px solid var(--bs-primary); outline-offset: -2px; }
+.code-buttons { display: flex; flex-wrap: wrap; gap: .4rem; padding: .5rem .7rem; border-top: 1px solid var(--bs-border-color); }
+.code-hint { padding: 0 .8rem .5rem; }
+.code-expected, .code-output { margin: 0; padding: .6rem .8rem; border-top: 1px dashed var(--bs-border-color); }
+.code-expected { font-size: .8rem; color: var(--bs-secondary-color); white-space: pre; overflow-x: auto; }
+.code-expected::before { content: "Saída (conferida na criação da aula)"; display: block; font-family: var(--bs-body-font-family);
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; margin-bottom: .25rem; }
+.code-stdout, .code-error { margin: 0; font-size: .82rem; white-space: pre; overflow-x: auto; }
+.code-error { color: var(--bs-danger-text-emphasis); white-space: pre-wrap; }
+.code-verdict { font-weight: 600; margin-bottom: .3rem; }
+.code-spark { margin-top: .5rem; }
+.lesson-dataset { margin: .75rem 0; }
+
+/* Desempenho por conceito na aula: linha fraca (sem pergunta ou abaixo de 70%) em destaque. */
+.lesson-coverage tr.is-weak td { color: var(--bs-danger-text-emphasis); }
+.lesson-coverage tr.is-weak td:last-child { font-weight: 600; }

@@ -37,10 +37,18 @@
                 <span class="alt-letter" th:text="${a.letra}"></span>
                 <span class="quiz-option-body">
                     <span th:utext="${@richText.html(a.texto)}"></span>
-                    <span class="quiz-why" hidden th:text="${a.explicacao}"></span>
+                    <span class="quiz-why" hidden><span th:text="${a.explicacao}"></span><span class="quiz-why-slide"
+                          th:each="c, it : ${reviewSlides[q.id]}" th:if="${it.first}"
+                          th:text="' (Veja o slide ' + ${c.slide} + ': ' + ${c.slideTitle} + '.)'"></span></span>
                     <span class="btn-copy copy-answer" role="button" tabindex="0" data-copy="answer" title="Copiar resposta" aria-label="Copiar resposta"><i class="bi bi-clipboard-check"></i></span>
                 </span>
             </button>
+        </div>
+        <!-- Rastreabilidade: o slide da aula que ensina o que a pergunta cobra, ou o aviso de que vai alem dela. -->
+        <div class="quiz-review small mt-2" th:if="${lesson != null and (q.beyondLesson or !#lists.isEmpty(reviewSlides[q.id]))}">
+            <span class="badge text-bg-warning me-1" th:if="${q.beyondLesson}" title="Esta pergunta vai além do que a aula ensinou">Além da aula</span>
+            <a th:each="c : ${reviewSlides[q.id]}" class="me-2" th:href="@{/aulas/{id}(id=${lesson.id})} + '#c-' + ${c.id}">
+                <i class="bi bi-easel me-1"></i>Revise: slide <span th:text="${c.slide}"></span> · <span th:text="${c.slideTitle}"></span></a>
         </div>
         <!-- Certo/Errado: deixar em branco nao pontua nem anula acerto. -->
         <div class="mt-2" th:if="${quiz.certoErrado()}">

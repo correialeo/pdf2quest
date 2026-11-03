@@ -59,8 +59,9 @@ public class LessonMcpToolsIntegrationTest {
             + "pedindo o instrumento correto e o limite, e pegadinhas com a vigência do crédito extraordinário.";
     public static final String REFS = "questão local #1\nhttps://www.pciconcursos.com.br/provas/fcc";
 
-    /** Aula em slides mínima aceita pelo criar_aula: 2 slides e 3 questões de fixação. */
-    public static final String SLIDES = "=== Regra\nTexto.\n[[questão 1]]\n=== Exceção\nTexto.\n[[questão 2]]\n[[questão 3]]";
+    /** Aula em slides mínima aceita pelo criar_aula: 2 slides (com conceito) e 3 questões de fixação. */
+    public static final String SLIDES = "=== Regra {#regra}\nTexto.\n[[questão 1]]\n=== Exceção {#excecao}\nTexto.\n"
+            + "[[questão 2]]\n[[questão 3]]";
 
     public static List<QuizItem> fixacao() {
         return List.of(item("Fixação", "A"), item("Fixação", "B"), item("Fixação", "C"));
@@ -82,7 +83,8 @@ public class LessonMcpToolsIntegrationTest {
         return new QuizItem("Crédito para despesa sem dotação específica é (" + tag + "):", topic, List.of(
                 new QuizAlternative("Suplementar " + tag.substring(0, 20), "Errada: reforça dotação já existente."),
                 new QuizAlternative("Especial " + tag.substring(20), "Certa: despesa sem dotação específica."),
-                new QuizAlternative("Extraordinário " + tag, "Errada: despesa urgente e imprevisível.")), correct);
+                new QuizAlternative("Extraordinário " + tag, "Errada: despesa urgente e imprevisível.")), correct,
+                List.of("regra"), null);
     }
 
     private void answer(Long quizId, Long questionId, String letter) throws Exception {
@@ -425,7 +427,8 @@ public class LessonMcpToolsIntegrationTest {
     @Test
     void aulaEmSlidesComQuestoesDeFixacaoNoMeio() throws Exception {
         String link = "[NBC TSP 12](https://www.legisweb.com.br/legislacao/?id=492485)";
-        String slides = "=== DFC\nFluxos de **investimento**.\n[[questão 1]]\n=== DMPL\nMutações do PL.\n[[questão 2]]\n[[questão 3]]";
+        String slides = "=== DFC {#regra}\nFluxos de **investimento**.\n[[questão 1]]\n=== DMPL {#excecao}\nMutações do PL.\n"
+                + "[[questão 2]]\n[[questão 3]]";
         var semQuestoes = assertThrows(IllegalArgumentException.class, () -> tools.createLesson("Slides", "Contabilidade",
                 "DCASP", slides, link, null, null, null, null, null, null, null, null));
         assertTrue(semQuestoes.getMessage().contains("perguntasDaAula"), semQuestoes.getMessage());
@@ -451,7 +454,8 @@ public class LessonMcpToolsIntegrationTest {
         answer(fixacao.getId(), perguntas.get(0).getId(), "A");
 
         // Reescrever troca o conteúdo e a fixação; o erro da fixação anterior precisa ser retomado.
-        String novo = "=== DFC\nCaixa e equivalentes.\n[[questão 1]]\n=== PL\nResidual.\n[[questão 2]]\n[[questão 3]]";
+        String novo = "=== DFC {#regra}\nCaixa e equivalentes.\n[[questão 1]]\n=== PL {#excecao}\nResidual.\n"
+                + "[[questão 2]]\n[[questão 3]]";
         assertThrows(IllegalArgumentException.class, () -> tools.rewriteLesson(aula.aulaId(), null, novo, link, null,
                 null, fixacao(), ESTILO, REFS, null, null));
         var errosAntes = tools.previousErrors(aula.aulaId(), null, null);
@@ -512,5 +516,94 @@ public class LessonMcpToolsIntegrationTest {
         assertTrue(html.contains("<div class=\"lesson-box-intro\"><p>Todos os exemplos usam estas tabelas.</p></div>"
                 + "<div class=\"lesson-cols\">"), html);
         assertEquals(2, html.split("class=\"lesson-col\"").length - 1, "só as duas tabelas viram colunas");
+    }
+
+    private static QuizItem with(QuizItem base, String extra, List<String> conceitos, Boolean ampliacao) {
+        return new QuizItem(base.enunciado() + extra, base.topico(), base.alternativas(), base.correta(), conceitos,
+                ampliacao);
+    }
+
+    @Test
+    void quizDaAulaSoCobraConceitosDaAulaComDadosDiferentesDoExemplo() throws Exception {
+        String link = "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)";
+        String slides = """
+                === Inscrição em RP {#rp-inscricao}
+                Empenho de 100.000, liquidado 60.000: inscreve 40.000 em restos a pagar.
+                [[questão 1]]
+                === Cancelamento {#rp-cancelamento}
+                :::pegadinha Prazo {#rp-prazo}
+                Cancela no fim do exercício seguinte.
+                :::
+                [[questão 2]]
+                [[questão 3]]""";
+
+        var semConceito = assertThrows(IllegalArgumentException.class, () -> tools.createLesson("RP", "AFO", "Restos",
+                slides.replace(" {#rp-cancelamento}", ""), link, null, null, null, null, fixacao(), ESTILO, REFS, null));
+        assertTrue(semConceito.getMessage().contains("\"Cancelamento\""), semConceito.getMessage());
+
+        // P1: a fixação do slide 1 reaproveita 100.000 e 60.000 do exemplo.
+        var mesmosDados = assertThrows(IllegalArgumentException.class, () -> tools.createLesson("RP", "AFO", "Restos",
+                slides, link, null, null, null, null, List.of(
+                        with(item("RP", "A"), " Empenho de R$ 100.000 e liquidação de 60.000.", List.of("rp-inscricao"), null),
+                        with(item("RP", "B"), "", List.of("rp-cancelamento"), null),
+                        with(item("RP", "B"), "", List.of("rp-prazo"), null)), ESTILO, REFS, null));
+        assertTrue(mesmosDados.getMessage().contains("repete os valores 100000, 60000 do exemplo do slide 1"),
+                mesmosDados.getMessage());
+
+        var aula = tools.createLesson("RP", "AFO", "Restos", slides, link, null, null, null, null, List.of(
+                with(item("RP", "A"), " Empenho de R$ 250.000 e liquidação de 90.000.", List.of("rp-inscricao"), null),
+                with(item("RP", "B"), "", List.of("#rp-cancelamento"), null),
+                with(item("RP", "B"), "", List.of("{#rp-prazo}"), null)), ESTILO, REFS, null);
+
+        // P2: conceito fora da aula ou pergunta sem conceito são recusados; ampliacao=true passa e fica marcada.
+        var fora = assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(aula.aulaId(), null, null, null,
+                null, null, null, List.of(with(item("RP", "A"), "", List.of("rp-ordem-shuffle"), null)), null, null,
+                null, ESTILO, REFS));
+        assertTrue(fora.getMessage().contains("{#rp-ordem-shuffle}, que não está em nenhum slide"), fora.getMessage());
+        assertTrue(fora.getMessage().contains("rp-inscricao (slide 1: Inscrição em RP)"), fora.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> tools.createQuiz(aula.aulaId(), null, null, null, null,
+                null, null, List.of(with(item("RP", "A"), "", null, null)), null, null, null, ESTILO, REFS));
+
+        var quiz = tools.createQuiz(aula.aulaId(), null, null, null, null, null, null, List.of(
+                with(item("RP", "A"), "", List.of("rp-inscricao"), null),
+                with(item("RP", "B"), "", List.of("rp-prazo"), null),
+                with(item("RP", "A"), "", null, true)), null, null, null, ESTILO, REFS);
+        var result = tools.quizResult(quiz.quizId());
+        assertEquals(List.of(3), result.alemDaAula());
+        assertTrue(result.incluirNaAula().contains("reescrever_aula"));
+        assertEquals(List.of("slide 2: Cancelamento"), result.questoes().get(1).revise());
+
+        mvc.perform(get("/quizzes/" + quiz.quizId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("/aulas/" + aula.aulaId() + "#c-rp-inscricao")))
+                .andExpect(content().string(containsString("Revise: slide")))
+                .andExpect(content().string(containsString("Além da aula")))
+                .andExpect(content().string(containsString("(Veja o slide 2: Cancelamento.)")));
+        mvc.perform(get("/aulas/" + aula.aulaId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"c-rp-inscricao\"")))
+                .andExpect(content().string(containsString("id=\"c-rp-prazo\"")));
+
+        var cobertura = tools.lessonCoverage(aula.aulaId());
+        assertEquals(List.of(), cobertura.semPergunta().stream().map(c -> c.conceito()).toList());
+        assertEquals(2, cobertura.conceitos().get(0).perguntas(), "fixação + quiz");
+        assertEquals(1, cobertura.alemDaAula().size());
+
+        // Acerto por conceito: errar a pergunta de rp-inscricao do quiz deixa o conceito "reler" na tela da aula.
+        var perguntasQuiz = lessonService.questions(quiz.quizId());
+        answer(quiz.quizId(), perguntasQuiz.get(0).getId(), "C");
+        var inscricao = tools.lessonCoverage(aula.aulaId()).conceitos().get(0);
+        assertEquals(1, inscricao.respondidas());
+        assertEquals(0, inscricao.acertos());
+        assertTrue(inscricao.fraco());
+        mvc.perform(get("/aulas/" + aula.aulaId())).andExpect(status().isOk())
+                .andExpect(content().string(containsString("Desempenho por conceito")))
+                .andExpect(content().string(containsString("0 de 1 (0%)")))
+                .andExpect(content().string(containsString(">reler<")))
+                .andExpect(content().string(containsString("href=\"#c-rp-prazo\"")));
+
+        // "Incluir na aula": depois de reescrever_aula com o conceito, a pergunta passa a apontar para ele.
+        assertThrows(IllegalArgumentException.class, () -> tools.fixQuizQuestion(quiz.quizId(), 3, null, null, null,
+                null, null, List.of("nao-existe"), false));
+        tools.fixQuizQuestion(quiz.quizId(), 3, null, null, null, null, null, List.of("rp-cancelamento"), false);
+        assertEquals(List.of(), tools.quizResult(quiz.quizId()).alemDaAula());
     }
 }
