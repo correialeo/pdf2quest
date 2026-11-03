@@ -65,4 +65,12 @@ command -v tesseract >/dev/null 2>&1 || erro "Tesseract nao encontrado depois da
 tesseract --list-langs 2>/dev/null | grep -qx por || erro "Tesseract instalado, mas sem o idioma portugues (por)."
 ok "Tesseract com portugues"
 
+# Aulas interativas (formulas, calculo guiado, SQL/pandas/PySpark no navegador): precisa do Node.js.
+if command -v node >/dev/null 2>&1; then
+    passo "Baixando os runtimes das aulas interativas (KaTeX, sql.js, Pyodide)"
+    ./instalar-runtimes.sh
+else
+    printf '  aviso: sem Node.js, as aulas com codigo e formulas ficam sem rodar (brew install node; ./instalar-runtimes.sh)\n'
+fi
+
 printf '\n\033[1;32mTudo pronto!\033[0m Agora rode:  ./iniciar.sh\n'

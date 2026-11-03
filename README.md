@@ -133,6 +133,24 @@ de linhas, rascunho salvo sozinho), entregue e peça *"corrige a discursiva 1"*.
 Outros exemplos: *"me treina nos meus erros de Economia e registra o treino no fim"*, *"faz a revisão de hoje
 comigo"*, *"analisa meu último simulado e agenda reforço nas piores matérias"*. Nenhuma ferramenta apaga dados.
 
+## Aulas interativas (fórmulas, cálculo guiado e código)
+
+As aulas em slides podem ter cartões de fórmula, exercícios de cálculo passo a passo (com números novos a cada
+tentativa) e exemplos de SQL, pandas e PySpark que você edita e roda no navegador. Para isso, rode uma vez:
+
+```bash
+./instalar-runtimes.sh
+```
+
+Ele precisa do Node.js 20+ (`brew install node`) e baixa cerca de 50 MB para `data/runtime`: KaTeX, sql.js (SQLite)
+e Pyodide (Python com pandas). Depois disso, tudo roda localmente, sem internet. O código roda isolado num Web Worker,
+sem acesso à rede e com tempo-limite. O que você editar fica só neste navegador. **PySpark é uma simulação didática**
+(feita em pandas, sem JVM): ela mostra o plano, o que é transformação e o que é ação, e conta jobs e stages, mas não é
+o Spark de verdade. A tela avisa isso. R não roda nas aulas.
+
+O servidor usa o mesmo Pyodide e o mesmo sql.js (via Node) para conferir, ao criar a aula, que cada exemplo roda e dá a
+saída declarada. Duas aulas de demonstração estão em `docs/aulas-demo` (veja o README de lá).
+
 ## Onde ficam os meus dados?
 
 Tudo fica dentro da pasta do projeto:
