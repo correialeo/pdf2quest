@@ -1,0 +1,30 @@
+{
+ "sql-pandas": [
+  {
+   "url": "https://www.sqlite.org/lang_select.html",
+   "dispositivo": "SQLite, SELECT: cláusula HAVING",
+   "texto": "If a HAVING clause is specified, it is evaluated once for each group of rows as a boolean expression . If the result of evaluating the HAVING clause is false, the group is discarded. If the HAVING clause is an aggregate expression, it is evaluated across all rows in the group. If a HAVING clause is a non-aggregate expression, it is evaluated with respect to an arbitrarily selected row from the group. The HAVING expression may refer to values, even aggregate functions, that are not in the result.",
+   "comoObtido": "curl -sL da página oficial, HTML convertido em texto, recorte do parágrafo sobre HAVING (2026-11-02)"
+  },
+  {
+   "url": "https://pandas.pydata.org/docs/user_guide/groupby.html",
+   "dispositivo": "pandas, Group by: split-apply-combine",
+   "texto": "By “group by” we are referring to a process involving one or more of the following steps: Splitting the data into groups based on some criteria. Applying a function to each group independently. Combining the results into a data structure. Out of these, the split step is the most straightforward. In the apply step, we might wish to do one of the following: Aggregation : compute a summary statistic (or statistics) for each group. Some examples: Compute group sums or means. Compute group sizes / counts. Transformation : perform some group-specific computations and return a like-indexed object. Some examples: Standardize data (zscore) within a group.",
+   "comoObtido": "curl -sL do guia oficial, HTML convertido em texto, recorte da introdução (2026-11-02)"
+  },
+  {
+   "url": "https://spark.apache.org/docs/latest/rdd-programming-guide.html#rdd-operations",
+   "dispositivo": "Spark, RDD operations: transformações são lazy",
+   "texto": "All transformations in Spark are lazy , in that they do not compute their results right away. Instead, they just remember the transformations applied to some base dataset (e.g. a file). The transformations are only computed when an action requires a result to be returned to the driver program. This design enables Spark to run more efficiently. For example, we can realize that a dataset created through map will be used in a reduce and return only the result of the reduce to the driver, rather than the larger mapped dataset. By default, each transformed RDD may be recomputed each time you run an action on it. However, you may also persist an RDD in memory using the persist (or cache ) method, in which case Spark will keep the elements around on the cluster for much faster access the next time you query it.",
+   "comoObtido": "curl -sL do guia oficial, HTML convertido em texto, recorte do parágrafo sobre avaliação preguiçosa (2026-11-02)"
+  }
+ ],
+ "matematica-financeira": [
+  {
+   "url": "https://pt.wikipedia.org/wiki/Juro#Juros_compostos",
+   "dispositivo": "Wikipédia, Juro: seção Juros compostos",
+   "texto": "No regime de juros compostos, os juros de cada período são incorporados ao capital, passando a também render juros nos períodos seguintes. Assim, a base de cálculo cresce ao longo do tempo; mantidas a taxa e a periodicidade, o montante evolui conforme a fórmula apresentada.\nA fórmula de juros compostos pode ser escrita da seguinte maneira:\n\n<math display=\"block\">V_f=V_p(1+j)^n,</math>\nonde\n*<math>V_f:</math> Valor Futuro\n*<math>V_p:</math> Valor Presente\n*<math>j:</math> Taxa de juros\n*<math>n:</math> Número de períodos\n\n'''Exemplo:'''\nUma pessoa toma emprestado $ 100 (<math>V_p = 100</math>) com taxa de juros de 10% ao mês (<math>j = 0,1</math>), calculados conforme o regime de juros compostos. Depois de 2 meses ('''<math>n = 2</math>''') essa pessoa irá pagar $121, conforme a fórmula:\n\n<math display=\"block\">\n   \\begin{align}\n   V_f & = 100 \\cdot \\left ( 1 + 0,1 \\right )^2 \\\\\n   & = 100 \\cdot \\left ( 1,1 \\right )^2 \\\\\n   & = 100 \\cdot 1,1 \\cdot 1,1 \\\\\n   & = 110 \\cdot 1,1 \\\\\n   & = 121\n   \\end{align}\n   </math>\n\nPara o caso mais geral, quando o juro é capitalizado mais de que uma vez por período, a fórmula é\n\n<math display=\"block\">V_f = V_p \\left(1 + \\frac{j}{n}\\right)^{nt}</math>\n\nonde,\n* <math>V_f :</math> Valor Futuro\n* <math>V_p :</math> Valor Presente\n* <math>j :</math> taxa de juro nominal para o período\n* <math>n :</math> número de vezes que o juro é capitalizado por período\n* <math>t :</math> número de períodos\n\n'''Cálculo do montante de juros a partir do capital'''\n",
+   "comoObtido": "curl -sL do wikitexto (action=raw) do artigo Juro, recorte da seção Juros compostos sem as referências (2026-11-02)"
+  }
+ ]
+}

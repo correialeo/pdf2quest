@@ -1,0 +1,104 @@
+{
+ "titulo": "Agregação: GROUP BY, HAVING, pandas e PySpark (demonstração)",
+ "disciplina": "TI",
+ "topicoEdital": "Linguagem SQL; análise de dados com pandas e PySpark",
+ "conteudoArquivo": "sql-pandas.md",
+ "fontes": "[SQLite: SELECT (GROUP BY e HAVING)](https://www.sqlite.org/lang_select.html)\n[pandas: Group by: split-apply-combine](https://pandas.pydata.org/docs/user_guide/groupby.html)\n[Spark: RDD operations (transformações e ações)](https://spark.apache.org/docs/latest/rdd-programming-guide.html#rdd-operations)",
+ "estiloDaBanca": "DEMONSTRAÇÃO DO FORMATO, sem pesquisa de questões reais: o estilo abaixo é genérico e serve só para preencher o campo obrigatório. A FCC costuma cobrar o tópico com enunciado curto que apresenta uma tabela ou um trecho de código/fórmula e pede a alternativa correta; distratores trocam a cláusula (WHERE por HAVING), a função (COUNT por SUM, simples por composto) ou a unidade (taxa mensal com prazo em anos), e há itens no formato I-II-III. Numa aula real, o agente substitui isto pelo que observou nas questões lidas.",
+ "referencias": "demonstração do formato: nenhuma questão real lida (ver docs/aulas-demo/README.md)\ndemonstração do formato: substituir por questões reais da FCC na aula de verdade",
+ "perguntasDaAula": [
+  {
+   "enunciado": "Considere a tabela ARRECADACAO(orgao, mes, valor). A consulta que retorna o total arrecadado por órgão é:",
+   "topico": "GROUP BY",
+   "conceitos": [
+    "sql-group-by"
+   ],
+   "correta": "A",
+   "alternativas": [
+    {
+     "texto": "SELECT orgao, SUM(valor) FROM ARRECADACAO GROUP BY orgao;",
+     "explicacao": "Certa: uma linha por órgão, com a soma dos valores das linhas daquele órgão."
+    },
+    {
+     "texto": "SELECT orgao, mes, SUM(valor) FROM ARRECADACAO GROUP BY orgao;",
+     "explicacao": "Errada: mes está no SELECT sem agregação e fora do GROUP BY."
+    },
+    {
+     "texto": "SELECT orgao, SUM(valor) FROM ARRECADACAO WHERE SUM(valor) > 0 GROUP BY orgao;",
+     "explicacao": "Errada: agregação não pode ficar no WHERE, que é avaliado antes do agrupamento."
+    },
+    {
+     "texto": "SELECT orgao, COUNT(valor) FROM ARRECADACAO GROUP BY orgao;",
+     "explicacao": "Errada: COUNT conta as linhas de cada órgão; não soma os valores."
+    },
+    {
+     "texto": "SELECT SUM(valor) FROM ARRECADACAO ORDER BY orgao;",
+     "explicacao": "Errada: sem GROUP BY, devolve um único total geral."
+    }
+   ]
+  },
+  {
+   "enunciado": "Na consulta SELECT setor, AVG(salario) FROM SERVIDOR WHERE cargo = 'Analista' GROUP BY setor HAVING AVG(salario) > 9000, é correto afirmar que",
+   "topico": "WHERE x HAVING",
+   "conceitos": [
+    "sql-having",
+    "sql-ordem-logica"
+   ],
+   "correta": "C",
+   "alternativas": [
+    {
+     "texto": "o HAVING é avaliado antes do WHERE, descartando setores com média até 9000 antes de filtrar os analistas.",
+     "explicacao": "Errada: a ordem lógica é WHERE, depois GROUP BY, depois HAVING."
+    },
+    {
+     "texto": "trocar HAVING por WHERE AVG(salario) > 9000 produziria o mesmo resultado, só que mais rápido.",
+     "explicacao": "Errada: agregação no WHERE é inválida, porque o grupo ainda não existe."
+    },
+    {
+     "texto": "primeiro saem as linhas que não são de analistas e só depois saem os setores cuja média não supera 9000.",
+     "explicacao": "Certa: WHERE filtra linhas antes do agrupamento; HAVING filtra os grupos depois."
+    },
+    {
+     "texto": "a cláusula HAVING só pode ser usada quando a mesma consulta não tem cláusula WHERE.",
+     "explicacao": "Errada: WHERE e HAVING convivem; cada uma age numa fase."
+    },
+    {
+     "texto": "a média de cada setor é calculada sobre todos os servidores, inclusive os que não são analistas.",
+     "explicacao": "Errada: o WHERE já tirou quem não é analista antes do AVG."
+    }
+   ]
+  },
+  {
+   "enunciado": "Em pandas, sendo df um DataFrame com as colunas uf e receita, a instrução df.groupby('uf')['receita'].mean() retorna",
+   "topico": "pandas groupby",
+   "conceitos": [
+    "pd-groupby",
+    "pd-groupby-lazy"
+   ],
+   "correta": "B",
+   "alternativas": [
+    {
+     "texto": "um objeto DataFrameGroupBy, que só é calculado quando se chama uma ação.",
+     "explicacao": "Errada: com .mean() a agregação já foi feita; o objeto GroupBy é o que vem antes dela."
+    },
+    {
+     "texto": "uma Series indexada por uf com a receita média de cada UF.",
+     "explicacao": "Certa: groupby + coluna + agregação dá uma Series indexada pelo grupo."
+    },
+    {
+     "texto": "um DataFrame com uma linha por registro e uma coluna com a média da UF.",
+     "explicacao": "Errada: isso seria transform('mean'), que mantém uma linha por registro."
+    },
+    {
+     "texto": "a média geral da coluna receita, repetida uma vez para cada UF.",
+     "explicacao": "Errada: a média é calculada dentro de cada grupo, não no total."
+    },
+    {
+     "texto": "uma Series indexada por uf com a quantidade de receitas não nulas.",
+     "explicacao": "Errada: isso seria .count(), não .mean()."
+    }
+   ]
+  }
+ ],
+ "concurso": "SEFAZ"
+}

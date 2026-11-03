@@ -1,0 +1,104 @@
+{
+ "titulo": "Juros compostos e taxas equivalentes (demonstração)",
+ "disciplina": "Mat. Fin.",
+ "topicoEdital": "Juros compostos; taxas equivalentes, nominais e efetivas",
+ "conteudoArquivo": "matematica-financeira.md",
+ "fontes": "[Juro: seção Juros compostos (Wikipédia)](https://pt.wikipedia.org/wiki/Juro#Juros_compostos)",
+ "estiloDaBanca": "DEMONSTRAÇÃO DO FORMATO, sem pesquisa de questões reais: o estilo abaixo é genérico e serve só para preencher o campo obrigatório. A FCC costuma cobrar o tópico com enunciado curto que apresenta uma tabela ou um trecho de código/fórmula e pede a alternativa correta; distratores trocam a cláusula (WHERE por HAVING), a função (COUNT por SUM, simples por composto) ou a unidade (taxa mensal com prazo em anos), e há itens no formato I-II-III. Numa aula real, o agente substitui isto pelo que observou nas questões lidas.",
+ "referencias": "demonstração do formato: nenhuma questão real lida (ver docs/aulas-demo/README.md)\ndemonstração do formato: substituir por questões reais da FCC na aula de verdade",
+ "perguntasDaAula": [
+  {
+   "enunciado": "Um capital de R$ 8.000,00 foi aplicado a juros compostos de 3% ao mês durante 4 meses. Considerando 1,03^4 = 1,1255, o montante ao fim do prazo é, em reais,",
+   "topico": "Montante",
+   "conceitos": [
+    "jc-montante"
+   ],
+   "correta": "B",
+   "alternativas": [
+    {
+     "texto": "8.960,00",
+     "explicacao": "Errada: é o montante a juros simples, 8.000 × (1 + 0,03 × 4)."
+    },
+    {
+     "texto": "9.004,00",
+     "explicacao": "Certa: M = 8.000 × 1,1255 = 9.004,00."
+    },
+    {
+     "texto": "9.255,00",
+     "explicacao": "Errada: somou o fator inteiro ao capital em vez de multiplicar (8.000 + 1.255)."
+    },
+    {
+     "texto": "8.240,00",
+     "explicacao": "Errada: é o montante de um mês só, 8.000 × 1,03."
+    },
+    {
+     "texto": "9.600,00",
+     "explicacao": "Errada: usou 5% ao mês por 4 meses a juros simples."
+    }
+   ]
+  },
+  {
+   "enunciado": "Uma instituição anuncia taxa de 36% ao ano com capitalização mensal. Dado 1,03^12 = 1,4258, a taxa efetiva anual é, aproximadamente,",
+   "topico": "Taxa nominal x efetiva",
+   "conceitos": [
+    "jc-nominal",
+    "jc-taxa-equivalente"
+   ],
+   "correta": "C",
+   "alternativas": [
+    {
+     "texto": "36,00%",
+     "explicacao": "Errada: 36% é a taxa nominal anunciada, não a efetiva."
+    },
+    {
+     "texto": "3,00%",
+     "explicacao": "Errada: 3% é a taxa efetiva mensal (36% ÷ 12), não a anual."
+    },
+    {
+     "texto": "42,58%",
+     "explicacao": "Certa: efetiva mensal de 3%, capitalizada por 12 meses: 1,4258 − 1 = 42,58%."
+    },
+    {
+     "texto": "39,00%",
+     "explicacao": "Errada: somou 3 pontos à taxa nominal, sem capitalizar."
+    },
+    {
+     "texto": "33,33%",
+     "explicacao": "Errada: não há divisão da taxa nominal que leve à efetiva anual."
+    }
+   ]
+  },
+  {
+   "enunciado": "Considere as afirmativas sobre juros compostos: I. 3% ao mês é equivalente a 36% ao ano. II. Taxas equivalentes produzem o mesmo montante sobre o mesmo capital e prazo. III. Taxa nominal anual com capitalização mensal deve ser dividida por 12 para dar a efetiva mensal. Está correto o que se afirma em",
+   "topico": "Taxas equivalentes",
+   "conceitos": [
+    "jc-taxa-equivalente",
+    "jc-nominal"
+   ],
+   "correta": "B",
+   "alternativas": [
+    {
+     "texto": "I, apenas.",
+     "explicacao": "Errada: I confunde taxa proporcional (3% × 12) com equivalente."
+    },
+    {
+     "texto": "II e III, apenas.",
+     "explicacao": "Certa: II é a definição de taxas equivalentes; III é a regra da taxa nominal."
+    },
+    {
+     "texto": "I e II, apenas.",
+     "explicacao": "Errada: I está errada; a equivalente anual de 3% ao mês passa de 42%."
+    },
+    {
+     "texto": "III, apenas.",
+     "explicacao": "Errada: II também está correta."
+    },
+    {
+     "texto": "I, II e III.",
+     "explicacao": "Errada: I está errada."
+    }
+   ]
+  }
+ ],
+ "concurso": "SEFAZ"
+}
