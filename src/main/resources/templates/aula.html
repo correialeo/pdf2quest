@@ -79,7 +79,7 @@
             <i class="bi bi-ui-checks"></i><span>Esta aula ainda não tem quiz. Copie o pedido acima e cole no Claude Code.</span>
         </div>
         <div class="card page-list" th:unless="${quizzes.isEmpty()}">
-            <a class="page-list-row" th:each="q : ${quizzes}" th:href="@{/quizzes/{id}(id=${q.id})}" th:with="r=${results[q.id]}">
+            <a class="page-list-row" th:each="q : ${quizzes}" th:unless="${q.embedded}" th:href="@{/quizzes/{id}(id=${q.id})}" th:with="r=${results[q.id]}">
                 <i class="bi bi-ui-checks text-muted"></i>
                 <span class="text-truncate"><span th:text="${q.title}"></span>
                     <span class="text-muted small" th:if="${q.level != null}" th:text="' · ' + ${q.level}"></span></span>

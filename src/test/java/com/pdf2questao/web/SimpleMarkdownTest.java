@@ -37,4 +37,14 @@ class SimpleMarkdownTest {
         assertEquals("<blockquote><p>FCC adora <strong>EXCETO</strong></p></blockquote><ol><li>um</li><li>dois</li></ol>",
                 SimpleMarkdown.toHtml("> FCC adora **EXCETO**\n1. um\n2. dois"));
     }
+
+    @Test
+    void negritoComCodigoDentroETabela() {
+        assertEquals("<p>ganham <strong><code>_x</code> e <code>_y</code></strong> (com <code>suffixes=</code>)</p>",
+                SimpleMarkdown.toHtml("ganham **`_x` e `_y`** (com `suffixes=`)"));
+        assertEquals("<p><strong><code>df.join</code> une pelo índice</strong></p>",
+                SimpleMarkdown.toHtml("**`df.join` une pelo índice**"));
+        assertEquals("<table><thead><tr><th>k</th><th>v</th></tr></thead><tbody><tr><td>1</td><td><strong>a</strong></td>"
+                + "</tr></tbody></table><p>fim</p>", SimpleMarkdown.toHtml("| k | v |\n|---|---|\n| 1 | **a** |\nfim"));
+    }
 }

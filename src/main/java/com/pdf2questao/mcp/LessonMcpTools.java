@@ -68,7 +68,8 @@ public class LessonMcpTools {
                 oficiais) e veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
                 banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
                 hoje que ela cobre; em 'fontes', só o que você LEU, cada fonte com o link (URL)), no nível dele (use o \\
-                desempenho), EM SLIDES: um slide ("=== Título") por assunto do tópico (ex.: DFC num, DMPL noutro), \\
+                desempenho), EM SLIDES (veja a descrição de criar_aula: caixas :::regra/:::pegadinha/:::exemplo e \\
+                exemplos com os dados de entrada e o resultado lado a lado): um slide ("=== Título") por assunto do tópico (ex.: DFC num, DMPL noutro), \\
                 cada um com a regra, a exceção e a pegadinha da banca, do que mais cai ao que menos cai (sem número \\
                 de item de norma que a banca não cobra, sem o que está fora do edital e sem bastidor da pesquisa), e \\
                 logo depois de cada explicação uma questão de fixação no nível da prova ("[[questão N]]", enviadas \\
@@ -113,7 +114,13 @@ public class LessonMcpTools {
             + "uma página por assunto (ex.: \"=== DFC\", \"=== DMPL\"); dentro do slide, a linha \"[[questão N]]\" "
             + "põe ali a questão N de 'perguntasDaAula' para fixar o que acabou de ser explicado (nível prova, com "
             + "estiloDaBanca e referencias). Toda questão precisa aparecer em algum slide. As fontes viram o último "
-            + "slide sozinhas: não escreva bastidor (ferramenta que falhou, como leu o PDF) no conteúdo.";
+            + "slide sozinhas: não escreva bastidor (ferramenta que falhou, como leu o PDF) no conteúdo. "
+            + "ESCRITA: um conceito por slide, frases curtas, no máximo 5 tópicos seguidos; destaque em caixas "
+            + "\":::regra Título\", \":::pegadinha\", \":::exemplo Título\" ou \":::dica\" fechadas com \":::\". "
+            + "TODO exemplo é concreto: mostre os DADOS de entrada (tabelas pequenas, 3 a 4 linhas, com nomes do "
+            + "contexto do concurso, ex.: contribuinte e debitos) e o RESULTADO, lado a lado com \"+++\" entre as "
+            + "colunas da caixa; nunca use nome solto (esq, dir, df, x) sem mostrar o que tem dentro. Explique a regra "
+            + "a partir do exemplo, não o contrário.";
 
     @McpTool(name = "criar_aula",
             description = "Cria uma aula no sistema (Markdown: ## títulos, listas, **negrito**, `código`, blocos ``` , "

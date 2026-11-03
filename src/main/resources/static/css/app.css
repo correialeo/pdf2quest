@@ -1833,3 +1833,32 @@ html.sidebar-collapsed .workspace-switch {
 .lesson-deck-tab.is-current { background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; }
 .lesson-question { border: 1px dashed var(--bs-border-color); border-radius: 10px; padding: 1rem; margin: 1.25rem 0; }
 
+
+/* Slides da aula: leitura arejada, caixas coloridas por tipo e exemplos lado a lado */
+.lesson-slide { font-size: 1.05rem; line-height: 1.7; padding: 2rem 2.25rem !important; }
+.lesson-slide > h2 { margin-bottom: 1.25rem; }
+.lesson-slide p, .lesson-slide ul, .lesson-slide ol { max-width: 68ch; }
+.lesson-slide li + li { margin-top: .35rem; }
+.lesson-slide table { border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .95rem; }
+.lesson-slide th, .lesson-slide td { padding: .45rem .8rem; border: 1px solid var(--bs-border-color); text-align: left; vertical-align: top; }
+.lesson-slide th { background: var(--bs-tertiary-bg); font-weight: 600; }
+.lesson-slide pre { font-size: .9rem; }
+.lesson-box { border-radius: 12px; padding: 1rem 1.25rem; margin: 1.25rem 0; border: 1px solid; }
+.lesson-box > :last-child, .lesson-col > :last-child { margin-bottom: 0; }
+.lesson-box-title { font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-bottom: .5rem; }
+.lesson-box-regra { border-color: color-mix(in srgb, var(--bs-primary) 35%, transparent); background: color-mix(in srgb, var(--bs-primary) 7%, var(--bs-body-bg)); }
+.lesson-box-regra .lesson-box-title { color: var(--bs-primary); }
+.lesson-box-pegadinha { border-color: color-mix(in srgb, var(--bad) 35%, transparent); background: color-mix(in srgb, var(--bad) 7%, var(--bs-body-bg)); }
+.lesson-box-pegadinha .lesson-box-title { color: var(--bad); }
+.lesson-box-pegadinha .lesson-box-title::before { content: "⚠ "; }
+.lesson-box-exemplo { border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 6%, var(--bs-body-bg)); }
+.lesson-box-exemplo .lesson-box-title { color: var(--ok); }
+.lesson-box-dica { border-color: color-mix(in srgb, var(--guess) 35%, transparent); background: color-mix(in srgb, var(--guess) 7%, var(--bs-body-bg)); }
+.lesson-box-dica .lesson-box-title { color: var(--guess); }
+.lesson-box-lado { border: 0; padding: 0; background: none; }
+.lesson-box table { background: var(--bs-body-bg); margin: .25rem 0 .5rem; }
+.lesson-cols { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
+.lesson-col { flex: 0 1 auto; min-width: 0; }
+.lesson-col > h3, .lesson-col > p:first-child { font-size: .85rem; font-weight: 600; margin: 0 0 .25rem; color: var(--bs-secondary-color); }
+.lesson-box-intro { margin-bottom: .75rem; }
+.lesson-box-intro > :last-child { margin-bottom: 0; }

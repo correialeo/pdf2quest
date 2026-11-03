@@ -461,4 +461,56 @@ public class LessonMcpToolsIntegrationTest {
         assertEquals(1, lessonService.quizzes(aula.aulaId()).size(), "a fixação antiga saiu");
         assertTrue(lessonService.find(aula.aulaId()).getContent().contains("Caixa e equivalentes"));
     }
+
+    @Test
+    void caixasEColunasLadoALadoNosSlides() {
+        var slides = com.pdf2questao.aula.LessonSlides.parse("""
+                === Merge
+                Texto.
+                :::exemplo Duas tabelas
+                **contribuinte**
+                | id | nome |
+                |---|---|
+                | 1 | Ana |
+                +++
+                **resultado**
+                | nome |
+                |---|
+                | Ana |
+                :::
+                :::pegadinha
+                Padrão é **`inner`**.
+                :::
+                Fim.""");
+        String html = slides.get(0).parts().stream().map(com.pdf2questao.aula.LessonSlides.Part::html)
+                .collect(java.util.stream.Collectors.joining());
+        assertTrue(html.contains("lesson-box lesson-box-exemplo"), html);
+        assertTrue(html.contains("<div class=\"lesson-box-title\">Duas tabelas</div>"), html);
+        assertEquals(2, html.split("class=\"lesson-col\"").length - 1, html);
+        assertTrue(html.contains("<td>Ana</td>"), html);
+        assertTrue(html.contains("Pegadinha da banca"), html);
+        assertTrue(html.contains("<strong><code>inner</code></strong>"), html);
+        assertTrue(html.endsWith("<p>Fim.</p>"), html);
+    }
+
+    @Test
+    void textoAntesDasColunasFicaEmCimaNaLarguraToda() {
+        var slides = com.pdf2questao.aula.LessonSlides.parse("""
+                === Dados
+                :::dica Os dados
+                Todos os exemplos usam estas tabelas.
+                +++
+                | id |
+                |---|
+                | 1 |
+                +++
+                | id |
+                |---|
+                | 10 |
+                :::""");
+        String html = slides.get(0).parts().get(0).html();
+        assertTrue(html.contains("<div class=\"lesson-box-intro\"><p>Todos os exemplos usam estas tabelas.</p></div>"
+                + "<div class=\"lesson-cols\">"), html);
+        assertEquals(2, html.split("class=\"lesson-col\"").length - 1, "só as duas tabelas viram colunas");
+    }
 }

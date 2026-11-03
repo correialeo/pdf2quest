@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Markdown simples (o que o Claude escreve num resumo) para o HTML do editor de paginas: titulos ## e ###,
  * listas com "- " ou "* " (2 espacos de recuo por nivel viram sublista), listas numeradas "1. ", citacoes "> ",
- * blocos de codigo entre ``` , `codigo`, **negrito**, *italico* e paragrafos. Todo texto e escapado.
+ * blocos de codigo entre ``` , tabelas | a | b |, `codigo`, **negrito**, *italico* e paragrafos. Todo texto e escapado.
  * O resultado ainda passa pelo {@code HtmlSanitizer} ao ser gravado.
  */
 public final class SimpleMarkdown {
@@ -24,11 +24,13 @@ public final class SimpleMarkdown {
         boolean ordered = false;   // lista numerada aberta (um nivel)
         StringBuilder code = null;   // bloco ``` aberto
         List<String> quote = new ArrayList<>();
+        List<String> table = new ArrayList<>();   // linhas | a | b | da tabela aberta
         for (String raw : markdown.strip().split("\\R")) {
             String line = raw.replace("\t", "  ");
             String trimmed = line.strip();
             if (trimmed.startsWith("```")) {
                 if (code == null) {
+                    flushTable(out, table);
                     flush(out, paragraph);
                     closeLists(out, depth, 0);
                     depth = 0;
@@ -45,6 +47,16 @@ public final class SimpleMarkdown {
                 code.append(raw).append('\n');
                 continue;
             }
+            if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length() > 1) {
+                flush(out, paragraph);
+                closeLists(out, depth, 0);
+                depth = 0;
+                ordered = closeOrdered(out, ordered);
+                flushQuote(out, quote);
+                table.add(trimmed);
+                continue;
+            }
+            flushTable(out, table);
             boolean numbered = trimmed.matches("\\d+[.)] .*");
             if (!numbered) {
                 ordered = closeOrdered(out, ordered);
@@ -97,6 +109,7 @@ public final class SimpleMarkdown {
                 paragraph.add(inline(trimmed));
             }
         }
+        flushTable(out, table);
         flush(out, paragraph);
         closeLists(out, depth, 0);
         closeOrdered(out, ordered);
@@ -138,22 +151,69 @@ public final class SimpleMarkdown {
         }
     }
 
+    /** Tabela Markdown: a 2a linha |---|---| separa o cabecalho; sem ela, todas as linhas sao de dados. */
+    private static void flushTable(StringBuilder out, List<String> rows) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        boolean header = rows.size() > 1 && rows.get(1).matches("\\|[\\s:|-]+\\|");
+        out.append("<table>");
+        for (int r = 0; r < rows.size(); r++) {
+            if (header && r == 1) {
+                continue;
+            }
+            String tag = header && r == 0 ? "th" : "td";
+            if (header && r == 0) {
+                out.append("<thead>");
+            } else if (r == (header ? 2 : 0)) {
+                out.append("<tbody>");
+            }
+            out.append("<tr>");
+            String row = rows.get(r);
+            for (String cell : row.substring(1, row.length() - 1).split("(?<!\\\\)\\|", -1)) {
+                out.append('<').append(tag).append('>').append(inline(cell.strip().replace("\\|", "|")))
+                        .append("</").append(tag).append('>');
+            }
+            out.append("</tr>");
+            if (header && r == 0) {
+                out.append("</thead>");
+            }
+        }
+        if (rows.size() > (header ? 2 : 0)) {
+            out.append("</tbody>");
+        }
+        out.append("</table>");
+        rows.clear();
+    }
+
     private static String escape(String text) {
         return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
+    /** Uma linha de Markdown inline (negrito, italico, `codigo`), escapada. */
+    public static String inlineHtml(String text) {
+        return text == null ? "" : inline(text);
+    }
+
     private static String inline(String text) {
-        // `codigo` primeiro, sem negrito/italico dentro
+        // `codigo` sai do texto antes da enfase (sem negrito dentro) e volta depois: assim **negrito com `codigo`**
+        // funciona, mesmo com o codigo no meio do negrito.
+        List<String> codes = new ArrayList<>();
         StringBuilder out = new StringBuilder();
         String[] parts = text.split("`", -1);
         for (int i = 0; i < parts.length; i++) {
             if (i % 2 == 1 && i < parts.length - 1) {
-                out.append("<code>").append(escape(parts[i])).append("</code>");
+                out.append('\u0000').append(codes.size()).append('\u0000');
+                codes.add("<code>" + escape(parts[i]) + "</code>");
             } else {
-                out.append(emphasis(escape(i % 2 == 1 ? "`" + parts[i] : parts[i])));
+                out.append(escape(i % 2 == 1 ? "`" + parts[i] : parts[i]));
             }
         }
-        return out.toString();
+        String html = emphasis(out.toString());
+        for (int i = 0; i < codes.size(); i++) {
+            html = html.replace("\u0000" + i + "\u0000", codes.get(i));
+        }
+        return html;
     }
 
     private static String emphasis(String escaped) {
