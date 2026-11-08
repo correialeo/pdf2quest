@@ -306,6 +306,9 @@ public class LessonMcpToolsIntegrationTest {
         flow = flowService.flow(lessonService.task(taskId));
         assertTrue(flow.steps().get(0).done());
         assertEquals("concluir", flow.action().kind());
+        // Aula e quiz da fila mostram a barra de sessao; "Hoje" no lugar de "Aulas" no voltar.
+        mvc.perform(get("/aulas/" + lesson.aulaId())).andExpect(content().string(containsString("session-bar")));
+        mvc.perform(get("/quizzes/" + quiz.quizId())).andExpect(content().string(containsString("session-bar")));
         // Concluir e seguir: grava o tempo e vai para o proximo passo; endereco de fora e ignorado.
         mvc.perform(post("/estudos/cronograma/" + taskId + "/concluir").param("spentMinutes", "37")
                         .param("voltar", "/aulas/" + lesson.aulaId()))

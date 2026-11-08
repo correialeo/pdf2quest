@@ -34,7 +34,7 @@
 
 <!-- Concluir/reabrir. Ao concluir, o app.js pergunta os minutos (ja preenchidos com o estimado). -->
 <form th:fragment="taskCheck(t)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}" class="task-done-form"
-      th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+      th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title},data-task=${t.id}">
     <input type="hidden" name="done" th:value="${!t.done}"/>
     <input type="hidden" name="spentMinutes" value=""/>
     <button type="submit" class="task-check" th:title="${t.done} ? 'Reabrir' : 'Concluir'"
@@ -69,7 +69,7 @@
 
 <!-- Botao "Concluir tarefa" (aula, quiz): abre o mesmo dialogo de minutos do cronograma. -->
 <form th:fragment="taskDoneButton(t)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}"
-      class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+      class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title},data-task=${t.id}">
     <input type="hidden" name="done" value="true"/>
     <input type="hidden" name="spentMinutes" value=""/>
     <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Concluir tarefa</button>
@@ -77,7 +77,7 @@
 
 <!-- Concluir e seguir: conclui (com o tempo do cronometro) e abre o proximo passo da fila ("voltar"). -->
 <form th:fragment="taskDoneAndGo(t, go, label)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}"
-      class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+      class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title},data-task=${t.id}">
     <input type="hidden" name="done" value="true"/>
     <input type="hidden" name="spentMinutes" value=""/>
     <input type="hidden" name="voltar" th:value="${go}"/>

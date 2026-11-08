@@ -1,0 +1,15 @@
+<!-- Barra de sessao (aula e quiz de uma tarefa da fila de hoje): onde estou no dia, os passos da tarefa,
+     o cronometro da tarefa e o atalho para a proxima. s = LessonController.Session; kind/id = o que esta aberto. -->
+<div th:fragment="bar(s, kind, id)" th:if="${s != null}" class="session-bar" th:attr="data-task=${s.flow.task.id}">
+    <a href="/hoje" class="session-home" title="Voltar para Hoje"><i class="bi bi-sun"></i><span class="d-none d-md-inline">Hoje</span></a>
+    <span class="session-pos" th:text="${s.position} + ' de ' + ${s.total}" th:title="'Tarefa ' + ${s.position} + ' de ' + ${s.total} + ' da fila de hoje'"></span>
+    <span class="session-task text-truncate d-none d-lg-inline" th:text="${s.flow.task.title}" th:title="${s.flow.task.title}"></span>
+    <ol th:replace="~{fragments/estudos :: flowSteps(${s.flow}, ${kind}, ${id})}"></ol>
+    <span class="session-timer" th:unless="${s.flow.task.done}" title="Tempo nesta tarefa (conta com a aba aberta). Clique para pausar.">
+        <button type="button" class="session-timer-toggle" aria-label="Pausar ou retomar o cronômetro">
+            <i class="bi bi-stopwatch"></i><span data-role="time">0 min</span><i class="bi bi-pause-fill" data-role="icon"></i></button>
+    </span>
+    <span class="session-done small text-ok" th:if="${s.flow.task.done}"><i class="bi bi-check-circle-fill me-1"></i>Concluída</span>
+    <a class="session-next" th:if="${s.next != null}" th:href="${s.next.link}" th:title="'Próxima: ' + ${s.next.task.title}">
+        <span class="d-none d-md-inline">Próxima</span><i class="bi bi-arrow-right"></i></a>
+</div>

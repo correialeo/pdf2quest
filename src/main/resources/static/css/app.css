@@ -1981,6 +1981,7 @@ html.sidebar-collapsed .workspace-switch {
 .review-items .review-rate { display: inline-flex; gap: .25rem; margin-left: .5rem; }
 .review-items .review-rate .btn { padding: 0 .45rem; font-size: .75rem; line-height: 1.5; border-radius: 999px; width: auto; }
 .review-items li { margin-bottom: .3rem; }
+.session-timer-badge { color: var(--accent); }
 
 .done-today > summary, .notes-box > summary { cursor: pointer; list-style: none; color: var(--bs-secondary-color); font-size: .9rem; }
 .done-today > summary::-webkit-details-marker, .notes-box > summary::-webkit-details-marker { display: none; }
@@ -1988,3 +1989,24 @@ html.sidebar-collapsed .workspace-switch {
 .notes-box[open] > summary::after { transform: rotate(180deg); }
 .week-card { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; }
 .day-cleared { padding: 1.5rem; }
+
+/* ---- Barra de sessao (aula e quiz da fila de hoje): fixa no rodape ---- */
+body.has-session-bar main.page { padding-bottom: 5rem; }
+.session-bar {
+    position: fixed; bottom: 0; right: 0; left: 0; z-index: 1025;
+    display: flex; align-items: center; gap: .75rem;
+    padding: .5rem 1rem; font-size: .85rem;
+    background-color: color-mix(in srgb, var(--bs-body-bg) 94%, transparent);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--bs-border-color);
+}
+@media (min-width: 992px) { .session-bar { left: var(--sidebar-w); } }
+.session-bar .flow-steps { margin: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.session-home { display: inline-flex; align-items: center; gap: .35rem; color: var(--bs-body-color); text-decoration: none; font-weight: 500; }
+.session-pos { color: var(--bs-secondary-color); white-space: nowrap; }
+.session-task { max-width: 16rem; color: var(--bs-secondary-color); }
+.session-timer { margin-left: auto; }
+.session-timer-toggle { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid var(--bs-border-color); background: none; border-radius: 999px; padding: .15rem .6rem; color: var(--bs-body-color); font-variant-numeric: tabular-nums; }
+.session-timer-toggle.is-paused { color: var(--bs-secondary-color); border-style: dashed; }
+.session-done { margin-left: auto; white-space: nowrap; }
+.session-next { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; font-weight: 500; text-decoration: none; }

@@ -41,6 +41,7 @@
                     <span th:if="${f.task.overdue}" class="text-bad">Atrasada · <span th:text="${#temporals.format(f.task.plannedDate, 'dd/MM')}"></span></span>
                     <span th:if="${f.task.subject != null}" th:text="${f.task.subject}"></span>
                     <span th:if="${f.task.estimatedMinutes != null}"><i class="bi bi-clock me-1"></i><span th:text="${f.task.estimatedMinutes} + ' min'"></span></span>
+                    <span class="session-timer-badge" th:attr="data-timer-task=${f.task.id}" hidden></span>
                 </div>
                 <ol th:replace="~{fragments/estudos :: flowSteps(${f}, '', null)}"></ol>
             </div>
@@ -79,6 +80,7 @@
                             <span th:if="${t.overdue}" class="text-bad">Atrasada · <span th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span></span>
                             <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
                             <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
+                            <span class="session-timer-badge" th:attr="data-timer-task=${t.id}" hidden></span>
                         </div>
                         <ol th:replace="~{fragments/estudos :: flowSteps(${f}, '', null)}"></ol>
                         <form th:replace="~{fragments/estudos :: taskDescription(${t})}"></form>

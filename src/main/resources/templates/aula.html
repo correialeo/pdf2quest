@@ -125,6 +125,7 @@
         </div>
     </section>
 </main>
+<div th:replace="~{fragments/session :: bar(${fila}, 'aula', ${lesson.id})}"></div>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
 <!-- Aula interativa: KaTeX (local, de instalar-runtimes.sh), exercicio guiado e codigo executavel. -->
 <th:block th:if="${hasMath}">

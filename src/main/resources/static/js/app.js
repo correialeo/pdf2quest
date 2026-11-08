@@ -106,7 +106,8 @@
             + '<div class="fw-semibold mb-1" data-role="heading"></div>'
             + '<div class="small text-muted mb-3 text-truncate" data-role="title"></div>'
             + '<label class="form-label small" for="taskTimeInput">Minutos estudados</label>'
-            + '<input type="number" id="taskTimeInput" class="form-control mb-3" min="0" step="5" inputmode="numeric"/>'
+            + '<input type="number" id="taskTimeInput" class="form-control mb-1" min="0" step="1" inputmode="numeric"/>'
+            + '<div class="small text-muted mb-3" data-role="timer" hidden></div>'
             + '<div class="d-flex flex-wrap gap-2 justify-content-end">'
             + '<button type="button" class="btn btn-link btn-sm me-auto px-0" data-role="skip"></button>'
             + '<button type="button" class="btn btn-outline-secondary btn-sm" data-role="cancel">Cancelar</button>'
@@ -116,8 +117,12 @@
         var input = dialog.querySelector('input');
         var target = null;
 
+        var completingNow = false;
+
         function finish(minutes) {
             target.querySelector('[name=spentMinutes]').value = minutes;
+            // Concluiu: o cronometro da tarefa ja foi para os minutos, zera.
+            if (completingNow && target.dataset.task && window.p2qTimer) { window.p2qTimer.clear(target.dataset.task); }
             dialog.close();
             target.submit();
         }
@@ -130,7 +135,12 @@
             dialog.querySelector('[data-role=ok]').textContent = completing ? 'Concluir' : 'Salvar';
             dialog.querySelector('[data-role=skip]').textContent = completing ? 'Concluir sem registrar tempo' : 'Apagar o tempo';
             dialog.querySelector('[data-role=skip]').hidden = !completing && !spent;
-            input.value = spent || estimate || '';
+            completingNow = completing;
+            // Cronometro da sessao (session.js): soma ao que ja estava registrado.
+            var timed = completing && form.dataset.task && window.p2qTimer ? window.p2qTimer.minutes(form.dataset.task) : 0;
+            input.value = timed > 0 ? (Number(spent) || 0) + timed : (spent || estimate || '');
+            dialog.querySelector('[data-role=timer]').hidden = !(timed > 0);
+            dialog.querySelector('[data-role=timer]').textContent = 'Inclui ' + timed + ' min do cronômetro.';
             dialog.showModal();
             input.select();
         }
