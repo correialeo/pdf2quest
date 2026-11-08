@@ -47,12 +47,18 @@ public class LessonService {
     private final com.pdf2questao.concurso.ConcursoService concursoService;
     private final LessonBlockValidator blockValidator;
     private final SourceExcerptRepository excerptRepository;
+    private final com.pdf2questao.flashcard.FlashcardRepository flashcardRepository;
+    private final com.pdf2questao.flashcard.FlashcardRatingRepository flashcardRatingRepository;
 
     public LessonService(LessonRepository lessonRepository, QuizRepository quizRepository,
                          QuizQuestionRepository questionRepository, QuizAttemptRepository attemptRepository,
                          StudyTaskRepository taskRepository, com.pdf2questao.concurso.Workspace workspace,
                          com.pdf2questao.concurso.ConcursoService concursoService,
-                         LessonBlockValidator blockValidator, SourceExcerptRepository excerptRepository) {
+                         LessonBlockValidator blockValidator, SourceExcerptRepository excerptRepository,
+                         com.pdf2questao.flashcard.FlashcardRepository flashcardRepository,
+                         com.pdf2questao.flashcard.FlashcardRatingRepository flashcardRatingRepository) {
+        this.flashcardRepository = flashcardRepository;
+        this.flashcardRatingRepository = flashcardRatingRepository;
         this.blockValidator = blockValidator;
         this.excerptRepository = excerptRepository;
         this.workspace = workspace;
@@ -1099,6 +1105,7 @@ public class LessonService {
         List<QuizAttempt> attempts = attemptRepository.findByQuizQuestionIdInOrderByAnsweredAt(
                 questions.stream().map(QuizQuestion::getId).toList());
         attemptRepository.deleteAll(attempts);
+        flashcardRatingRepository.deleteAll(flashcardRatingRepository.findByQuizIdOrderByRatedAt(quizId));
         questionRepository.deleteAll(questions);
         quizRepository.delete(quiz);
         return new DeletedQuiz(quizId, quiz.getTitle(), questions.size(), attempts.size());
@@ -1290,7 +1297,25 @@ public class LessonService {
     public record QuizResult(Long quizId, String titulo, Long aulaId, String disciplina, String topico, String nivel,
                              int perguntas, int respondidas, int acertos, int brancos, boolean concluido,
                              List<QuestionResult> questoes, String formato, Integer liquido,
-                             List<Integer> alemDaAula, String incluirNaAula) {
+                             List<Integer> alemDaAula, String incluirNaAula, List<FlashcardOutcome> flashcards) {
+    }
+
+    /** Flashcard do quiz com a ultima autoavaliacao (nula = nao avaliado). */
+    public record FlashcardOutcome(Long flashcardId, Long aulaId, String conceito, String frente, String avaliacao) {
+    }
+
+    private List<FlashcardOutcome> flashcardOutcomes(Quiz quiz) {
+        List<Long> ids = quiz.flashcardIds();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, String> last = new LinkedHashMap<>();
+        flashcardRatingRepository.findByQuizIdOrderByRatedAt(quiz.getId())
+                .forEach(r -> last.put(r.getFlashcardId(), r.getRating()));
+        Map<Long, com.pdf2questao.flashcard.Flashcard> byId = flashcardRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(com.pdf2questao.flashcard.Flashcard::getId, Function.identity()));
+        return ids.stream().map(byId::get).filter(Objects::nonNull).map(f -> new FlashcardOutcome(f.getId(),
+                f.getLessonId(), f.getConcept(), clip(f.getFront(), 160), last.get(f.getId()))).toList();
     }
 
     public QuizResult result(Long quizId) {
@@ -1325,7 +1350,7 @@ public class LessonService {
                 beyond.isEmpty() || quiz.getLessonId() == null ? null
                         : "As perguntas " + beyond + " foram além da aula " + quiz.getLessonId() + ". Para incluí-las, "
                         + "chame reescrever_aula acrescentando um slide (ou caixa) com {#id} para cada ponto e depois "
-                        + "corrigir_pergunta_quiz com esses conceitos.");
+                        + "corrigir_pergunta_quiz com esses conceitos.", flashcardOutcomes(quiz));
     }
 
     // ---- tela /aulas: tudo agrupado por disciplina ----

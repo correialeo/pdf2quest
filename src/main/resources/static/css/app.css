@@ -1911,6 +1911,14 @@ html.sidebar-collapsed .workspace-switch {
 .lesson-coverage tr.is-weak td { color: var(--bs-danger-text-emphasis); }
 .lesson-coverage tr.is-weak td:last-child { font-weight: 600; }
 
+/* ---- Flashcards da revisao (antes das questoes) ---- */
+.flash-card { min-height: 12rem; border-left: 4px solid var(--bs-primary); }
+.flash-front { font-size: 1.15rem; font-weight: 500; white-space: pre-line; }
+.flash-back { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--bs-border-color); }
+.flash-answer { font-size: 1.05rem; white-space: pre-line; margin-bottom: .35rem; }
+.flash-rate .btn { margin-right: .25rem; }
+.flash-hint { color: var(--bs-warning-text-emphasis); }
+
 /* Placar do quiz sempre visivel: fixo no canto, nao rola com a pagina nem cobre as questoes. */
 #quizScore {
     position: fixed;

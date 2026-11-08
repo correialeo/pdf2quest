@@ -39,7 +39,12 @@ public class LessonMcpTools {
 
     private final String baseUrl;
 
-    public LessonMcpTools(LessonService lessonService, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+    private final com.pdf2questao.flashcard.FlashcardService flashcardService;
+
+    public LessonMcpTools(LessonService lessonService, McpConcurso mcpConcurso,
+                          com.pdf2questao.flashcard.FlashcardService flashcardService,
+                          @Value("${server.port:8080}") int port) {
+        this.flashcardService = flashcardService;
         this.mcpConcurso = mcpConcurso;
         this.lessonService = lessonService;
         this.baseUrl = "http://localhost:" + port;
@@ -89,6 +94,9 @@ public class LessonMcpTools {
                 não confirmado depois de pelo menos duas tentativas diferentes, em 'naoConfirmado' e 'tentativas'. \\
                 Escreva cada conceito a partir do trecho: definição curta, o porquê, um exemplo com dados e a \\
                 pegadinha. Nunca escreva da memória o que a fonte deveria dizer, nem leve isso para o quiz.
+
+                FLASHCARDS. Logo depois de criar a aula, crie os cartões dela com criar_flashcards (um ou mais \\
+                por conceito; eles voltam nas revisões, antes das questões).
 
                 3. QUIZ. Veja erros_quiz_anteriores do assunto e, com criar_quiz (aulaId da aula; o quiz herda a tarefa), crie de 6 a 10 \
                 perguntas baseadas no que a aula ensinou (não em outra \\
@@ -455,14 +463,24 @@ public class LessonMcpTools {
                 o que for norma ou jurisprudência. Não cobre o que não confirmou. Toda alternativa com a explicação de \
                 por que está certa ou errada.
 
-                5. GRAVAR. De 3 a 4 perguntas por assunto, nível "prova" (com estiloDaBanca e referencias: as \
+                5. FLASHCARDS. Para cada disciplina, chame flashcards_da_revisao: escolha de 4 a 8 cartões por \
+                assunto que vence hoje (primeiro os marcados errei/dificil e os nunca vistos). Aula do assunto sem \
+                cartões: crie com criar_flashcards (um por conceito; lacuna para prazos e percentuais, contraste \
+                para o que ele confunde). Os cartões aparecem antes das questões, na mesma tela, e as questões dos \
+                conceitos que ele marcar como difíceis sobem para o começo: escreva perguntas que cubram os \
+                conceitos dos cartões, com 'conceitos' quando o quiz for de uma aula.
+
+                6. GRAVAR. De 3 a 4 perguntas por assunto, nível "prova" (com estiloDaBanca e referencias: as \
                 questões reais da banca que você leu como modelo), um quiz por disciplina (assim o sistema \
                 retoma os erros dela; informe errosRetomados) ou um só se o usuário pedir um simulado misturado, e \
-                nesse caso leia erros_quiz_anteriores de cada disciplina. Passe o link e não mostre as respostas.
+                nesse caso leia erros_quiz_anteriores de cada disciplina. Passe em 'flashcards' os ids escolhidos. \
+                Passe o link e não mostre as respostas.
 
-                6. DEPOIS. Leia resultado_quiz. Para cada assunto, marcar_revisao com lembrei=true só se ele acertou \
-                pelo menos 70%% das perguntas daquele assunto (e false, voltando para amanhã, se não); explique em \
-                poucas linhas o que errou.
+                7. DEPOIS. Leia resultado_quiz. Para cada assunto, marcar_revisao com lembrei=true só se ele acertou \
+                pelo menos 70%% das perguntas daquele assunto (e false, voltando para amanhã, se não): a \
+                autoavaliação dos flashcards não aprova a revisão, só aponta o que ele sente que não sabe. Explique \
+                em poucas linhas o que errou e compare com os cartões (marcou fácil e errou a questão = falsa \
+                segurança, vale citar).
                 """.formatted(c);
     }
 
@@ -575,12 +593,69 @@ public class LessonMcpTools {
                     required = false) String estiloDaBanca,
             @McpToolParam(description = "Nível prova (obrigatório): questões reais da banca lidas como modelo, uma "
                     + "por linha (link da questão/prova ou \"questão local #id\"). Mínimo 2.",
-                    required = false) String referencias) {
+                    required = false) String referencias,
+            @McpToolParam(description = "Revisão: ids dos flashcards (flashcards_da_revisao) que aparecem ANTES das "
+                    + "questões, na mesma tela. As questões dos conceitos que o usuário marcar como errei/difícil "
+                    + "sobem para o começo.", required = false) List<Long> flashcards) {
         Quiz quiz = mcpConcurso.in(concurso, () -> lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel,
                 duvidas, errosRetomados, perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(),
                 tarefaId, formato, estiloDaBanca, referencias));
+        flashcardService.attach(quiz, flashcards);
         return new QuizCreated(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), lessonService.questions(quiz.getId()).size(),
                 errosRetomados == null ? 0 : errosRetomados.size(), baseUrl + "/quizzes/" + quiz.getId());
+    }
+
+    /** Sem flashcards (chamadas antigas e testes). */
+    public QuizCreated createQuiz(Long aulaId, String titulo, String disciplina, String topico, String nivel,
+                                  String duvidas, List<Long> errosRetomados, List<QuizItem> perguntas, Long tarefaId,
+                                  String concurso, String formato, String estiloDaBanca, String referencias) {
+        return createQuiz(aulaId, titulo, disciplina, topico, nivel, duvidas, errosRetomados, perguntas, tarefaId,
+                concurso, formato, estiloDaBanca, referencias, null);
+    }
+
+    public record FlashcardItem(
+            @McpToolParam(description = "Id do conceito da aula ({#id} do slide ou caixa).") String conceito,
+            @McpToolParam(description = "pergunta (padrão), lacuna (\"___\" na frente no lugar do que se lembra: "
+                    + "prazo, percentual, competência) ou contraste (dois conceitos vizinhos lado a lado).",
+                    required = false) String tipo,
+            @McpToolParam(description = "Frente: pergunta de recordação, sem alternativas e sem pista da resposta.")
+            String frente,
+            @McpToolParam(description = "Verso: resposta curta (até 220 caracteres), com o item/artigo quando houver.")
+            String verso) {
+    }
+
+    public record FlashcardsSaved(Long aulaId, int cartoes, List<String> conceitos, String link) {
+    }
+
+    @McpTool(name = "criar_flashcards",
+            description = "Cria (ou substitui) os flashcards de uma aula, usados nas revisões ANTES das questões: "
+                    + "recordação ativa, sem alternativas. Ao menos 1 cartão por conceito de slide de conteúdo (o "
+                    + "resumo não precisa), no máximo 3 por conceito; frente sem pista da resposta; verso curto (até "
+                    + "220 caracteres). Prefira 'lacuna' para prazos, percentuais, limites e competências (o que a "
+                    + "banca troca nas alternativas) e 'contraste' para conceitos vizinhos que o usuário confunde "
+                    + "(veja erros_quiz_anteriores). Crie logo depois de criar_aula; aulas antigas, na primeira "
+                    + "revisão em que entrarem.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true, idempotentHint = true))
+    public FlashcardsSaved createFlashcards(@McpToolParam(description = "Id da aula.") Long aulaId,
+                                            @McpToolParam(description = "Cartões.") List<FlashcardItem> cartoes) {
+        var saved = flashcardService.replace(aulaId, cartoes == null ? null : cartoes.stream()
+                .map(c -> new com.pdf2questao.flashcard.FlashcardService.NewCard(c.conceito(), c.tipo(), c.frente(),
+                        c.verso())).toList());
+        return new FlashcardsSaved(aulaId, saved.size(), saved.stream().map(f -> f.getConcept()).distinct().toList(),
+                baseUrl + "/aulas/" + aulaId);
+    }
+
+    @McpTool(name = "flashcards_da_revisao",
+            description = "Flashcards das aulas de uma disciplina (ou de uma aula), com a última autoavaliação do "
+                    + "usuário em cada um (errei, dificil, facil) e as aulas que ainda não têm cartões. Use na revisão: "
+                    + "escolha os cartões dos assuntos que vencem hoje (priorize errei/dificil e os nunca vistos), crie "
+                    + "os que faltam com criar_flashcards e passe os ids em 'flashcards' de criar_quiz.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
+    public com.pdf2questao.flashcard.FlashcardService.DueCards reviewFlashcards(
+            @McpToolParam(description = "Id da aula.", required = false) Long aulaId,
+            @McpToolParam(description = "Disciplina (parte do nome).", required = false) String disciplina,
+            @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
+        return mcpConcurso.in(concurso, () -> flashcardService.forReview(aulaId, disciplina));
     }
 
     public record TaskLinked(Long tarefaId, Long aulaId, Long quizId, String link) {

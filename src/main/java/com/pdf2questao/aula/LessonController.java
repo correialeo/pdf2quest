@@ -20,7 +20,11 @@ public class LessonController {
     private final LessonService lessonService;
     private final com.pdf2questao.study.StudyTaskService taskService;
 
-    public LessonController(LessonService lessonService, com.pdf2questao.study.StudyTaskService taskService) {
+    private final com.pdf2questao.flashcard.FlashcardService flashcardService;
+
+    public LessonController(LessonService lessonService, com.pdf2questao.study.StudyTaskService taskService,
+                            com.pdf2questao.flashcard.FlashcardService flashcardService) {
+        this.flashcardService = flashcardService;
         this.lessonService = lessonService;
         this.taskService = taskService;
     }
@@ -107,6 +111,8 @@ public class LessonController {
         model.addAttribute("questions", lessonService.questions(id));
         model.addAttribute("answers", lessonService.latest(id));
         // "Revise: slide X" de cada pergunta: o slide da aula que ensina o conceito que ela cobra.
+        // Revisao com flashcards: cartoes primeiro, depois as questoes (as dos conceitos dificeis vem antes).
+        model.addAttribute("flashcards", flashcardService.forQuiz(quiz));
         model.addAttribute("reviewSlides", lessonService.conceptsOf(quiz.getLessonId(), lessonService.questions(id)));
         Long taskId = lessonService.effectiveTaskId(quiz);
         model.addAttribute("next", next(taskId));
@@ -131,6 +137,17 @@ public class LessonController {
         }
         return lessonService.recordExercise(id, request.block(), Boolean.TRUE.equals(request.correct()),
                 request.hints() == null ? 0 : request.hints());
+    }
+
+    public record FlashcardRequest(Long card, String rating) {
+    }
+
+    /** Autoavaliacao de um flashcard do quiz (errei, dificil, facil). */
+    @PostMapping("/quizzes/{id}/flashcard")
+    @ResponseBody
+    public java.util.Map<String, Object> rateFlashcard(@PathVariable Long id, @RequestBody FlashcardRequest request) {
+        var r = flashcardService.rate(id, request.card(), request.rating());
+        return java.util.Map.of("card", r.getFlashcardId(), "rating", r.getRating());
     }
 
     @PostMapping("/quizzes/{id}/responder")

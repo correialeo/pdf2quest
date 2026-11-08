@@ -24,9 +24,48 @@
             <span class="fw-medium">Retoma erros anteriores:</span> <span class="essay-prompt" th:text="${quiz.previousErrors}"></span></div>
     </div>
 
+    <!-- Revisao com flashcards: primeiro lembrar sem pista (cartao a cartao, com autoavaliacao), depois as questoes.
+         As questoes dos conceitos marcados como errei/dificil sobem para o comeco. -->
+    <section class="flash-deck mb-3" th:if="${!flashcards.isEmpty()}" th:attr="data-quiz=${quiz.id}">
+        <div class="d-flex align-items-baseline justify-content-between mb-2">
+            <h2 class="h5 m-0"><i class="bi bi-card-text me-1"></i>Flashcards</h2>
+            <span class="small text-muted flash-progress"></span>
+        </div>
+        <div class="flash-card card p-4" th:each="c : ${flashcards}"
+             th:attr="data-id=${c.id},data-concept=${c.conceito},data-rating=${c.avaliacao}" hidden>
+            <div class="small text-muted mb-2">
+                <span th:text="${c.tipo == 'lacuna'} ? 'Complete' : (${c.tipo == 'contraste'} ? 'Compare' : 'Lembre')"></span>
+                · <span th:text="${c.aula}"></span>
+            </div>
+            <div class="flash-front" th:text="${c.frente}"></div>
+            <div class="flash-back" hidden>
+                <div class="flash-answer" th:text="${c.verso}"></div>
+                <a class="small" th:if="${c.slide != null}" th:href="${c.link}" target="_blank" rel="noopener">
+                    <i class="bi bi-easel me-1"></i>Slide <span th:text="${c.slide}"></span> · <span th:text="${c.slideTitulo}"></span></a>
+            </div>
+            <div class="flash-actions mt-3">
+                <button type="button" class="btn btn-primary btn-sm flash-show">Mostrar resposta <kbd>espaço</kbd></button>
+                <div class="flash-rate" hidden>
+                    <span class="small text-muted me-2">Como foi?</span>
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-rating="errei">Errei <kbd>1</kbd></button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" data-rating="dificil">Difícil <kbd>2</kbd></button>
+                    <button type="button" class="btn btn-outline-success btn-sm" data-rating="facil">Fácil <kbd>3</kbd></button>
+                </div>
+            </div>
+        </div>
+        <div class="flash-summary card p-3" hidden>
+            <div class="flash-summary-text mb-2"></div>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary btn-sm flash-go">Ir para as questões <kbd>Enter</kbd></button>
+                <button type="button" class="btn btn-outline-secondary btn-sm flash-again">Rever os cartões</button>
+            </div>
+            <div class="small text-muted mt-2">A autoavaliação só ordena as questões: quem decide a revisão é o seu acerto nelas.</div>
+        </div>
+    </section>
+
     <!-- Clicar numa alternativa responde: ela fica verde/vermelha com o porque; se errou, a correta aparece.
          Depois de responder, clicar nas outras mostra a explicacao delas. -->
-    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-topic=${q.topic},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : '',data-answer=${q.correctAnswer}">
+    <div class="card p-4 mb-3 quiz-question" th:each="q : ${questions}" th:attr="data-id=${q.id},data-topic=${q.topic},data-concepts=${q.concepts},data-correct=${answers[q.id] != null} ? ${q.correctAnswer} : '',data-selected=${answers[q.id] != null} ? ${answers[q.id].selectedAnswer} : '',data-answer=${q.correctAnswer}">
         <div class="d-flex align-items-center gap-2 mb-1">
             <span class="small text-muted" th:text="${q.position} + ' de ' + ${questions.size()} + (${q.topic != null} ? ' · ' + ${q.topic} : '')"></span>
             <button type="button" class="btn-copy" data-copy="question" title="Copiar questão" aria-label="Copiar questão"><i class="bi bi-clipboard"></i></button>
@@ -163,6 +202,7 @@
         const t = e.target;
         if (e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
         if (document.querySelector('dialog[open]')) return;
+        if (document.body.classList.contains('flash-phase')) return;   // fase dos flashcards: teclas sao deles
         const key = e.key.toUpperCase();
         if (current && certoErrado && key === 'B') {
             const blank = current.querySelector('.quiz-blank');
@@ -239,5 +279,6 @@
     });
     score();
 </script>
+<script src="/js/flashcards.js" th:if="${!flashcards.isEmpty()}"></script>
 </body>
 </html>

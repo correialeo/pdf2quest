@@ -52,10 +52,18 @@ public class Quiz {
     private String styleSources;
     /** Questoes de fixacao no meio de uma aula em slides (respondidas na propria aula, nao numa tela de quiz). */
     private boolean embedded;
+    /** Flashcards mostrados antes das questoes (ids separados por virgula, na ordem); nulo = sem cartoes. */
+    private String flashcards;
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime finishedAt;
     /** Refazer: respostas anteriores a isto saem da tela (continuam no historico). */
     private LocalDateTime restartedAt;
+
+    public java.util.List<Long> flashcardIds() {
+        return flashcards == null || flashcards.isBlank() ? java.util.List.of()
+                : java.util.Arrays.stream(flashcards.split(",")).map(String::strip).filter(x -> !x.isEmpty())
+                .map(Long::valueOf).toList();
+    }
 
     public boolean certoErrado() {
         return CERTO_ERRADO.equals(format);
