@@ -21,9 +21,11 @@ import java.util.Set;
  * a etapa e o indice do intervalo usado no proximo "lembrei". Concluir (ou esquecer) agenda em {@code intervalos[0]}
  * e deixa a etapa em 1; lembrou = proxima revisao em {@code intervalos[etapa]} dias e sobe uma etapa (ate a ultima).
  * <p>
- * Os assuntos a revisar no dia viram uma tarefa por concurso (workspace), no cronograma padrao dele
- * ({@code pdf2questao.revisao.minutos}); concluir a tarefa conta como "lembrei" para os assuntos daquele concurso que
- * ainda estao nela. Assunto de tarefa avulsa (sem cronograma) tem a sua propria tarefa, vista so em "Todos".
+ * Os assuntos a revisar no dia viram uma tarefa por concurso (workspace), no cronograma padrao dele. A tarefa nao junta
+ * tudo o que venceu: {@link ReviewFocusService} escolhe poucas disciplinas (as mais fracas nos quizzes) e o resto
+ * espera os proximos dias. Os escolhidos ficam gravados na tarefa (o foco nao muda no meio do dia) e concluir a tarefa
+ * conta como "lembrei" so para eles. Assunto de tarefa avulsa (sem cronograma) tem a sua propria tarefa, vista so em
+ * "Todos".
  */
 @Service
 public class SpacedRepetitionService {
@@ -31,21 +33,26 @@ public class SpacedRepetitionService {
     private final StudyTaskRepository taskRepository;
     private final ConcursoService concursoService;
     private final Workspace workspace;
+    private final ReviewFocusService focusService;
     private final List<Integer> intervals;
     private final int reviewMinutes;
+    private final int reviewMinutesSunday;
 
     public SpacedRepetitionService(StudyTaskRepository taskRepository, ConcursoService concursoService,
-                                   Workspace workspace,
+                                   Workspace workspace, ReviewFocusService focusService,
                                    @Value("${pdf2questao.revisao.intervalos:1,3,7,14,30}") List<Integer> intervals,
-                                   @Value("${pdf2questao.revisao.minutos:25}") int reviewMinutes) {
+                                   @Value("${pdf2questao.revisao.minutos:30}") int reviewMinutes,
+                                   @Value("${pdf2questao.revisao.minutos-domingo:60}") int reviewMinutesSunday) {
         if (intervals.isEmpty() || intervals.stream().anyMatch(d -> d == null || d < 1)) {
             throw new IllegalStateException("pdf2questao.revisao.intervalos precisa de dias positivos, ex.: 1,3,7,14,30");
         }
         this.taskRepository = taskRepository;
         this.concursoService = concursoService;
         this.workspace = workspace;
+        this.focusService = focusService;
         this.intervals = List.copyOf(intervals);
         this.reviewMinutes = reviewMinutes;
+        this.reviewMinutesSunday = reviewMinutesSunday;
     }
 
     public List<Integer> intervals() {
@@ -95,6 +102,59 @@ public class SpacedRepetitionService {
         return taskRepository.save(task);
     }
 
+    /** Lembrou com dificuldade: repete o ultimo intervalo, sem subir de etapa. */
+    @Transactional
+    public StudyTask hard(Long id, LocalDate today) {
+        StudyTask task = taskRepository.findById(id).orElseThrow();
+        int step = Math.min(Math.max(task.getCurrentStep(), 1), intervals.size() - 1);
+        task.setNextReviewDate(today.plusDays(intervals.get(step - 1)));
+        task.setCurrentStep(step);
+        return taskRepository.save(task);
+    }
+
+    /** Resultado da revisao de um assunto: "bom" (avanca), "dificil" (repete o intervalo) ou "errei" (volta a amanha). */
+    @Transactional
+    public StudyTask mark(Long id, String result, LocalDate today) {
+        String r = result == null ? "" : com.pdf2questao.scoring.ScoringCalculator.normalize(result).strip();
+        return switch (r) {
+            case "bom", "lembrei", "facil" -> remembered(id, today);
+            case "dificil" -> hard(id, today);
+            case "errei", "esqueci" -> forgot(id, today);
+            default -> throw new IllegalArgumentException("Resultado da revisão: bom, dificil ou errei.");
+        };
+    }
+
+    /** Assuntos escolhidos para hoje (tarefas de revisao abertas de hoje) que ainda nao foram marcados, do concurso em vigor. */
+    public List<StudyTask> todayItems(LocalDate today) {
+        Set<Long> chosen = chosenToday(today);
+        return due(today).stream().filter(t -> chosen.contains(t.getId())).toList();
+    }
+
+    /** Como {@link #todayItems}, de um concurso especifico (nulo = avulsos). */
+    public List<StudyTask> todayItemsFor(Long concursoId, LocalDate today) {
+        Set<Long> chosen = chosenToday(today);
+        return dueFor(concursoId, today).stream().filter(t -> chosen.contains(t.getId())).toList();
+    }
+
+    private Set<Long> chosenToday(LocalDate today) {
+        Set<Long> chosen = new LinkedHashSet<>();
+        taskRepository.findAllByReviewDate(today).stream().filter(t -> !t.isDone())
+                .forEach(t -> chosen.addAll(t.reviewItemIds()));
+        return chosen;
+    }
+
+    /**
+     * Foco de hoje do concurso em vigor (em "Todos", de todos): os assuntos das tarefas do dia que ainda faltam, com a
+     * fraqueza de cada disciplina, e o que ficou para os proximos dias.
+     */
+    public ReviewFocusService.Focus focus(LocalDate today) {
+        syncReviewTask(today);
+        List<StudyTask> due = due(today);
+        Set<Long> chosen = chosenToday(today);
+        return focusService.describe(due.stream().filter(t -> chosen.contains(t.getId())).toList(),
+                due.stream().filter(t -> !chosen.contains(t.getId())).toList(), today);
+    }
+
     /**
      * Deixa as tarefas de revisao do dia em dia com os assuntos pendentes, uma por concurso (cada assunto so entra
      * na do seu concurso): cria na primeira vez, traz para hoje uma que ficou aberta de outro dia (ou apaga, se nao
@@ -103,7 +163,15 @@ public class SpacedRepetitionService {
     @Transactional
     public void syncReviewTask(LocalDate today) {
         Map<Long, Long> concursoBy = concursoByCronograma();
-        Map<Long, List<StudyTask>> due = byConcurso(taskRepository.findDueReviews(today), concursoBy);
+        Set<Long> archived = new java.util.HashSet<>();
+        concursoService.byId().forEach((id, c) -> {
+            if (c.isArquivado()) {
+                archived.add(id);
+            }
+        });
+        // Concurso arquivado nao ganha revisao nova (a aberta de outro dia e apagada abaixo, por ficar sem assunto).
+        Map<Long, List<StudyTask>> due = byConcurso(taskRepository.findDueReviews(today).stream()
+                .filter(t -> !archived.contains(concursoOf(t, concursoBy))).toList(), concursoBy);
         Map<Long, List<StudyTask>> open = byConcurso(
                 taskRepository.findByReviewDateNotNullAndDoneFalseOrderByReviewDateDesc(), concursoBy);
         Map<Long, List<StudyTask>> doneToday = byConcurso(taskRepository.findAllByReviewDate(today).stream()
@@ -128,20 +196,55 @@ public class SpacedRepetitionService {
         if (items.isEmpty()) {
             return; // a de hoje (mesmo reaberta) fica como esta
         }
-        if (task == null) {
-            if (reviewedToday) {
-                return; // a de hoje ja foi concluida; o que vencer agora entra na de amanha
+        if (task == null && reviewedToday) {
+            return; // a de hoje ja foi concluida; o que vencer agora entra na de amanha
+        }
+        ReviewFocusService.Focus focus;
+        if (task != null && !stale && !task.reviewItemIds().isEmpty()) {
+            // O foco de hoje ja foi escolhido: so tira o que ja foi marcado (o que venceu depois espera amanha).
+            List<Long> ids = task.reviewItemIds();
+            List<StudyTask> chosen = items.stream().filter(t -> ids.contains(t.getId()))
+                    .sorted(java.util.Comparator.comparingInt(t -> ids.indexOf(t.getId()))).toList();
+            if (chosen.isEmpty()) {
+                return;
             }
-            task = new StudyTask();
-            task.setEstimatedMinutes(reviewMinutes);
-            task.setCronogramaId(concursoId == null ? null : concursoService.defaultCronograma(concursoId).getId());
+            focus = focusService.describe(chosen, items.stream().filter(t -> !ids.contains(t.getId())).toList(), today);
+        } else {
+            if (task == null) {
+                task = new StudyTask();
+                task.setCronogramaId(concursoId == null ? null : concursoService.defaultCronograma(concursoId).getId());
+            }
+            focus = focusService.choose(items, today);
+            task.setReviewItems(String.join(",", focus.items().stream().map(t -> String.valueOf(t.getId())).toList()));
         }
         task.setReviewDate(today);
         task.setPlannedDate(today);
-        task.setTitle("Revisão · " + items.size() + (items.size() == 1 ? " assunto" : " assuntos"));
-        task.setDescription(String.join("\n", items.stream()
-                .map(t -> "- " + t.getTitle() + (t.getSubject() == null ? "" : " (" + t.getSubject() + ")")).toList()));
+        task.setEstimatedMinutes(today.getDayOfWeek() == java.time.DayOfWeek.SUNDAY ? reviewMinutesSunday : reviewMinutes);
+        int n = focus.items().size();
+        task.setTitle("Revisão · Foco: " + focus.label() + " · " + n + (n == 1 ? " assunto" : " assuntos"));
+        task.setDescription(describe(focus));
         taskRepository.save(task);
+    }
+
+    /** Texto da tarefa: as disciplinas em foco com o acerto, os conceitos mais errados, os assuntos e o que espera. */
+    static String describe(ReviewFocusService.Focus focus) {
+        List<String> lines = new ArrayList<>();
+        for (ReviewFocusService.FocusSubject f : focus.foco()) {
+            String acerto = f.acertoQuiz() == null ? "sem quiz ainda" : f.acertoQuiz() + "% de acerto nos quizzes";
+            String weak = f.conceitosFracos().isEmpty() ? ""
+                    : " · mais erra: " + String.join(", ", f.conceitosFracos().stream()
+                    .map(c -> c.conceito() + " (" + c.erros() + "/" + c.vezes() + ")").toList());
+            lines.add("Foco " + f.disciplina() + " — " + acerto + weak);
+            f.assuntos().forEach(t -> lines.add("- " + t.getTitle()
+                    + (t.getSubject() == null ? "" : " (" + t.getSubject() + ")")));
+        }
+        if (!focus.aguardando().isEmpty()) {
+            int waiting = focus.aguardando().stream().mapToInt(ReviewFocusService.Waiting::assuntos).sum();
+            lines.add("Aguardando: " + waiting + (waiting == 1 ? " assunto" : " assuntos") + " de "
+                    + focus.aguardando().size() + (focus.aguardando().size() == 1 ? " disciplina" : " disciplinas")
+                    + " (entram nos próximos dias, as mais fracas primeiro).");
+        }
+        return String.join("\n", lines);
     }
 
     private static Map<Long, List<StudyTask>> byConcurso(List<StudyTask> tasks, Map<Long, Long> concursoBy) {
@@ -150,9 +253,15 @@ public class SpacedRepetitionService {
         return out;
     }
 
-    /** Concluir a tarefa de revisao: os assuntos do concurso dela que ainda estao nela contam como lembrados. */
+    /**
+     * Concluir a tarefa de revisao: os assuntos escolhidos para ela que ainda nao foram marcados contam como lembrados
+     * (os que ficaram aguardando nao andam). Tarefa antiga, sem a lista, avanca os do concurso, como antes.
+     */
     void completeReview(StudyTask review, LocalDate today) {
-        dueFor(concursoService.concursoOfTask(review), today).forEach(t -> remembered(t.getId(), today));
+        List<Long> ids = review.reviewItemIds();
+        dueFor(concursoService.concursoOfTask(review), today).stream()
+                .filter(t -> ids.isEmpty() || ids.contains(t.getId()))
+                .forEach(t -> remembered(t.getId(), today));
     }
 
     /** Primeira revisao de uma tarefa recem-concluida (se ainda nao tiver uma). */

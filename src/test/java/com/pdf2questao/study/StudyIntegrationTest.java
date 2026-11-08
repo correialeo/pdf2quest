@@ -77,8 +77,9 @@ class StudyIntegrationTest {
         spacedRepetition.syncReviewTask(today);
         spacedRepetition.syncReviewTask(today);
         StudyTask review = taskRepository.findAllByReviewDate(today).get(0);
-        assertEquals("Revisão · 2 assuntos", review.getTitle());
-        assertEquals(25, review.getEstimatedMinutes());
+        assertTrue(review.getTitle().startsWith("Revisão · Foco: "), review.getTitle());
+        assertTrue(review.getTitle().endsWith(" · 2 assuntos"), review.getTitle());
+        assertEquals(today.getDayOfWeek() == java.time.DayOfWeek.SUNDAY ? 60 : 30, review.getEstimatedMinutes());
         assertEquals(today, review.getPlannedDate());
         assertTrue(review.getDescription().contains("Atos (Adm)"));
         assertFalse(review.getDescription().contains("Pendente"));
@@ -87,7 +88,7 @@ class StudyIntegrationTest {
         // Esqueci um: sai da tarefa de hoje e volta amanha.
         spacedRepetition.forgot(b.getId(), today);
         spacedRepetition.syncReviewTask(today);
-        assertEquals("Revisão · 1 assunto", taskRepository.findById(review.getId()).orElseThrow().getTitle());
+        assertTrue(taskRepository.findById(review.getId()).orElseThrow().getTitle().endsWith(" · 1 assunto"));
 
         taskService.setDone(review.getId(), true, null);
         StudyTask reviewed = taskRepository.findById(a.getId()).orElseThrow();

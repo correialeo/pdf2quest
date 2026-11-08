@@ -344,43 +344,69 @@ public class StudyMcpTools {
                              int etapa, String materialLink, List<LessonService.Linked> aulasEQuizzes) {
     }
 
+    /** Disciplina em foco hoje: acerto nos quizzes, conceitos que o usuario mais erra e os assuntos a revisar. */
+    public record FocusView(String disciplina, Integer acertoQuiz, int respostasQuiz,
+                            List<com.pdf2questao.study.ReviewFocusService.WeakConcept> conceitosFracos,
+                            List<ReviewView> assuntos) {
+    }
+
+    public record TodayReviews(String foco, List<FocusView> disciplinas,
+                               List<com.pdf2questao.study.ReviewFocusService.Waiting> aguardando) {
+
+        /** Todos os assuntos do foco de hoje, na ordem. */
+        public List<ReviewView> assuntos() {
+            return disciplinas.stream().flatMap(d -> d.assuntos().stream()).toList();
+        }
+    }
+
     @McpTool(name = "revisoes_de_hoje",
-            description = "Assuntos da revisão espaçada do concurso que vencem hoje (ou já venceram); cada concurso "
-                    + "tem os seus. Traz também as aulas e quizzes que o assunto já teve (aulasEQuizzes). Para montar "
-                    + "um quiz de revisão, use o prompt revisao_do_dia (chame perguntas_ja_feitas antes, para não "
-                    + "repetir questão) e depois chame marcar_revisao com lembrei=true ou false.",
+            description = "Foco da revisão espaçada de hoje no concurso: só as poucas disciplinas mais fracas nos "
+                    + "quizzes (2 por dia, 3 no domingo) com os assuntos vencidos delas, o acerto nos quizzes e os "
+                    + "conceitos que o usuário mais erra (conceitosFracos: aulaId + conceito). O resto vencido vem em "
+                    + "'aguardando' e entra nos próximos dias: não revise. Cada assunto traz as aulas e quizzes que já "
+                    + "teve. Monte a revisão pelo prompt revisao_do_dia e depois chame marcar_revisao.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
-    public List<ReviewView> todayReviews(
+    public TodayReviews todayReviews(
             @McpToolParam(description = McpConcurso.PARAM, required = false) String concurso) {
         LocalDate today = LocalDate.now();
-        spacedRepetition.syncReviewTask(today);
-        List<StudyTask> due = mcpConcurso.in(concurso, () -> spacedRepetition.due(today));
-        var linked = lessonService.forTasks(due.stream().map(StudyTask::getId).toList());
-        return due.stream()
+        var focus = mcpConcurso.in(concurso, () -> spacedRepetition.focus(today));
+        var linked = lessonService.forTasks(focus.items().stream().map(StudyTask::getId).toList());
+        List<FocusView> views = focus.foco().stream().map(f -> new FocusView(f.disciplina(), f.acertoQuiz(),
+                f.respostasQuiz(), f.conceitosFracos(), f.assuntos().stream()
                 .map(t -> new ReviewView(t.getId(), t.getTitle(), t.getSubject(), t.getPlannedDate(),
                         t.getNextReviewDate(), t.getCurrentStep(),
                         t.getPageId() == null ? null : baseUrl + "/estudos/paginas/" + t.getPageId(),
                         linked.getOrDefault(t.getId(), List.of())))
-                .toList();
+                .toList())).toList();
+        return new TodayReviews(focus.label(), views, focus.aguardando());
     }
 
-    public record ReviewMarked(Long id, String assunto, boolean lembrou, LocalDate proximaRevisao,
+    public record ReviewMarked(Long id, String assunto, String resultado, boolean lembrou, LocalDate proximaRevisao,
                                int revisoesRestantesHoje) {
     }
 
     @McpTool(name = "marcar_revisao",
-            description = "Registra o resultado da revisão de um assunto (id vindo de revisoes_de_hoje): lembrei=true "
-                    + "avança para o próximo intervalo; false volta para amanhã. Quando não sobra assunto, a tarefa "
-                    + "de revisão do dia some da lista.",
+            description = "Registra o resultado da revisão de um assunto (id vindo de revisoes_de_hoje). resultado: "
+                    + "bom (acertou 85%+ das perguntas do assunto; avança o intervalo), dificil (70% a 84%; repete o "
+                    + "intervalo) ou errei (abaixo de 70%; volta amanhã). O antigo lembrei=true/false ainda vale como "
+                    + "bom/errei. Quando não sobra assunto do foco, a tarefa de revisão do dia some da lista.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public ReviewMarked markReview(
             @McpToolParam(description = "Id do assunto.") Long id,
-            @McpToolParam(description = "true se o usuário lembrou bem; false se esqueceu ou errou.") boolean lembrei) {
+            @McpToolParam(description = "Compatibilidade: true = bom, false = errei (use 'resultado').",
+                    required = false) Boolean lembrei,
+            @McpToolParam(description = "bom, dificil ou errei.", required = false) String resultado) {
         LocalDate today = LocalDate.now();
-        StudyTask task = lembrei ? spacedRepetition.remembered(id, today) : spacedRepetition.forgot(id, today);
+        String r = !McpText.blank(resultado) ? resultado : lembrei == null ? null : lembrei ? "bom" : "errei";
+        if (r == null) {
+            throw new IllegalArgumentException("Informe resultado: bom, dificil ou errei.");
+        }
+        StudyTask task = spacedRepetition.mark(id, r, today);
         spacedRepetition.syncReviewTask(today);
-        return new ReviewMarked(task.getId(), task.getTitle(), lembrei, task.getNextReviewDate(),
-                spacedRepetition.dueFor(taskService.concursoOf(task), today).size());
+        int left = spacedRepetition.todayItemsFor(taskService.concursoOf(task), today).size();
+        String normalized = com.pdf2questao.scoring.ScoringCalculator.normalize(r).strip();
+        return new ReviewMarked(task.getId(), task.getTitle(), normalized,
+                !normalized.equals("errei") && !normalized.equals("esqueci"), task.getNextReviewDate(), left);
     }
 
     public record SummaryAppended(Long paginaId, String titulo, String link) {

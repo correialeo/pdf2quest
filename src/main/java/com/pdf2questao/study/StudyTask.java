@@ -62,8 +62,21 @@ public class StudyTask {
     /** Falso: concluir a tarefa nao agenda revisao espacada (descanso, prova, tarefas que nao sao assunto). */
     private boolean reviewEnabled = true;
 
+    /** So na tarefa diaria de revisao: ids dos assuntos escolhidos para o dia (foco), separados por virgula. */
+    @Column(length = 2000)
+    private String reviewItems;
+
     public boolean isReview() {
         return reviewDate != null;
+    }
+
+    /** Assuntos da tarefa de revisao, na ordem em que foram escolhidos. */
+    public java.util.List<Long> reviewItemIds() {
+        if (reviewItems == null || reviewItems.isBlank()) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(reviewItems.split(",")).map(String::strip).filter(s -> !s.isEmpty())
+                .map(Long::valueOf).toList();
     }
 
     /** Cabecalho de bloco vindo do .docx ("B – TI (90 min)"): so repete disciplina e tempo, ja mostrados na lista. */

@@ -55,10 +55,12 @@
                                 <a class="text-reset" th:href="${r.pageId != null} ? @{/estudos/paginas/{id}(id=${r.pageId})} : @{/estudos/cronograma/{id}/editar(id=${r.id})}" th:text="${r.title}"></a>
                                 <span class="text-muted" th:if="${r.subject != null}" th:text="'· ' + ${r.subject}"></span>
                                 <form method="post" th:action="@{/estudos/cronograma/{id}/revisar(id=${r.id})}" class="d-inline">
-                                    <button type="submit" name="lembrei" value="true" class="btn btn-link btn-sm p-0 ms-1 text-ok"
-                                            title="Lembrei: sai da revisão de hoje e vai para o próximo intervalo">lembrei</button>
-                                    <button type="submit" name="lembrei" value="false" class="btn btn-link btn-sm p-0 ms-1 text-bad"
-                                            title="Esqueci: sai da revisão de hoje e volta amanhã">esqueci</button>
+                                    <button type="submit" name="resultado" value="bom" class="btn btn-link btn-sm p-0 ms-1 text-ok"
+                                            title="Bom: sai da revisão de hoje e vai para o próximo intervalo">bom</button>
+                                    <button type="submit" name="resultado" value="dificil" class="btn btn-link btn-sm p-0 ms-1 text-muted"
+                                            title="Difícil: sai da revisão de hoje e repete o mesmo intervalo">difícil</button>
+                                    <button type="submit" name="resultado" value="errei" class="btn btn-link btn-sm p-0 ms-1 text-bad"
+                                            title="Errei: sai da revisão de hoje e volta amanhã">errei</button>
                                 </form>
                             </li>
                         </ul>

@@ -78,7 +78,7 @@ class StudyMcpToolsIntegrationTest {
         assertEquals(50, done.minutos());
         assertEquals(today.plusDays(1), done.proximaRevisao());
 
-        var marked = tools.markReview(task.getId(), true);
+        var marked = tools.markReview(task.getId(), null, "bom");
         assertEquals(today.plusDays(3), marked.proximaRevisao());
 
         var summary = tools.appendToDaySummary("## Treino\n- ponto **chave**", null, null);

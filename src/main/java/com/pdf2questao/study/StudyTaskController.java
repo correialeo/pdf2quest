@@ -237,18 +237,16 @@ public class StudyTaskController {
     }
 
     /**
-     * Revisao espacada de um assunto: {@code lembrei=true} avanca nos intervalos; {@code false} volta para o primeiro
-     * e sai da tarefa de revisao de hoje.
+     * Revisao espacada de um assunto: {@code resultado} = bom (avanca nos intervalos), dificil (repete o intervalo) ou
+     * errei (volta para amanha). O antigo {@code lembrei=true/false} continua valendo como bom/errei.
      */
     @PostMapping("/estudos/cronograma/{id}/revisar")
-    public String review(@PathVariable Long id, @RequestParam boolean lembrei,
+    public String review(@PathVariable Long id, @RequestParam(required = false) Boolean lembrei,
+                         @RequestParam(required = false) String resultado,
                          @RequestHeader(value = "Referer", required = false) String referer) {
         LocalDate today = LocalDate.now();
-        if (lembrei) {
-            spacedRepetition.remembered(id, today);
-        } else {
-            spacedRepetition.forgot(id, today);
-        }
+        String r = resultado != null && !resultado.isBlank() ? resultado : Boolean.FALSE.equals(lembrei) ? "errei" : "bom";
+        spacedRepetition.mark(id, r, today);
         spacedRepetition.syncReviewTask(today);
         return "redirect:" + StudyController.sameSite(referer, "/estudos");
     }

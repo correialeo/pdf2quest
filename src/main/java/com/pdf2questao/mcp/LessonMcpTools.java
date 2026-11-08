@@ -441,11 +441,18 @@ public class LessonMcpTools {
         String c = McpText.blank(concurso) ? "" : " Passe concurso=\"" + concurso + "\" em todas as ferramentas.";
         return """
                 Monte a revisão do dia do usuário no pdf2questao.%s Revisão não é reler a aula: é testar se o que foi \
-                estudado ainda se sustenta, e tem que ser MAIS DIFÍCIL que o quiz da aula.
+                estudado ainda se sustenta, e tem que ser MAIS DIFÍCIL que o quiz da aula. E é FOCADA: poucas \
+                disciplinas por dia, atacando os pontos fracos, em vez de um pouco de tudo.
 
-                1. ASSUNTOS. Chame revisoes_de_hoje (só devolve os do concurso; cada concurso tem os seus). Agrupe por \
-                disciplina e use a etapa: quanto maior, mais difícil e mais misturado com assuntos parecidos. Para cada \
-                disciplina chame erros_quiz_anteriores, desempenho_quiz e perguntas_ja_feitas.
+                1. FOCO. Chame revisoes_de_hoje. Ele já escolheu as disciplinas do dia (as mais fracas nos quizzes, \
+                2 por dia, 3 no domingo) e traz, em cada uma, os assuntos vencidos e os conceitosFracos (o que ele \
+                mais erra, com aulaId). Revise SÓ essas disciplinas; o que vier em 'aguardando' fica para os próximos \
+                dias, não entra hoje. Use a etapa: quanto maior, mais difícil. Para cada disciplina do foco chame \
+                erros_quiz_anteriores, desempenho_quiz e perguntas_ja_feitas.
+
+                PONTOS FRACOS PRIMEIRO. Pelo menos 60%% das perguntas de cada disciplina cobrem os conceitosFracos e \
+                os erros_quiz_anteriores dela (outro ângulo, outro cenário, nunca a mesma pergunta). O restante cobre \
+                os assuntos vencidos que ainda não têm erro registrado.
 
                 2. NÃO REPITA. O sistema recusa pergunta já feita no concurso (outro quiz ou revisão anterior), \
                 inclusive reescrita de leve. Não mude só as palavras: cubra um ponto ainda não perguntado, ou o mesmo \
@@ -463,24 +470,25 @@ public class LessonMcpTools {
                 o que for norma ou jurisprudência. Não cobre o que não confirmou. Toda alternativa com a explicação de \
                 por que está certa ou errada.
 
-                5. FLASHCARDS. Para cada disciplina, chame flashcards_da_revisao: escolha de 4 a 8 cartões por \
-                assunto que vence hoje (primeiro os marcados errei/dificil e os nunca vistos). Aula do assunto sem \
-                cartões: crie com criar_flashcards (um por conceito; lacuna para prazos e percentuais, contraste \
-                para o que ele confunde). Os cartões aparecem antes das questões, na mesma tela, e as questões dos \
-                conceitos que ele marcar como difíceis sobem para o começo: escreva perguntas que cubram os \
-                conceitos dos cartões, com 'conceitos' quando o quiz for de uma aula.
+                5. FLASHCARDS. Poucos e certeiros: no máximo 6 por disciplina. Chame flashcards_da_revisao e escolha \
+                primeiro os cartões dos conceitosFracos, depois os marcados errei/dificil, depois os nunca vistos \
+                dos assuntos vencidos. Não inclua cartão de conceito que ele acerta sempre. Conceito fraco sem \
+                cartão: crie com criar_flashcards (lacuna para prazos e percentuais, contraste para o que ele \
+                confunde). Os cartões aparecem antes das questões, e as questões dos conceitos que ele marcar como \
+                difíceis sobem para o começo: escreva perguntas que cubram os conceitos dos cartões, com \
+                'conceitos' quando o quiz for de uma aula.
 
-                6. GRAVAR. De 3 a 4 perguntas por assunto, nível "prova" (com estiloDaBanca e referencias: as \
-                questões reais da banca que você leu como modelo), um quiz por disciplina (assim o sistema \
-                retoma os erros dela; informe errosRetomados) ou um só se o usuário pedir um simulado misturado, e \
-                nesse caso leia erros_quiz_anteriores de cada disciplina. Passe em 'flashcards' os ids escolhidos. \
-                Passe o link e não mostre as respostas.
+                6. GRAVAR. Um quiz por disciplina do foco (assim o sistema retoma os erros dela; informe \
+                errosRetomados), de 8 a 12 perguntas no total da disciplina, nível "prova" (com estiloDaBanca e \
+                referencias: as questões reais da banca que você leu como modelo). Grave a disciplina real na \
+                questão (nunca "Revisão" ou "Misto"): é ela que alimenta a medida de pontos fracos. Passe em \
+                'flashcards' os ids escolhidos. Passe o link e não mostre as respostas.
 
-                7. DEPOIS. Leia resultado_quiz. Para cada assunto, marcar_revisao com lembrei=true só se ele acertou \
-                pelo menos 70%% das perguntas daquele assunto (e false, voltando para amanhã, se não): a \
-                autoavaliação dos flashcards não aprova a revisão, só aponta o que ele sente que não sabe. Explique \
-                em poucas linhas o que errou e compare com os cartões (marcou fácil e errou a questão = falsa \
-                segurança, vale citar).
+                7. DEPOIS. Leia resultado_quiz. Para cada assunto, marcar_revisao com resultado: "bom" se acertou \
+                85%% ou mais das perguntas daquele assunto, "dificil" de 70%% a 84%%, "errei" abaixo de 70%% (volta \
+                amanhã). A autoavaliação dos flashcards não aprova a revisão, só aponta o que ele sente que não \
+                sabe. Explique em poucas linhas o que errou, quais conceitos fracos melhoraram ou continuam fracos, \
+                e compare com os cartões (marcou fácil e errou a questão = falsa segurança, vale citar).
                 """.formatted(c);
     }
 

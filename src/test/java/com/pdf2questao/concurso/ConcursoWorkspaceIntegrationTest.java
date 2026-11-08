@@ -232,7 +232,7 @@ class ConcursoWorkspaceIntegrationTest {
         assertEquals(java.util.List.of(a.getId()), spacedRepetition.due(today).stream().map(StudyTask::getId).toList());
         var reviewsAlfa = taskService.dueBy(today).stream().filter(StudyTask::isReview).toList();
         assertEquals(1, reviewsAlfa.size());
-        assertEquals("Revisão · 1 assunto", reviewsAlfa.get(0).getTitle());
+        assertEquals("Revisão · Foco: Contab · 1 assunto", reviewsAlfa.get(0).getTitle());
         assertTrue(reviewsAlfa.get(0).getDescription().contains("Assunto so do Alfa"));
         assertFalse(reviewsAlfa.get(0).getDescription().contains("Beta"));
         assertEquals(alfa.getId(), concursoService.concursoOfTask(reviewsAlfa.get(0)));
@@ -246,9 +246,9 @@ class ConcursoWorkspaceIntegrationTest {
 
         // As ferramentas MCP respeitam o concurso pedido, sem trocar o ativo da tela.
         var mcpAlfa = studyTools.todayReviews(String.valueOf(alfa.getId()));
-        assertEquals(java.util.List.of(a.getId()), mcpAlfa.stream().map(StudyMcpTools.ReviewView::id).toList());
+        assertEquals(java.util.List.of(a.getId()), mcpAlfa.assuntos().stream().map(StudyMcpTools.ReviewView::id).toList());
         assertEquals(beta.getId(), workspace.selectedId());
-        assertEquals(0, studyTools.markReview(a.getId(), true).revisoesRestantesHoje());
+        assertEquals(0, studyTools.markReview(a.getId(), true, null).revisoesRestantesHoje());
         assertEquals(1, spacedRepetition.dueFor(beta.getId(), today).size());
 
         // Concluir a revisao de um concurso nao avanca os assuntos do outro.
