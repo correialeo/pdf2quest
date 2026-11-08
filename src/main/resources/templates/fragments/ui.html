@@ -14,6 +14,14 @@
     <i class="bi bi-chat-dots me-1"></i><span th:text="${label}"></span>
 </button>
 
+<!-- Abas das telas de importacao (uma entrada so no menu: "Importar"). active = pdf | arquivo | gabarito. -->
+<nav th:fragment="importTabs(active)" class="study-tabs" aria-label="Importar">
+    <a href="/import" th:classappend="${active == 'pdf'} ? 'active'"><i class="bi bi-file-earmark-pdf"></i> Prova em PDF</a>
+    <a href="/import/arquivo#treino"><i class="bi bi-chat-dots"></i> Treino do Claude</a>
+    <a href="/import/arquivo" th:classappend="${active == 'arquivo'} ? 'active'"><i class="bi bi-filetype-csv"></i> Planilha/JSON</a>
+    <a href="/import/gabarito" th:classappend="${active == 'gabarito'} ? 'active'"><i class="bi bi-check2-square"></i> Gabarito</a>
+</nav>
+
 <!-- Cartao de metrica: rotulo pequeno em cima, numero grande embaixo. -->
 <div th:fragment="stat(label, value, cls)" class="card stat">
     <div class="stat-label" th:text="${label}"></div>

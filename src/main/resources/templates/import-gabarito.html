@@ -11,6 +11,7 @@
         </div>
         <a href="/import/gabarito/arquivo" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i>Gabarito em planilha/texto</a>
     </div>
+    <nav th:replace="~{fragments/ui :: importTabs('gabarito')}"></nav>
 
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
 

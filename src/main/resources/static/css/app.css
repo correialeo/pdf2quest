@@ -2010,3 +2010,11 @@ body.has-session-bar main.page { padding-bottom: 5rem; }
 .session-timer-toggle.is-paused { color: var(--bs-secondary-color); border-style: dashed; }
 .session-done { margin-left: auto; white-space: nowrap; }
 .session-next { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; font-weight: 500; text-decoration: none; }
+
+/* ---- Menu lateral: "Mais" recolhivel ---- */
+.sidebar-more > summary { list-style: none; cursor: pointer; }
+.sidebar-more > summary::-webkit-details-marker { display: none; }
+.sidebar-more-caret { margin-left: auto; font-size: .7rem !important; transition: transform .15s; }
+.sidebar-more[open] .sidebar-more-caret { transform: rotate(180deg); }
+.sidebar-more .sidebar-section { padding-top: .7rem; }
+html.sidebar-collapsed .sidebar-more[open] > summary { margin-bottom: .5rem; }

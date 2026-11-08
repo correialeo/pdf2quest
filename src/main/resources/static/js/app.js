@@ -35,8 +35,52 @@
         if (best) {
             best.classList.add('active');
         }
+        // "Mais": abre quando a pagina atual esta la dentro; senao lembra a ultima escolha.
+        var more = document.querySelector('.sidebar-more');
+        if (more) {
+            more.open = (best && more.contains(best)) || localStorage.getItem('sidebarMore') === '1';
+            more.addEventListener('toggle', function () { localStorage.setItem('sidebarMore', more.open ? '1' : '0'); });
+        }
+        // /estudos/cronogramas acende "Cronograma" (mesma area); as abas do topo separam as duas telas.
+        if (!best && path.indexOf('/estudos/cronogramas') === 0) {
+            var cron = document.querySelector('.sidebar .sidebar-link[href="/estudos/cronograma"]');
+            if (cron) cron.classList.add('active');
+        }
     }
 
+    // Anotacao rapida de qualquer tela: tecla N abre, Ctrl/Cmd+Enter guarda na caixa de entrada e volta para a tela.
+    function setupQuickNoteKey() {
+        var dialog = null;
+        document.addEventListener('keydown', function (e) {
+            var t = e.target;
+            if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable
+                || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0 || document.querySelector('dialog[open]')
+                || document.body.classList.contains('flash-phase') || document.body.classList.contains('focus-mode')) return;
+            e.preventDefault();
+            if (!dialog) {
+                dialog = document.createElement('dialog');
+                dialog.className = 'task-time-dialog quick-note-dialog';
+                dialog.innerHTML = '<form method="post" action="/estudos/caixa-de-entrada">'
+                    + '<div class="fw-semibold mb-2"><i class="bi bi-inbox me-1"></i>Anotação rápida</div>'
+                    + '<textarea name="content" class="form-control mb-2" rows="3" required placeholder="Dúvida, artigo para revisar, ideia…"></textarea>'
+                    + '<div class="d-flex gap-2 justify-content-end align-items-center">'
+                    + '<span class="small text-muted me-auto"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> guarda · <kbd>Esc</kbd> fecha</span>'
+                    + '<button type="button" class="btn btn-outline-secondary btn-sm" data-role="cancel">Cancelar</button>'
+                    + '<button type="submit" class="btn btn-primary btn-sm">Guardar</button></div></form>';
+                document.body.appendChild(dialog);
+                var area = dialog.querySelector('textarea');
+                area.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && area.value.trim() !== '') {
+                        ev.preventDefault();
+                        area.form.submit();
+                    }
+                });
+                dialog.querySelector('[data-role=cancel]').addEventListener('click', function () { dialog.close(); });
+            }
+            dialog.showModal();
+            dialog.querySelector('textarea').focus();
+        });
+    }
 
     // Menu lateral recolhido (so icones) no desktop; a escolha fica salva e o head.html aplica antes de pintar.
     function setupSidebarCollapse() {
@@ -370,6 +414,7 @@
         setupFlowActions();
         setupTaskDescription();
         setupQuickNote();
+        setupQuickNoteKey();
         setupThemeToggle();
         highlightActiveNavLink();
         setupSidebarCollapse();
