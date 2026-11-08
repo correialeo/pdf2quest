@@ -2,6 +2,7 @@ package com.pdf2questao.mcp;
 
 import com.pdf2questao.Pdf2QuestaoApplication;
 import com.pdf2questao.aula.LessonService;
+import com.pdf2questao.aula.TodayFlowService;
 import com.pdf2questao.mcp.LessonMcpTools.QuizAlternative;
 import com.pdf2questao.mcp.LessonMcpTools.QuizItem;
 import com.pdf2questao.session.AttemptRepository;
@@ -169,7 +170,9 @@ public class LessonMcpToolsIntegrationTest {
         mvc.perform(get("/aulas")).andExpect(status().isOk()).andExpect(content().string(containsString("Créditos adicionais")))
                 .andExpect(content().string(containsString("Quizzes avulsos")))
                 .andExpect(content().string(containsString("Aproveitamento")));
-        mvc.perform(get("/hoje")).andExpect(status().isOk()).andExpect(content().string(containsString("Créditos adicionais")));
+        // Aula sem tarefa nao entra na fila do dia (fica em Aulas).
+        mvc.perform(get("/hoje")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Créditos adicionais"))));
     }
 
     private static QuizItem scrum(String statement, String a, String b) {
@@ -238,6 +241,8 @@ public class LessonMcpToolsIntegrationTest {
     com.pdf2questao.study.StudyTaskRepository taskRepository;
     @Autowired
     StudyMcpTools studyTools;
+    @Autowired
+    com.pdf2questao.aula.TodayFlowService flowService;
 
     @Test
     void aulaEQuizLigadosATarefaAparecemNaTarefaENoHoje() throws Exception {
@@ -287,7 +292,28 @@ public class LessonMcpToolsIntegrationTest {
         var view = studyTools.todayTasks(null, null).stream().filter(t -> t.id().equals(taskId)).findFirst().orElseThrow();
         assertEquals(2, view.aulasEQuizzes().size());
 
-        mvc.perform(get("/hoje")).andExpect(content().string(containsString("Quiz: Quiz de receita")));
+        mvc.perform(get("/hoje")).andExpect(content().string(containsString("Quiz de receita")))
+                .andExpect(content().string(containsString("Começar aula")));
+
+        // Fila do dia: Aula -> Quiz da aula -> Quiz avulso (ja feito) -> Concluir.
+        var flow = flowService.flow(lessonService.task(taskId));
+        assertEquals(List.of("aula", "quiz", "quiz"), flow.steps().stream().map(TodayFlowService.Step::kind).toList());
+        assertEquals("aula", flow.action().kind());
+        assertEquals("Começar aula", flow.action().label());
+        assertTrue(flow.steps().get(2).done(), "o avulso respondido conta como feito");
+        // Respondeu o quiz da aula: a aula conta como lida e o proximo passo vira concluir.
+        answer(quiz.quizId(), lessonService.questions(quiz.quizId()).get(0).getId(), "B");
+        flow = flowService.flow(lessonService.task(taskId));
+        assertTrue(flow.steps().get(0).done());
+        assertEquals("concluir", flow.action().kind());
+        // Concluir e seguir: grava o tempo e vai para o proximo passo; endereco de fora e ignorado.
+        mvc.perform(post("/estudos/cronograma/" + taskId + "/concluir").param("spentMinutes", "37")
+                        .param("voltar", "/aulas/" + lesson.aulaId()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/aulas/" + lesson.aulaId()));
+        assertEquals(37, lessonService.task(taskId).getSpentMinutes());
+        mvc.perform(post("/estudos/cronograma/" + taskId + "/concluir").param("done", "false")
+                        .param("voltar", "//exemplo.com"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/estudos/cronograma"));
         mvc.perform(get("/estudos/cronograma/" + taskId + "/editar"))
                 .andExpect(content().string(containsString("Aula: Receita pública")));
         mvc.perform(get("/quizzes/" + quiz.quizId())).andExpect(content().string(containsString("AFO – Receita pública")));

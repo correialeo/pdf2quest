@@ -1936,3 +1936,55 @@ html.sidebar-collapsed .workspace-switch {
 @media (max-width: 767.98px) {
     #quizScore { top: 3.6rem; right: .5rem; font-size: .75rem; }
 }
+
+/* ---- Hoje: fila do dia ---- */
+.day-progress { display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; font-size: .85rem; color: var(--bs-secondary-color); }
+.day-progress strong { color: var(--bs-body-color); }
+.day-progress-bar { display: block; width: 8rem; height: .35rem; border-radius: 999px; background: var(--bs-tertiary-bg); overflow: hidden; }
+.week-card .day-progress-bar { width: 100%; }
+.day-progress-bar > span { display: block; height: 100%; background: var(--ok); border-radius: inherit; }
+
+.continue-card { padding: 1.1rem 1.25rem; margin-bottom: 1.5rem; border-left: 4px solid var(--accent); background: linear-gradient(90deg, var(--accent-soft), transparent 70%), var(--bs-card-bg); }
+.continue-label { display: flex; align-items: center; gap: .4rem; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); margin-bottom: .35rem; }
+.continue-body { display: flex; align-items: center; gap: 1rem; }
+.continue-body > .min-w-0 { flex: 1; min-width: 0; }
+.continue-title { font-size: 1.2rem; font-weight: 600; }
+.continue-meta { display: flex; flex-wrap: wrap; gap: .25rem .9rem; font-size: .85rem; color: var(--bs-secondary-color); }
+.continue-action { flex-shrink: 0; }
+@media (max-width: 575.98px) { .continue-body { flex-direction: column; align-items: stretch; } }
+
+.flow-list { display: flex; flex-direction: column; gap: .6rem; }
+.flow-card { flex-direction: row; align-items: flex-start; gap: .75rem; padding: .8rem 1rem; }
+.flow-card .task-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flow-card .task-done-form:first-child { padding-top: .1rem; }
+.flow-card.is-current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+.flow-card.is-overdue .task-check { color: var(--bad); }
+.flow-body { flex: 1; min-width: 0; }
+.flow-title { display: block; font-weight: 500; color: inherit; text-decoration: none; }
+.flow-title:hover { color: var(--accent); }
+.flow-actions { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
+@media (max-width: 575.98px) { .flow-card { flex-wrap: wrap; } .flow-actions { width: 100%; padding-left: 1.9rem; } }
+.flow-card:target { animation: flow-flash 1.2s ease-out; }
+@keyframes flow-flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: none; } }
+
+.flow-steps { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; list-style: none; padding: 0; margin: .4rem 0 0; font-size: .78rem; }
+.flow-steps li { display: flex; align-items: center; }
+.flow-steps li + li::before { content: "\203A"; color: var(--bs-secondary-color); margin-right: .25rem; }
+.flow-steps a, .flow-steps span { color: var(--bs-secondary-color); text-decoration: none; white-space: nowrap; }
+.flow-steps li > a, .flow-steps li > span { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .5rem; border-radius: 999px; border: 1px solid var(--bs-border-color); }
+.flow-steps li > a:hover { color: var(--bs-body-color); border-color: var(--bs-secondary-color); }
+.flow-steps li.is-done > a, .flow-steps li.is-done > span { color: var(--ok); border-color: transparent; background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.flow-steps li.is-next > a, .flow-steps li.is-next > span { color: var(--accent); border-color: var(--accent); font-weight: 500; }
+.flow-steps li[aria-current] > a { background: var(--accent); color: #fff; border-color: var(--accent); }
+.flow-steps li > a span, .flow-steps li > span span, .flow-steps .flow-step-detail { padding: 0; border: 0; color: inherit; background: none; }
+
+.review-items .review-rate { display: inline-flex; gap: .25rem; margin-left: .5rem; }
+.review-items .review-rate .btn { padding: 0 .45rem; font-size: .75rem; line-height: 1.5; border-radius: 999px; width: auto; }
+.review-items li { margin-bottom: .3rem; }
+
+.done-today > summary, .notes-box > summary { cursor: pointer; list-style: none; color: var(--bs-secondary-color); font-size: .9rem; }
+.done-today > summary::-webkit-details-marker, .notes-box > summary::-webkit-details-marker { display: none; }
+.notes-box > summary::after { content: "\F282"; font-family: bootstrap-icons; margin-left: .5rem; font-size: .7rem; transition: transform .15s; }
+.notes-box[open] > summary::after { transform: rotate(180deg); }
+.week-card { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; }
+.day-cleared { padding: 1.5rem; }

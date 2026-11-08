@@ -42,12 +42,46 @@
         <i class="bi" th:classappend="${t.done} ? 'bi-check-circle-fill' : 'bi-circle'"></i></button>
 </form>
 
+<!-- Sequencia da tarefa: Aula -> Quiz -> Concluir, com o passo atual destacado (f: TodayFlowService.Flow). -->
+<ol th:fragment="flowSteps(f, currentKind, currentId)" class="flow-steps" th:if="${f.hasLinked()}">
+    <li th:each="s : ${f.steps}"
+        th:classappend="${s.done} ? 'is-done' : (${s == f.action} ? 'is-next' : '')"
+        th:attr="aria-current=${currentKind == s.kind and currentId == s.id} ? 'step' : null">
+        <a th:href="${s.link}" th:title="${s.title}">
+            <i class="bi" th:classappend="${s.done} ? 'bi-check-circle-fill' : (${s.kind == 'aula'} ? 'bi-easel' : 'bi-ui-checks')"></i>
+            <span th:text="${s.kind == 'aula'} ? 'Aula' : 'Quiz'"></span><span class="flow-step-detail"
+                  th:if="${s.detail != null}" th:text="' · ' + ${#strings.replace(s.detail, 'em andamento · ', '')}"></span></a>
+    </li>
+    <li th:classappend="${f.task.done} ? 'is-done' : (${f.action.kind == 'concluir'} ? 'is-next' : '')">
+        <span><i class="bi" th:classappend="${f.task.done} ? 'bi-check-circle-fill' : 'bi-flag'"></i> Concluir</span>
+    </li>
+</ol>
+
+<!-- Botao principal da tarefa: o proximo passo (aula/quiz) ou concluir. A aula ja lida no navegador vira "Fazer quiz". -->
+<th:block th:fragment="flowAction(f, size)">
+    <a th:if="${f.action.link != null}" th:href="${f.action.link}" class="btn btn-primary flow-action" th:classappend="${size}"
+       th:attr="data-lesson=${f.action.kind == 'aula'} ? ${f.action.id} : null,
+                data-after-link=${f.action.kind == 'aula' and f.pendingQuiz() != null} ? ${f.pendingQuiz().link} : null,
+                data-after-label=${f.action.kind == 'aula' and f.pendingQuiz() != null} ? ${f.pendingQuiz().label} : null">
+        <i class="bi me-1" th:classappend="${f.action.kind == 'aula'} ? 'bi-easel' : 'bi-ui-checks'"></i><span th:text="${f.action.label}"></span></a>
+    <th:block th:if="${f.action.kind == 'concluir' and !f.task.done}"><form th:replace="~{fragments/estudos :: taskDoneButton(${f.task})}"></form></th:block>
+</th:block>
+
 <!-- Botao "Concluir tarefa" (aula, quiz): abre o mesmo dialogo de minutos do cronograma. -->
 <form th:fragment="taskDoneButton(t)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}"
       class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
     <input type="hidden" name="done" value="true"/>
     <input type="hidden" name="spentMinutes" value=""/>
     <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Concluir tarefa</button>
+</form>
+
+<!-- Concluir e seguir: conclui (com o tempo do cronometro) e abre o proximo passo da fila ("voltar"). -->
+<form th:fragment="taskDoneAndGo(t, go, label)" method="post" th:action="@{/estudos/cronograma/{id}/concluir(id=${t.id})}"
+      class="task-done-form d-inline" th:attr="data-done=${t.done},data-estimate=${t.estimatedMinutes},data-spent=${t.spentMinutes},data-title=${t.title}">
+    <input type="hidden" name="done" value="true"/>
+    <input type="hidden" name="spentMinutes" value=""/>
+    <input type="hidden" name="voltar" th:value="${go}"/>
+    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i><span th:text="${label}"></span></button>
 </form>
 
 <!-- Tempo da tarefa ("45 de 60 min"); clicar corrige os minutos dedicados. -->

@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head('Hoje')}"></head>
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
-<main class="container page">
+<main class="container page today-page">
     <div class="page-header">
         <div>
             <h1>Hoje</h1>
@@ -18,139 +18,177 @@
                 </th:block>
             </p>
         </div>
-        <form method="post" action="/estudos/paginas">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nova página</button>
-        </form>
+        <div class="d-flex align-items-center gap-3">
+            <div class="day-progress" th:if="${day.total() > 0}" th:title="'Tarefas de hoje: ' + ${day.done.size()} + ' de ' + ${day.total()}">
+                <span class="day-progress-text"><strong th:text="${day.done.size()}"></strong> de <span th:text="${day.total()}"></span></span>
+                <span class="day-progress-bar"><span th:style="'width:' + ${day.done.size() * 100 / day.total()} + '%'"></span></span>
+            </div>
+            <th:block th:replace="~{fragments/estudos :: dayButton(${today}, ${todaySummary}, 'Resumo do dia', '')}"></th:block>
+        </div>
     </div>
-    <nav th:replace="~{fragments/estudos :: tabs('overview')}"></nav>
     <th:block th:replace="~{fragments/ui :: flash}"></th:block>
 
+    <!-- Continuar: o proximo passo do dia, a um clique. -->
+    <section class="card continue-card" th:if="${day.current != null}" th:with="f=${day.current}">
+        <div class="continue-label">
+            <i class="bi bi-play-circle-fill"></i>
+            <span th:text="${f.action.detail != null and #strings.startsWith(f.action.detail, 'em andamento')} ? 'Continuar de onde parou' : 'Próximo passo'"></span>
+        </div>
+        <div class="continue-body">
+            <div class="min-w-0">
+                <div class="continue-title text-truncate" th:text="${f.task.title}" th:title="${f.task.title}"></div>
+                <div class="continue-meta">
+                    <span th:if="${f.task.overdue}" class="text-bad">Atrasada · <span th:text="${#temporals.format(f.task.plannedDate, 'dd/MM')}"></span></span>
+                    <span th:if="${f.task.subject != null}" th:text="${f.task.subject}"></span>
+                    <span th:if="${f.task.estimatedMinutes != null}"><i class="bi bi-clock me-1"></i><span th:text="${f.task.estimatedMinutes} + ' min'"></span></span>
+                </div>
+                <ol th:replace="~{fragments/estudos :: flowSteps(${f}, '', null)}"></ol>
+            </div>
+            <div class="continue-action">
+                <th:block th:replace="~{fragments/estudos :: flowAction(${f}, '')}"></th:block>
+                <a th:if="${f.action.kind == 'revisao'}" th:href="'#t-' + ${f.task.id}" class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i>Revisar</a>
+            </div>
+        </div>
+    </section>
+
     <div class="row g-4">
-        <div class="col-lg-7">
+        <div class="col-lg-8">
             <div class="section-title d-flex align-items-center mt-0">
-                <span>Para hoje</span>
+                <span>Fila do dia</span>
                 <span class="ms-auto d-flex align-items-center gap-3">
-                    <th:block th:replace="~{fragments/estudos :: dayButton(${today}, ${todaySummary}, 'Resumo de hoje', '')}"></th:block>
-                    <form th:if="${#lists.size(dueTasks.?[overdue and !review]) > 0}" method="post" action="/estudos/cronograma/atrasadas/hoje" class="d-inline">
+                    <form th:if="${#lists.size(day.open.?[task.overdue and !task.review]) > 0}" method="post" action="/estudos/cronograma/atrasadas/hoje" class="d-inline">
                         <button type="submit" class="btn btn-link btn-sm p-0 fw-normal">Trazer atrasadas para hoje</button>
                     </form>
-                    <a href="/estudos/cronograma" class="small fw-normal">Ver cronograma</a>
+                    <a href="/estudos/cronograma" class="small fw-normal">Cronograma</a>
                 </span>
             </div>
-            <th:block th:if="${dueTasks.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-calendar-check', 'Nada planejado para hoje.', 'Planejar uma tarefa', '/estudos/cronograma')}"></div></th:block>
-            <div class="card task-list" th:unless="${dueTasks.isEmpty()}">
-                <div class="task-row" th:each="t : ${dueTasks}" th:classappend="${t.overdue} ? 'is-overdue'">
+
+            <th:block th:if="${day.open.isEmpty() and day.done.isEmpty()}"><div th:replace="~{fragments/ui :: empty('bi-calendar-check', 'Nada planejado para hoje.', 'Planejar uma tarefa', '/estudos/cronograma')}"></div></th:block>
+            <div class="empty-state day-cleared" th:if="${day.open.isEmpty() and !day.done.isEmpty()}">
+                <i class="bi bi-check2-all text-ok"></i><span>Fila de hoje concluída. Bom trabalho!</span>
+            </div>
+
+            <div class="flow-list">
+                <article class="card flow-card" th:each="f : ${day.open}" th:with="t=${f.task}" th:id="'t-' + ${t.id}"
+                         th:classappend="(${t.overdue} ? 'is-overdue ' : '') + (${day.current != null and day.current.task.id == t.id} ? 'is-current' : '')">
                     <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
-                    <div class="task-info">
-                        <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
+                    <div class="flow-body">
+                        <a class="flow-title" th:href="${f.action.link != null} ? ${f.action.link} : @{/estudos/cronograma/{id}/editar(id=${t.id})}"
+                           th:text="${t.title}"></a>
                         <div class="task-meta">
                             <span th:if="${t.overdue}" class="text-bad">Atrasada · <span th:text="${#temporals.format(t.plannedDate, 'dd/MM')}"></span></span>
                             <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
                             <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
                         </div>
+                        <ol th:replace="~{fragments/estudos :: flowSteps(${f}, '', null)}"></ol>
                         <form th:replace="~{fragments/estudos :: taskDescription(${t})}"></form>
-                        <div th:replace="~{fragments/estudos :: taskLinked(${linked[t.id]})}"></div>
-                        <ul class="review-items" th:if="${t.review and !t.done and !dueReviews.isEmpty()}">
+                        <ul class="review-items" th:if="${t.review and !dueReviews.isEmpty()}">
                             <li th:each="r : ${dueReviews}">
                                 <a class="text-reset" th:href="${r.pageId != null} ? @{/estudos/paginas/{id}(id=${r.pageId})} : @{/estudos/cronograma/{id}/editar(id=${r.id})}" th:text="${r.title}"></a>
                                 <span class="text-muted" th:if="${r.subject != null}" th:text="'· ' + ${r.subject}"></span>
-                                <form method="post" th:action="@{/estudos/cronograma/{id}/revisar(id=${r.id})}" class="d-inline">
-                                    <button type="submit" name="resultado" value="bom" class="btn btn-link btn-sm p-0 ms-1 text-ok"
+                                <form method="post" th:action="@{/estudos/cronograma/{id}/revisar(id=${r.id})}" class="review-rate">
+                                    <button type="submit" name="resultado" value="bom" class="btn btn-sm btn-outline-success"
                                             title="Bom: sai da revisão de hoje e vai para o próximo intervalo">bom</button>
-                                    <button type="submit" name="resultado" value="dificil" class="btn btn-link btn-sm p-0 ms-1 text-muted"
+                                    <button type="submit" name="resultado" value="dificil" class="btn btn-sm btn-outline-secondary"
                                             title="Difícil: sai da revisão de hoje e repete o mesmo intervalo">difícil</button>
-                                    <button type="submit" name="resultado" value="errei" class="btn btn-link btn-sm p-0 ms-1 text-bad"
+                                    <button type="submit" name="resultado" value="errei" class="btn btn-sm btn-outline-danger"
                                             title="Errei: sai da revisão de hoje e volta amanhã">errei</button>
                                 </form>
                             </li>
                         </ul>
                     </div>
-                </div>
+                    <div class="flow-actions">
+                        <th:block th:unless="${t.review}"><th:block th:replace="~{fragments/estudos :: flowAction(${f}, 'btn-sm')}"></th:block></th:block>
+                        <div class="dropdown">
+                            <button type="button" class="icon-btn border-0" data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="Mais ações"><i class="bi bi-three-dots"></i></button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}"><i class="bi bi-pencil me-2"></i>Editar tarefa</a></li>
+                                <li th:unless="${t.review}"><form method="post" th:action="@{/estudos/cronograma/{id}/adiar(id=${t.id})}">
+                                    <input type="hidden" name="para" th:value="${today.plusDays(1)}"/>
+                                    <button type="submit" class="dropdown-item"><i class="bi bi-calendar-plus me-2"></i>Adiar para amanhã</button></form></li>
+                                <li th:each="s : ${f.steps}"><a class="dropdown-item" th:href="${s.link}">
+                                    <i class="bi me-2" th:classappend="${s.kind == 'aula'} ? 'bi-easel' : 'bi-ui-checks'"></i><span th:text="${s.title}"></span></a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </article>
             </div>
 
-            <div class="row row-cols-1 row-cols-sm-3 g-3 mt-1">
-                <div class="col"><div th:replace="~{fragments/ui :: stat('Tarefas da semana', ${week.done} + ' de ' + ${week.planned}, '')}"></div></div>
-                <div class="col"><div th:replace="~{fragments/ui :: stat('Planejado na semana', ${week.estimatedMinutes} + ' min', '')}"></div></div>
-                <div class="col"><div th:replace="~{fragments/ui :: stat('Estudado na semana', ${week.spentMinutes} + ' min', 'text-ok')}"></div></div>
-            </div>
+            <details class="done-today mt-3" th:unless="${day.done.isEmpty()}">
+                <summary><i class="bi bi-check2-circle text-ok me-1"></i><span th:text="'Feitas hoje (' + ${day.done.size()} + ')'"></span></summary>
+                <div class="card task-list mt-2">
+                    <div class="task-row is-done" th:each="f : ${day.done}" th:with="t=${f.task}">
+                        <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>
+                        <div class="task-info">
+                            <a class="text-reset text-decoration-none fw-medium" th:href="@{/estudos/cronograma/{id}/editar(id=${t.id})}" th:text="${t.title}"></a>
+                            <div class="task-meta">
+                                <span th:if="${t.subject != null}" th:text="${t.subject}"></span>
+                                <form th:replace="~{fragments/estudos :: taskTime(${t})}"></form>
+                                <span th:each="s : ${f.steps}" th:if="${s.kind == 'quiz' and s.done}"><i class="bi bi-ui-checks me-1"></i><span th:text="${s.detail}"></span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </div>
 
-        <div class="col-lg-5">
-            <!-- Questoes: o que esta pela metade, o ultimo simulado e os erros esperando revisao. -->
-            <div class="section-title d-flex align-items-center mt-0">
-                <span>Questões</span>
-                <a href="/dashboard" class="ms-auto small fw-normal">Desempenho</a>
-            </div>
-            <div class="card p-3 mb-2" th:each="o : ${practice.open}">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="fw-medium text-truncate" th:text="${o.label()}" th:title="${o.label()}"></div>
-                        <div class="text-muted small" th:text="'Questão ' + ${o.resumeIndex + 1} + ' de ' + ${o.total()}"></div>
-                    </div>
-                    <a class="btn btn-primary btn-sm" th:href="@{/resolver/{id}(id=${o.session.id}, index=${o.resumeIndex})}">Continuar</a>
-                </div>
-            </div>
-            <a class="card p-3 mb-2 text-reset text-decoration-none d-block" th:if="${practice.lastScore != null and practice.lastScore.projectedTotal != null}"
-               th:href="@{/resultado/{id}(id=${practice.lastScored.id})}" th:with="sc=${practice.lastScore}">
-                <div class="d-flex justify-content-between align-items-baseline gap-2">
-                    <span class="stat-label">Último simulado · projeção</span>
-                    <span class="badge" th:if="${sc.projectedPassed != null}" th:classappend="${sc.projectedPassed} ? 'text-bg-success' : 'text-bg-danger'"
-                          th:text="${sc.projectedPassed} ? 'passa' : 'não passa'"></span>
-                </div>
-                <div class="fs-5 fw-semibold">
-                    <span th:text="${#numbers.formatDecimal(sc.projectedTotal, 1, 1)}"></span>
-                    <span class="text-muted fw-normal fs-6" th:text="'de ' + ${#numbers.formatDecimal(sc.maxTotal, 1, 0)}
-                          + (${sc.minTotal != null} ? ' · mínimo ' + ${#numbers.formatDecimal(sc.minTotal, 1, 0)} : '')"></span>
-                </div>
-                <div class="text-muted small text-truncate" th:text="${practice.lastScored.blockName} + ' · ' + ${#temporals.format(practice.lastScored.finishedAt, 'dd/MM')}"></div>
-            </a>
-            <div class="d-flex flex-wrap gap-2 mb-4">
-                <a class="btn btn-outline-secondary btn-sm" href="/caderno-erros" th:if="${practice.errors > 0}">
-                    <i class="bi bi-journal-x me-1 text-bad"></i><span th:text="${practice.errors} + (${practice.errors == 1} ? ' erro para revisar' : ' erros para revisar')"></span></a>
-                <a class="btn btn-outline-secondary btn-sm" href="/blocos"><i class="bi bi-stopwatch me-1"></i>Simulado</a>
-                <a class="btn btn-outline-secondary btn-sm" href="/import/arquivo#treino"><i class="bi bi-chat-dots me-1"></i>Importar treino do Claude</a>
+        <!-- Lateral: so o que pede acao (erros, simulado pela metade) e o placar da semana. -->
+        <aside class="col-lg-4">
+            <div class="section-title mt-0">Semana</div>
+            <div class="card p-3 mb-3 week-card">
+                <div class="d-flex justify-content-between"><span class="text-muted">Tarefas</span><strong th:text="${week.done} + ' de ' + ${week.planned}"></strong></div>
+                <div class="d-flex justify-content-between"><span class="text-muted">Estudado</span>
+                    <strong><span class="text-ok" th:text="${week.spentMinutes}"></span> <span class="text-muted fw-normal" th:text="'de ' + ${week.estimatedMinutes} + ' min'"></span></strong></div>
+                <span class="day-progress-bar mt-2" th:if="${week.estimatedMinutes > 0}"><span th:style="'width:' + ${T(java.lang.Math).min(100, week.spentMinutes * 100 / week.estimatedMinutes)} + '%'"></span></span>
             </div>
 
-            <th:block th:unless="${lessons.isEmpty()}">
-                <div class="section-title d-flex align-items-center">
-                    <span>Aulas</span><a href="/aulas" class="ms-auto small fw-normal">Todas</a>
-                </div>
-                <div class="card page-list mb-4">
-                    <a class="page-list-row" th:each="l : ${lessons}" th:href="@{/aulas/{id}(id=${l.id})}">
-                        <i class="bi bi-mortarboard text-muted"></i>
-                        <span class="text-truncate" th:text="${l.title}"></span>
-                        <span class="ms-auto small text-nowrap text-muted" th:text="${#temporals.format(l.createdAt, 'dd/MM')}"></span>
+            <div class="section-title">Pendências</div>
+            <div class="card page-list mb-3">
+                <a class="page-list-row" th:each="o : ${practice.open}" th:href="@{/resolver/{id}(id=${o.session.id}, index=${o.resumeIndex})}">
+                    <i class="bi bi-hourglass-split text-guess"></i>
+                    <span class="text-truncate" th:text="${o.label()}" th:title="${o.label()}"></span>
+                    <span class="ms-auto small text-nowrap text-muted" th:text="${o.resumeIndex + 1} + '/' + ${o.total()}"></span>
+                </a>
+                <a class="page-list-row" href="/aulas/erros" th:if="${quizErrors > 0}">
+                    <i class="bi bi-arrow-repeat text-bad"></i><span>Erros dos quizzes</span>
+                    <span class="ms-auto small text-nowrap text-bad" th:text="${quizErrors}"></span>
+                </a>
+                <a class="page-list-row" href="/caderno-erros" th:if="${practice.errors > 0}">
+                    <i class="bi bi-journal-x text-bad"></i><span>Caderno de erros (provas)</span>
+                    <span class="ms-auto small text-nowrap text-bad" th:text="${practice.errors}"></span>
+                </a>
+                <a class="page-list-row" th:if="${practice.lastScore != null and practice.lastScore.projectedTotal != null}"
+                   th:href="@{/resultado/{id}(id=${practice.lastScored.id})}" th:with="sc=${practice.lastScore}">
+                    <i class="bi bi-stopwatch text-muted"></i>
+                    <span class="text-truncate">Último simulado</span>
+                    <span class="ms-auto small text-nowrap" th:classappend="${sc.projectedPassed == null} ? 'text-muted' : (${sc.projectedPassed} ? 'text-ok' : 'text-bad')"
+                          th:text="${#numbers.formatDecimal(sc.projectedTotal, 1, 1)} + ' de ' + ${#numbers.formatDecimal(sc.maxTotal, 1, 0)}"></span>
+                </a>
+                <div class="page-list-row text-muted small" th:if="${practice.open.isEmpty() and quizErrors == 0 and practice.errors == 0 and (practice.lastScore == null or practice.lastScore.projectedTotal == null)}">
+                    <i class="bi bi-check2"></i><span>Nada pendente.</span></div>
+            </div>
+
+            <!-- Anotacoes: apoio, recolhido para nao competir com a fila. -->
+            <details class="notes-box" th:open="${inboxCount > 0}">
+                <summary class="section-title d-flex align-items-center">
+                    <span>Anotações</span>
+                    <span class="ms-auto small fw-normal text-muted" th:if="${inboxCount > 0}" th:text="${inboxCount} + ' na caixa'"></span>
+                </summary>
+                <form th:replace="~{fragments/estudos :: quickNote}"></form>
+                <div class="card page-list mt-2" th:unless="${recentPages.isEmpty()}">
+                    <a class="page-list-row" th:each="p, it : ${recentPages}" th:if="${it.index < 4}" th:href="@{/estudos/paginas/{id}(id=${p.id})}">
+                        <i class="bi bi-file-earmark-text text-muted"></i>
+                        <span class="text-truncate" th:text="${p.displayTitle}"></span>
+                        <span class="text-muted small ms-auto text-nowrap" th:text="${#temporals.format(p.updatedAt, 'dd/MM')}"></span>
                     </a>
                 </div>
-            </th:block>
-
-        </div>
-    </div>
-    <!-- Anotacoes e paginas: apoio, abaixo do que e para fazer hoje. -->
-    <div class="row g-4 mt-1">
-        <div class="col-lg-7">
-            <div class="section-title">Páginas recentes</div>
-            <div th:if="${recentPages.isEmpty()}" class="empty-state">
-                <i class="bi bi-file-earmark-text"></i>
-                <span>Crie sua primeira página de resumo: use títulos, listas, tabelas e checklists.</span>
-            </div>
-            <div class="card page-list" th:unless="${recentPages.isEmpty()}">
-                <a class="page-list-row" th:each="p : ${recentPages}" th:href="@{/estudos/paginas/{id}(id=${p.id})}">
-                    <i class="bi bi-file-earmark-text text-muted"></i>
-                    <span class="text-truncate" th:text="${p.displayTitle}"></span>
-                    <span class="text-muted small ms-auto text-nowrap" th:text="${#temporals.format(p.updatedAt, 'dd/MM HH:mm')}"></span>
-                </a>
-            </div>
-        </div>
-        <div class="col-lg-5">
-            <div class="section-title d-flex align-items-center">
-                <span>Anotação rápida</span>
-                <a href="/estudos/caixa-de-entrada" class="ms-auto small fw-normal"
-                   th:text="${inboxCount > 0} ? 'Caixa de entrada (' + ${inboxCount} + ')' : 'Caixa de entrada'"></a>
-            </div>
-            <form th:replace="~{fragments/estudos :: quickNote}"></form>
-
-        </div>
+                <div class="small mt-2 d-flex gap-3">
+                    <a href="/estudos/caixa-de-entrada">Caixa de entrada</a>
+                    <a href="/estudos/paginas">Páginas e resumos</a>
+                </div>
+            </details>
+        </aside>
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>

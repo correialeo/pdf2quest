@@ -165,6 +165,14 @@ public class StudyTaskService {
                 .sorted(Comparator.comparing(StudyTask::getPlannedDate).thenComparing(StudyTask::getId)).toList();
     }
 
+    /** Fila do dia: as de hoje (feitas ou nao) e as atrasadas ainda abertas, na ordem do cronograma. */
+    public List<StudyTask> today(LocalDate today) {
+        return visible(null).stream()
+                .filter(t -> t.getPlannedDate() != null && (t.getPlannedDate().equals(today)
+                        || (!t.isDone() && t.getPlannedDate().isBefore(today))))
+                .sorted(Comparator.comparing(StudyTask::getPlannedDate).thenComparing(StudyTask::getId)).toList();
+    }
+
     public WeekSummary week(LocalDate today) {
         LocalDate start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate end = start.plusDays(6);

@@ -113,7 +113,7 @@ class NewScreensWebTest {
 
     @Test
     void telasDeEstudosEAutosave() throws Exception {
-        mvc.perform(get("/estudos")).andExpect(status().isOk()).andExpect(content().string(containsString("Para hoje")));
+        mvc.perform(get("/estudos")).andExpect(status().isOk()).andExpect(content().string(containsString("Fila do dia")));
         mvc.perform(get("/estudos/paginas")).andExpect(status().isOk()).andExpect(content().string(containsString("Criar página")));
         mvc.perform(get("/estudos/cronograma")).andExpect(status().isOk()).andExpect(content().string(containsString("Nova tarefa")));
         mvc.perform(get("/estudos/caixa-de-entrada")).andExpect(status().isOk()).andExpect(content().string(containsString("Caixa vazia")));

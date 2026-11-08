@@ -4,12 +4,12 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page lesson-page">
-    <a href="/aulas" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Aulas</a>
+    <a th:href="${fila != null} ? '/hoje' : '/aulas'" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i><span th:text="${fila != null} ? 'Hoje' : 'Aulas'"></span></a>
     <h1 class="mt-1" th:text="${lesson.title}"></h1>
     <p class="page-subtitle">
         <span th:if="${lesson.subject != null}" th:text="${lesson.subject}"></span>
         <span th:if="${lesson.editalTopic != null}" th:text="' · Edital: ' + ${lesson.editalTopic}"></span>
-        <span th:if="${task != null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
+        <span th:if="${task != null and fila == null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
     </p>
 
     <div class="mb-2">
@@ -52,8 +52,31 @@
             <button type="button" class="btn btn-outline-secondary btn-sm" id="slidePrev"><i class="bi bi-arrow-left me-1"></i>Anterior</button>
             <span class="small text-muted" id="deckScore"></span>
             <button type="button" class="btn btn-primary btn-sm" id="slideNext">Próximo<i class="bi bi-arrow-right ms-1"></i></button>
+            <!-- Ultimo slide: o "Proximo" vira o proximo passo (o quiz da aula, ou o fim da aula). -->
+            <a class="btn btn-primary btn-sm" id="slideEnd" hidden th:href="${pendingQuiz != null} ? @{/quizzes/{id}(id=${pendingQuiz.id})} : '#nextStep'"
+               th:text="${pendingQuiz != null} ? 'Ir para o quiz →' : 'Terminar aula →'"></a>
         </div>
         <div class="small text-muted mt-1">Atalhos: <kbd>←</kbd> <kbd>→</kbd> mudam de slide.</div>
+    </section>
+
+    <!-- Proximo passo depois de ler: fazer o quiz, ou concluir a tarefa e seguir para a proxima da fila. -->
+    <section class="card p-3 mt-3 next-step" id="nextStep">
+        <div class="small text-muted mb-2">Próximo passo</div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a class="btn btn-primary btn-sm" th:if="${pendingQuiz != null}" th:href="@{/quizzes/{id}(id=${pendingQuiz.id})}">
+                <i class="bi bi-ui-checks me-1"></i>Fazer o quiz: <span th:text="${pendingQuiz.title}"></span></a>
+            <th:block th:if="${quizzes.isEmpty()}"><button th:replace="~{fragments/ui :: askClaude('cria um quiz da aula ' + ${lesson.id} + (${concursoAtivo != null} ? ' do concurso ' + ${concursoAtivo.nome} : ''), 'Copiar pedido de quiz')}"></button></th:block>
+            <th:block th:if="${task != null and !task.done and pendingQuiz == null and next != null}">
+                <form th:replace="~{fragments/estudos :: taskDoneAndGo(${task}, ${next.link}, 'Concluir e ir para a próxima')}"></form>
+            </th:block>
+            <th:block th:if="${task != null and !task.done and (pendingQuiz != null or next == null)}">
+                <form th:replace="~{fragments/estudos :: taskDoneButton(${task})}"></form>
+            </th:block>
+            <span class="small text-ok" th:if="${task != null and task.done}"><i class="bi bi-check-circle-fill me-1"></i>Tarefa concluída</span>
+            <a class="btn btn-outline-secondary btn-sm" th:if="${next != null and (task == null or task.done or pendingQuiz != null)}" th:href="${next.link}" th:title="${next.task.title}">
+                Próxima de hoje: <span class="text-truncate d-inline-block align-bottom" style="max-width: 16rem" th:text="${next.task.title}"></span></a>
+            <a class="btn btn-link btn-sm" th:if="${fila != null}" href="/hoje">Voltar para Hoje</a>
+        </div>
     </section>
 
     <!-- Cobertura por conceito: o que os quizzes cobrem de cada slide e o acerto (fraco = reler). -->
@@ -79,22 +102,6 @@
             <span th:if="${!coverage.alemDaAula.isEmpty()}" th:text="${coverage.alemDaAula.size()} + ' pergunta(s) além da aula'"></span>
             <span th:if="${!coverage.alemDaAula.isEmpty() and !coverage.perguntasSemConceito.isEmpty()}"> · </span>
             <span th:if="${!coverage.perguntasSemConceito.isEmpty()}" th:text="${coverage.perguntasSemConceito.size()} + ' pergunta(s) sem conceito (quizzes antigos)'"></span>
-        </div>
-    </section>
-
-    <!-- Proximo passo depois de ler: fazer o quiz, concluir a tarefa ou seguir para a proxima de hoje. -->
-    <section class="card p-3 mt-3 next-step">
-        <div class="small text-muted mb-2">Próximo passo</div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <a class="btn btn-primary btn-sm" th:if="${pendingQuiz != null}" th:href="@{/quizzes/{id}(id=${pendingQuiz.id})}">
-                <i class="bi bi-ui-checks me-1"></i>Fazer o quiz: <span th:text="${pendingQuiz.title}"></span></a>
-            <th:block th:if="${quizzes.isEmpty()}"><button th:replace="~{fragments/ui :: askClaude('cria um quiz da aula ' + ${lesson.id} + (${concursoAtivo != null} ? ' do concurso ' + ${concursoAtivo.nome} : ''), 'Copiar pedido de quiz')}"></button></th:block>
-            <th:block th:if="${task != null and !task.done}">
-                <form th:replace="~{fragments/estudos :: taskDoneButton(${task})}"></form>
-            </th:block>
-            <span class="small text-ok" th:if="${task != null and task.done}"><i class="bi bi-check-circle-fill me-1"></i>Tarefa concluída</span>
-            <a class="btn btn-outline-secondary btn-sm" th:if="${next != null}" th:href="${next.link}" th:title="${next.task.title}">
-                Próxima de hoje: <span class="text-truncate d-inline-block align-bottom" style="max-width: 16rem" th:text="${next.task.title}"></span></a>
         </div>
     </section>
 
@@ -242,8 +249,12 @@
             slides.forEach((s, k) => { s.hidden = k !== index; });
             tabs.forEach((t, k) => t.classList.toggle('is-current', k === index));
             document.getElementById('slidePrev').disabled = index === 0;
-            document.getElementById('slideNext').disabled = index === slides.length - 1;
+            const last = index === slides.length - 1;
+            document.getElementById('slideNext').hidden = last;
+            document.getElementById('slideEnd').hidden = !last;
             localStorage.setItem(key, index);
+            // Chegou ao fim: a tela Hoje passa a oferecer o quiz desta aula.
+            if (last) { localStorage.setItem('aula-lida-' + deck.dataset.lesson, '1'); }
         }
         function go(i) { show(i); deck.scrollIntoView({behavior: 'smooth', block: 'start'}); }
         tabs.forEach((t, k) => t.addEventListener('click', () => go(k)));

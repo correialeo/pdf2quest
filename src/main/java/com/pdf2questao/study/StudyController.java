@@ -24,12 +24,15 @@ public class StudyController {
     private final DaySummaryService daySummaryService;
     private final DashboardService dashboardService;
     private final com.pdf2questao.aula.LessonService lessonService;
+    private final com.pdf2questao.aula.TodayFlowService flowService;
 
     public StudyController(StudyPageService pageService, StudyTaskService taskService, InboxService inboxService,
                            StudySubjects subjects, DaySummaryService daySummaryService,
                            SpacedRepetitionService spacedRepetition, DashboardService dashboardService,
-                           com.pdf2questao.aula.LessonService lessonService) {
+                           com.pdf2questao.aula.LessonService lessonService,
+                           com.pdf2questao.aula.TodayFlowService flowService) {
         this.lessonService = lessonService;
+        this.flowService = flowService;
         this.dashboardService = dashboardService;
         this.spacedRepetition = spacedRepetition;
         this.pageService = pageService;
@@ -40,24 +43,23 @@ public class StudyController {
     }
 
     /**
-     * Tela inicial "Hoje": tarefas e revisoes do dia, sessoes para continuar, caderno de erros, ultimo simulado
-     * e anotacao rapida. /estudos e o endereco antigo da mesma tela.
+     * Tela inicial "Hoje": a fila do dia (cada tarefa com seu proximo passo: aula, quiz, concluir), o "Continuar",
+     * a revisao do dia e uma faixa compacta com semana, erros e simulados. /estudos e o endereco antigo da mesma tela.
      */
     @GetMapping({"/hoje", "/estudos"})
     public String overview(Model model) {
         LocalDate today = LocalDate.now();
         model.addAttribute("today", today);
         spacedRepetition.syncReviewTask(today);
-        var dueTasks = taskService.dueBy(today);
-        model.addAttribute("dueTasks", dueTasks);
-        model.addAttribute("linked", lessonService.forTasks(dueTasks.stream().map(StudyTask::getId).toList()));
+        model.addAttribute("day", flowService.day(today));
         model.addAttribute("dueReviews", spacedRepetition.todayItems(today));
         model.addAttribute("todaySummary", daySummaryService.existing(today, today).get(today));
         model.addAttribute("week", taskService.week(today));
         model.addAttribute("recentPages", pageService.recent());
         model.addAttribute("inboxCount", inboxService.count());
         model.addAttribute("practice", dashboardService.today());
-        model.addAttribute("lessons", lessonService.visible().stream().limit(3).toList());
+        model.addAttribute("quizErrors", lessonService.openErrorsBySubject().values().stream()
+                .mapToLong(Long::longValue).sum());
         return "estudos";
     }
 

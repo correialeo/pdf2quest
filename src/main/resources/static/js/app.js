@@ -37,6 +37,7 @@
         }
     }
 
+
     // Menu lateral recolhido (so icones) no desktop; a escolha fica salva e o head.html aplica antes de pintar.
     function setupSidebarCollapse() {
         var button = document.querySelector('.sidebar-collapse');
@@ -150,6 +151,19 @@
                 e.preventDefault();
                 open(form, completing);
             });
+        });
+    }
+
+    // Hoje: a aula ja lida ate o ultimo slide (marcado no navegador) passa o botao para o quiz dela.
+    function setupFlowActions() {
+        document.querySelectorAll('.flow-action[data-lesson][data-after-link]').forEach(function (btn) {
+            if (localStorage.getItem('aula-lida-' + btn.dataset.lesson) !== '1') return;
+            btn.setAttribute('href', btn.dataset.afterLink);
+            btn.querySelector('span').textContent = btn.dataset.afterLabel;
+            btn.querySelector('.bi').className = 'bi bi-ui-checks me-1';
+            var card = btn.closest('.flow-card, .continue-card');
+            var title = card && card.querySelector('.flow-title');
+            if (title) { title.setAttribute('href', btn.dataset.afterLink); }
         });
     }
 
@@ -343,6 +357,7 @@
         setupWeekDrag();
         setupCopyText();
         setupTaskTime();
+        setupFlowActions();
         setupTaskDescription();
         setupQuickNote();
         setupThemeToggle();

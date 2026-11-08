@@ -148,8 +148,13 @@ public class StudyTaskController {
     @PostMapping("/estudos/cronograma/{id}/concluir")
     public String done(@PathVariable Long id, @RequestParam(defaultValue = "true") boolean done,
                        @RequestParam(required = false) Integer spentMinutes,
+                       @RequestParam(required = false) String voltar,
                        @RequestHeader(value = "Referer", required = false) String referer) {
         taskService.setDone(id, done, spentMinutes);
+        // "Concluir e seguir" (aula/quiz): vai direto para o proximo passo da fila, se for desta aplicacao.
+        if (voltar != null && voltar.startsWith("/") && !voltar.startsWith("//") && !voltar.contains("\\")) {
+            return "redirect:" + voltar;
+        }
         return "redirect:" + StudyController.sameSite(referer, "/estudos/cronograma");
     }
 

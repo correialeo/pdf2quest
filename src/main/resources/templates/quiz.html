@@ -16,7 +16,7 @@
         <span th:if="${quiz.topic != null}" th:text="' · ' + ${quiz.topic}"></span>
         <span th:if="${quiz.level != null}" th:text="' · nível ' + ${quiz.level}"></span>
         <span th:if="${quiz.certoErrado()}"> · Certo/Errado (Cebraspe): um erro anula um acerto; em branco não pontua</span>
-        <span th:if="${task != null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
+        <span th:if="${task != null and fila == null}"> · Tarefa: <a th:href="@{/estudos/cronograma/{id}/editar(id=${task.id})}" th:text="${task.title}"></a></span>
     </p>
     <div class="card p-3 mb-3 small" th:if="${quiz.doubts != null or (quiz.previousErrors != null and !quiz.previousErrors.isEmpty())}">
         <div th:if="${quiz.doubts != null}"><span class="fw-medium">Suas dúvidas:</span> <span th:text="${quiz.doubts}"></span></div>
@@ -103,16 +103,21 @@
             <span class="fs-5 fw-semibold" id="quizDoneScore"></span>
         </div>
         <p class="small text-muted mb-2" id="quizDoneTopics"></p>
+        <!-- Botao principal: outro quiz da aula, ou concluir a tarefa e abrir a proxima da fila de uma vez. -->
         <div class="d-flex flex-wrap gap-2 align-items-center">
-            <th:block th:if="${task != null and !task.done}">
+            <a class="btn btn-primary btn-sm" th:if="${nextQuiz != null}" th:href="@{/quizzes/{id}(id=${nextQuiz.id})}">
+                Próximo quiz: <span th:text="${nextQuiz.title}"></span></a>
+            <th:block th:if="${task != null and !task.done and nextQuiz == null and next != null}">
+                <form th:replace="~{fragments/estudos :: taskDoneAndGo(${task}, ${next.link}, 'Concluir e ir para a próxima')}"></form>
+            </th:block>
+            <th:block th:if="${task != null and !task.done and (nextQuiz != null or next == null)}">
                 <form th:replace="~{fragments/estudos :: taskDoneButton(${task})}"></form>
             </th:block>
             <span class="small text-ok" th:if="${task != null and task.done}"><i class="bi bi-check-circle-fill me-1"></i>Tarefa concluída</span>
-            <a class="btn btn-outline-primary btn-sm" th:if="${nextQuiz != null}" th:href="@{/quizzes/{id}(id=${nextQuiz.id})}">
-                Próximo quiz: <span th:text="${nextQuiz.title}"></span></a>
-            <a class="btn btn-outline-secondary btn-sm" th:if="${next != null}" th:href="${next.link}"
+            <a class="btn btn-outline-secondary btn-sm" th:if="${next != null and (task == null or task.done or nextQuiz != null)}" th:href="${next.link}"
                th:title="${next.task.title}">Próxima de hoje: <span class="text-truncate d-inline-block align-bottom" style="max-width: 16rem" th:text="${next.task.title}"></span></a>
             <a class="btn btn-link btn-sm" th:if="${lesson != null}" th:href="@{/aulas/{id}(id=${lesson.id})}">Voltar à aula</a>
+            <a class="btn btn-link btn-sm" th:if="${fila != null}" href="/hoje">Hoje</a>
             <button th:replace="~{fragments/ui :: askClaude('fiz o quiz ' + ${quiz.id} + ': corrija minhas dúvidas e agende o reforço do que errei', 'Copiar pedido de correção')}"></button>
         </div>
     </section>
