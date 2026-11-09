@@ -1,5 +1,5 @@
 // Cronometro por tarefa: conta o tempo com a aula/quiz da tarefa aberto e a aba visivel. Fica no navegador
-// (localStorage "p2q-timer-<tarefa>": {ms, paused}) e preenche os minutos ao concluir a tarefa.
+// (localStorage "p2q-timer-<tarefa>": {ms, paused, at}) e preenche os minutos ao concluir a tarefa.
 (function () {
     var PREFIX = 'p2q-timer-';
 
@@ -50,14 +50,17 @@
 
     function tick() {
         var now = Date.now();
-        // Outra aba da mesma tarefa pode ter contado: parte sempre do que esta salvo.
+        // Parte sempre do que esta salvo (outras abas da mesma tarefa tambem contam). "at" e o ultimo
+        // instante ja contado por qualquer aba: cada aba so soma o trecho depois dele, entao duas abas
+        // abertas juntas nao contam o mesmo segundo duas vezes.
         var stored = load(task);
-        state.ms = Math.max(state.ms, stored.ms);
-        state.paused = stored.paused;
-        if (!state.paused && document.visibilityState === 'visible') {
-            state.ms += Math.min(now - last, 5000);   // aba dormindo/suspensa nao conta
+        if (!stored.paused && document.visibilityState === 'visible') {
+            var from = Math.max(last, stored.at || 0);
+            stored.ms += Math.min(Math.max(now - from, 0), 5000);   // aba dormindo/suspensa nao conta
+            stored.at = now;
         }
         last = now;
+        state = stored;
         save(task, state);
         render();
     }
