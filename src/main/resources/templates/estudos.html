@@ -47,7 +47,7 @@
             </div>
             <div class="continue-action">
                 <th:block th:replace="~{fragments/estudos :: flowAction(${f}, '')}"></th:block>
-                <a th:if="${f.action.kind == 'revisao'}" th:href="'#t-' + ${f.task.id}" class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i>Revisar</a>
+                <a th:if="${f.action.kind == 'revisao'}" th:href="'#t-' + ${f.task.id}" class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i><span th:text="${f.action.label}">Revisar</span></a>
             </div>
         </div>
     </section>
@@ -100,7 +100,7 @@
                         </ul>
                     </div>
                     <div class="flow-actions">
-                        <th:block th:unless="${t.review}"><th:block th:replace="~{fragments/estudos :: flowAction(${f}, 'btn-sm')}"></th:block></th:block>
+                        <th:block th:unless="${t.review and f.action.link == null}"><th:block th:replace="~{fragments/estudos :: flowAction(${f}, 'btn-sm')}"></th:block></th:block>
                         <div class="dropdown">
                             <button type="button" class="icon-btn border-0" data-bs-toggle="dropdown" aria-expanded="false"
                                     aria-label="Mais ações"><i class="bi bi-three-dots"></i></button>

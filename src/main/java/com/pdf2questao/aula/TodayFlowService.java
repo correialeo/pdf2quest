@@ -172,7 +172,17 @@ public class TodayFlowService {
         }
         Step action;
         if (task.isReview()) {
-            action = new Step("revisao", null, task.getTitle(), "Revisar", null, null, task.isDone());
+            // Revisao com quizzes ligados: o botao abre o proximo quiz pendente. Sem quiz (ou todos feitos), o
+            // cartao da tarefa, onde se marca cada assunto.
+            List<Step> quizzes = steps.stream().filter(s -> s.kind().equals("quiz")).toList();
+            Step pending = quizzes.stream().filter(s -> !s.done()).findFirst().orElse(null);
+            boolean started = quizzes.stream().anyMatch(s -> s.done()
+                    || (s.detail() != null && s.detail().startsWith("em andamento")));
+            action = pending == null
+                    ? new Step("revisao", null, task.getTitle(), quizzes.isEmpty() ? "Revisar" : "Marcar revisão",
+                    quizzes.isEmpty() ? null : "quizzes feitos", null, task.isDone())
+                    : new Step("quiz", pending.id(), pending.title(), started ? "Continuar revisão" : "Começar revisão",
+                    pending.detail(), pending.link(), false);
         } else {
             action = steps.stream().filter(s -> !s.done()).findFirst()
                     .orElse(new Step("concluir", null, task.getTitle(), "Concluir", null, null, task.isDone()));

@@ -350,7 +350,7 @@ public class StudyMcpTools {
                             List<ReviewView> assuntos) {
     }
 
-    public record TodayReviews(String foco, List<FocusView> disciplinas,
+    public record TodayReviews(Long tarefaRevisaoId, String foco, List<FocusView> disciplinas,
                                List<com.pdf2questao.study.ReviewFocusService.Waiting> aguardando) {
 
         /** Todos os assuntos do foco de hoje, na ordem. */
@@ -362,7 +362,7 @@ public class StudyMcpTools {
     @McpTool(name = "revisoes_de_hoje",
             description = "Foco da revisão espaçada de hoje no concurso: só as poucas disciplinas mais fracas nos "
                     + "quizzes (2 por dia, 3 no domingo) com os assuntos vencidos delas, o acerto nos quizzes e os "
-                    + "conceitos que o usuário mais erra (conceitosFracos: aulaId + conceito). O resto vencido vem em "
+                    + "conceitos que o usuário mais erra (conceitosFracos: aulaId + conceito) e tarefaRevisaoId (a tarefa de revisão do dia: passe em tarefaId de criar_quiz). O resto vencido vem em "
                     + "'aguardando' e entra nos próximos dias: não revise. Cada assunto traz as aulas e quizzes que já "
                     + "teve. Monte a revisão pelo prompt revisao_do_dia e depois chame marcar_revisao.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
@@ -378,7 +378,9 @@ public class StudyMcpTools {
                         t.getPageId() == null ? null : baseUrl + "/estudos/paginas/" + t.getPageId(),
                         linked.getOrDefault(t.getId(), List.of())))
                 .toList())).toList();
-        return new TodayReviews(focus.label(), views, focus.aguardando());
+        Long reviewTask = mcpConcurso.in(concurso, () -> spacedRepetition.openReviewTasks(today)).stream()
+                .map(StudyTask::getId).findFirst().orElse(null);
+        return new TodayReviews(reviewTask, focus.label(), views, focus.aguardando());
     }
 
     public record ReviewMarked(Long id, String assunto, String resultado, boolean lembrou, LocalDate proximaRevisao,

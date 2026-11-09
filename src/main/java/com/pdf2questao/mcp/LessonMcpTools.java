@@ -40,10 +40,13 @@ public class LessonMcpTools {
     private final String baseUrl;
 
     private final com.pdf2questao.flashcard.FlashcardService flashcardService;
+    private final com.pdf2questao.study.SpacedRepetitionService spacedRepetition;
 
     public LessonMcpTools(LessonService lessonService, McpConcurso mcpConcurso,
                           com.pdf2questao.flashcard.FlashcardService flashcardService,
+                          com.pdf2questao.study.SpacedRepetitionService spacedRepetition,
                           @Value("${server.port:8080}") int port) {
+        this.spacedRepetition = spacedRepetition;
         this.flashcardService = flashcardService;
         this.mcpConcurso = mcpConcurso;
         this.lessonService = lessonService;
@@ -479,7 +482,8 @@ public class LessonMcpTools {
                 'conceitos' quando o quiz for de uma aula.
 
                 6. GRAVAR. Um quiz por disciplina do foco (assim o sistema retoma os erros dela; informe \
-                errosRetomados), de 8 a 12 perguntas no total da disciplina, nível "prova" (com estiloDaBanca e \
+                errosRetomados) e com tarefaId = tarefaRevisaoId de revisoes_de_hoje (assim a tarefa de \
+                revisão da tela Hoje mostra "Começar revisão"), de 8 a 12 perguntas no total da disciplina, nível "prova" (com estiloDaBanca e \
                 referencias: as questões reais da banca que você leu como modelo). Grave a disciplina real na \
                 questão (nunca "Revisão" ou "Misto"): é ela que alimenta a medida de pontos fracos. Passe em \
                 'flashcards' os ids escolhidos. Passe o link e não mostre as respostas.
@@ -589,7 +593,8 @@ public class LessonMcpTools {
             @McpToolParam(description = "Ids das perguntas erradas (erros_quiz_anteriores) que este quiz retoma.",
                     required = false) List<Long> errosRetomados,
             @McpToolParam(description = "Perguntas.") List<QuizItem> perguntas,
-            @McpToolParam(description = "Id da tarefa do cronograma que o quiz cobre (vazio = a da aula, se houver).",
+            @McpToolParam(description = "Id da tarefa do cronograma que o quiz cobre (vazio = a da aula; na revisão, a "
+                    + "tarefa de revisão de hoje: tarefaRevisaoId de revisoes_de_hoje).",
                     required = false) Long tarefaId,
             @McpToolParam(description = McpConcurso.PARAM + " Vazio também herda o da aula/tarefa.", required = false)
             String concurso,
@@ -605,9 +610,14 @@ public class LessonMcpTools {
             @McpToolParam(description = "Revisão: ids dos flashcards (flashcards_da_revisao) que aparecem ANTES das "
                     + "questões, na mesma tela. As questões dos conceitos que o usuário marcar como errei/difícil "
                     + "sobem para o começo.", required = false) List<Long> flashcards) {
+        // Quiz de uma aula cujo assunto esta no foco da revisao de hoje: e quiz de revisao, liga a tarefa do dia
+        // (a fila "Hoje" mostra "Comecar revisao" e o andamento nela).
+        Long task = tarefaId != null || aulaId == null ? tarefaId
+                : spacedRepetition.openReviewFor(lessonService.find(aulaId).getTaskId(), java.time.LocalDate.now())
+                .map(com.pdf2questao.study.StudyTask::getId).orElse(null);
         Quiz quiz = mcpConcurso.in(concurso, () -> lessonService.createQuiz(aulaId, titulo, disciplina, topico, nivel,
                 duvidas, errosRetomados, perguntas == null ? null : perguntas.stream().map(QuizItem::toNew).toList(),
-                tarefaId, formato, estiloDaBanca, referencias));
+                task, formato, estiloDaBanca, referencias));
         flashcardService.attach(quiz, flashcards);
         return new QuizCreated(quiz.getId(), quiz.getTitle(), quiz.getLessonId(), lessonService.questions(quiz.getId()).size(),
                 errosRetomados == null ? 0 : errosRetomados.size(), baseUrl + "/quizzes/" + quiz.getId());

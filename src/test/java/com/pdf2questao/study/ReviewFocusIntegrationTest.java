@@ -44,6 +44,10 @@ class ReviewFocusIntegrationTest {
     StudyTaskRepository taskRepository;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    com.pdf2questao.mcp.LessonMcpTools lessonTools;
+    @Autowired
+    com.pdf2questao.aula.TodayFlowService flowService;
 
     @BeforeEach
     void clean() {
@@ -192,5 +196,31 @@ class ReviewFocusIntegrationTest {
                     "o que ficou aguardando não anda");
             assertEquals(today, taskRepository.findById(dir.getId()).orElseThrow().getNextReviewDate());
         }
+    }
+
+    @Test
+    void quizDaAulaDoFocoLigaATarefaDeRevisaoEABreComOBotaoComecarRevisao() {
+        LocalDate today = LocalDate.now();
+        StudyTask subject = due("Créditos adicionais", "AFO", today);
+        var aula = lessonTools.createLesson("Créditos", "AFO", "Créditos adicionais",
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.SLIDES, "[MCASP](https://www.tesourotransparente.gov.br/)",
+                subject.getId(), null, null, null, com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.fixacao(),
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.ESTILO,
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.REFS, null);
+        spacedRepetition.syncReviewTask(today);
+        StudyTask review = taskRepository.findAllByReviewDate(today).stream().filter(t -> !t.isDone()).findFirst()
+                .orElseThrow();
+        assertTrue(review.reviewItemIds().contains(subject.getId()));
+        assertEquals("Revisar", flowService.flow(review).action().label(), "sem quiz, só o cartão");
+
+        var quiz = lessonTools.createQuiz(aula.aulaId(), "Revisão", null, null, null, null, List.of(),
+                List.of(com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.item("Créditos", "A")), null, null, null,
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.ESTILO,
+                com.pdf2questao.mcp.LessonMcpToolsIntegrationTest.REFS);
+        assertEquals(review.getId(), jdbc.queryForObject("SELECT task_id FROM quiz WHERE id = ?", Long.class,
+                quiz.quizId()), "o quiz da aula em foco vai para a tarefa de revisão");
+        var action = flowService.flow(taskRepository.findById(review.getId()).orElseThrow()).action();
+        assertEquals("Começar revisão", action.label());
+        assertEquals("/quizzes/" + quiz.quizId(), action.link());
     }
 }

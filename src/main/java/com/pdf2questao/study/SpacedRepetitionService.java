@@ -136,6 +136,24 @@ public class SpacedRepetitionService {
         return dueFor(concursoId, today).stream().filter(t -> chosen.contains(t.getId())).toList();
     }
 
+    /** Tarefa de revisao aberta de hoje que tem o assunto {@code subjectTaskId} no foco (vazio = nao esta no foco). */
+    @Transactional
+    public java.util.Optional<StudyTask> openReviewFor(Long subjectTaskId, LocalDate today) {
+        if (subjectTaskId == null) {
+            return java.util.Optional.empty();
+        }
+        syncReviewTask(today);
+        return taskRepository.findAllByReviewDate(today).stream()
+                .filter(t -> !t.isDone() && t.reviewItemIds().contains(subjectTaskId)).findFirst();
+    }
+
+    /** Tarefas de revisao abertas de hoje do concurso em vigor (em "Todos", de todos). */
+    public List<StudyTask> openReviewTasks(LocalDate today) {
+        Map<Long, Long> concursoBy = concursoByCronograma();
+        return taskRepository.findAllByReviewDate(today).stream()
+                .filter(t -> !t.isDone() && workspace.matches(concursoOf(t, concursoBy))).toList();
+    }
+
     private Set<Long> chosenToday(LocalDate today) {
         Set<Long> chosen = new LinkedHashSet<>();
         taskRepository.findAllByReviewDate(today).stream().filter(t -> !t.isDone())
