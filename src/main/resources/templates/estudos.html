@@ -70,6 +70,25 @@
             </div>
 
             <div class="flow-list">
+                <!-- Volta dos erros: perguntas de quiz erradas ha 2+ dias, respondidas de novo (cota diaria). -->
+                <article class="card flow-card" id="erros-hoje" th:if="${errorReturn.pendente()}">
+                    <i class="bi bi-arrow-repeat text-bad pt-1"></i>
+                    <div class="flow-body">
+                        <a class="flow-title" href="/aulas/erros?hoje=true">Erros para rever hoje</a>
+                        <div class="task-meta">
+                            <span th:text="${errorReturn.hoje.size()} + (${errorReturn.hoje.size() == 1} ? ' pergunta que você errou' : ' perguntas que você errou') + ' há 2 dias ou mais'"></span>
+                            <span th:if="${errorReturn.feitosHoje > 0}" th:text="${errorReturn.feitosHoje} + ' já revistas hoje'"></span>
+                            <span th:if="${errorReturn.vencidos > errorReturn.hoje.size()}" th:text="(${errorReturn.vencidos - errorReturn.hoje.size()}) + ' esperando os próximos dias'"></span>
+                        </div>
+                    </div>
+                    <div class="flow-actions">
+                        <a href="/aulas/erros?hoje=true" class="btn btn-primary btn-sm"><i class="bi bi-arrow-repeat me-1"></i>Rever erros</a>
+                    </div>
+                </article>
+                <div class="small text-muted" id="erros-hoje-feito" th:if="${errorReturn.concluido()}">
+                    <i class="bi bi-check-circle-fill text-ok me-1"></i><span th:text="'Erros de hoje revistos (' + ${errorReturn.feitosHoje} + ')'"></span>
+                    <span th:if="${errorReturn.vencidos > 0}" th:text="' · ' + ${errorReturn.vencidos} + ' voltam nos próximos dias'"></span>
+                </div>
                 <article class="card flow-card" th:each="f : ${day.open}" th:with="t=${f.task}" th:id="'t-' + ${t.id}"
                          th:classappend="(${t.overdue} ? 'is-overdue ' : '') + (${day.current != null and day.current.task.id == t.id} ? 'is-current' : '')">
                     <form th:replace="~{fragments/estudos :: taskCheck(${t})}"></form>

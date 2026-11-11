@@ -70,8 +70,13 @@ public class LessonController {
     }
 
     @GetMapping("/aulas/erros")
-    public String errors(@RequestParam(required = false) String disciplina, Model model) {
-        model.addAttribute("errors", lessonService.openErrors(disciplina));
+    public String errors(@RequestParam(required = false) String disciplina,
+                         @RequestParam(defaultValue = "false") boolean hoje, Model model) {
+        // hoje=true: o passo diario da tela Hoje, so os erros antigos que voltam hoje (cota do dia).
+        LessonService.ErrorReturn retorno = hoje ? lessonService.errorReturn(java.time.LocalDate.now()) : null;
+        model.addAttribute("hoje", hoje);
+        model.addAttribute("retorno", retorno);
+        model.addAttribute("errors", hoje ? retorno.hoje() : lessonService.openErrors(disciplina));
         model.addAttribute("errorsBySubject", lessonService.openErrorsBySubject());
         model.addAttribute("disciplina", disciplina);
         return "aulas-erros";

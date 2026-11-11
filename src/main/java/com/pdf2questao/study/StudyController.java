@@ -58,8 +58,10 @@ public class StudyController {
         model.addAttribute("recentPages", pageService.recent());
         model.addAttribute("inboxCount", inboxService.count());
         model.addAttribute("practice", dashboardService.today());
-        model.addAttribute("quizErrors", lessonService.openErrorsBySubject().values().stream()
-                .mapToLong(Long::longValue).sum());
+        var openErrors = lessonService.openErrors(null);
+        model.addAttribute("quizErrors", (long) openErrors.size());
+        // Passo diario: os erros antigos que voltam hoje, no topo da fila.
+        model.addAttribute("errorReturn", lessonService.errorReturn(openErrors, today));
         return "estudos";
     }
 

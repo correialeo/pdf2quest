@@ -619,6 +619,70 @@ public class LessonService {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
+    // ---- volta dos erros: passo diario da tela Hoje ----
+
+    /** Um erro so volta depois deste tanto de dias: responder de novo no mesmo dia mede memoria curta. */
+    public static final int ERROR_RETURN_DAYS = 2;
+    /** Quantos erros antigos entram por dia (o resto espera os proximos dias, os mais antigos primeiro). */
+    public static final int ERRORS_PER_DAY = 20;
+
+    /**
+     * @param hoje       erros a responder hoje (os mais antigos primeiro, ate completar a cota do dia)
+     * @param vencidos   todos os erros que ja podem voltar (inclui os de hoje)
+     * @param feitosHoje erros antigos ja respondidos de novo hoje
+     */
+    public record ErrorReturn(List<OpenError> hoje, int vencidos, int feitosHoje) {
+        public boolean pendente() {
+            return !hoje.isEmpty();
+        }
+
+        public boolean concluido() {
+            return hoje.isEmpty() && feitosHoje > 0;
+        }
+    }
+
+    public ErrorReturn errorReturn(LocalDate today) {
+        return errorReturn(openErrors(null), today);
+    }
+
+    /**
+     * Erros de quiz que voltam hoje: ultima resposta errada ha {@link #ERROR_RETURN_DAYS} dias ou mais. Acertou, sai
+     * da caixa; errou de novo, a data da resposta passa a ser hoje e a pergunta volta sozinha daqui a
+     * {@link #ERROR_RETURN_DAYS} dias. Exercicio guiado e tarefa de codigo (sem alternativas) nao entram: sao
+     * refeitos na aula.
+     */
+    public ErrorReturn errorReturn(List<OpenError> open, LocalDate today) {
+        LocalDate limit = today.minusDays(ERROR_RETURN_DAYS);
+        List<OpenError> due = open.stream()
+                .filter(e -> !e.pergunta().alternativeList().isEmpty())
+                .filter(e -> !e.respondidaEm().toLocalDate().isAfter(limit))
+                .sorted(Comparator.comparing(OpenError::respondidaEm)).toList();
+        int done = retriedToday(today, limit);
+        return new ErrorReturn(due.stream().limit(Math.max(0, ERRORS_PER_DAY - done)).toList(), due.size(), done);
+    }
+
+    /** Perguntas respondidas hoje cuja resposta anterior era um erro que ja podia voltar. */
+    private int retriedToday(LocalDate today, LocalDate limit) {
+        Set<Long> visible = visibleQuizzes().stream().map(Quiz::getId).collect(Collectors.toSet());
+        Set<Long> questions = questionRepository.findAll().stream().filter(q -> visible.contains(q.getQuizId()))
+                .map(QuizQuestion::getId).collect(Collectors.toSet());
+        Map<Long, QuizAttempt> before = new LinkedHashMap<>();   // ultima resposta antes de hoje
+        Set<Long> answeredToday = new java.util.HashSet<>();
+        attemptRepository.findAll().stream()
+                .filter(a -> a.getAnsweredAt() != null && questions.contains(a.getQuizQuestionId()))
+                .sorted(Comparator.comparing(QuizAttempt::getAnsweredAt).thenComparing(QuizAttempt::getId))
+                .forEach(a -> {
+                    if (a.getAnsweredAt().toLocalDate().isBefore(today)) {
+                        before.put(a.getQuizQuestionId(), a);
+                    } else {
+                        answeredToday.add(a.getQuizQuestionId());
+                    }
+                });
+        return (int) answeredToday.stream().map(before::get).filter(Objects::nonNull)
+                .filter(a -> !Boolean.TRUE.equals(a.getCorrect()) && !a.getAnsweredAt().toLocalDate().isAfter(limit))
+                .count();
+    }
+
     /** O que mostrar da resposta dada: a letra ou "em branco". */
     private static String shown(String selected) {
         return BLANK.equals(selected) ? "em branco" : selected;

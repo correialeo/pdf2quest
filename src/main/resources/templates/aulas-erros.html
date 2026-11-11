@@ -4,26 +4,31 @@
 <body>
 <div th:replace="~{fragments/nav :: nav}"></div>
 <main class="container page lesson-page">
-    <a href="/aulas" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Aulas</a>
+    <a th:href="${hoje} ? '/hoje' : '/aulas'" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i><span th:text="${hoje} ? 'Hoje' : 'Aulas'">Aulas</span></a>
     <div class="d-flex align-items-baseline justify-content-between gap-2 mt-1">
-        <h1 class="m-0">Caixa de erros</h1>
+        <h1 class="m-0" th:text="${hoje} ? 'Erros para rever hoje' : 'Caixa de erros'">Caixa de erros</h1>
         <span class="small text-muted text-nowrap" id="quizScore"></span>
     </div>
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <p class="page-subtitle m-0">O que você errou nos quizzes e ainda não acertou de novo. Acertou aqui, sai da caixa.</p>
+        <p class="page-subtitle m-0" th:unless="${hoje}">O que você errou nos quizzes e ainda não acertou de novo. Acertou aqui, sai da caixa.</p>
+        <p class="page-subtitle m-0" th:if="${hoje}">Perguntas que você errou há 2 dias ou mais, as mais antigas primeiro. Acertou, sai da caixa; errou de novo, volta em 2 dias.
+            <span th:if="${retorno.vencidos > errors.size()}" th:text="(${retorno.vencidos - errors.size()}) + ' esperam os próximos dias.'"></span></p>
         <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" id="copy-reinforce" th:unless="${errors.isEmpty()}"
                 title="Copia um pedido pronto para colar no Claude Code: um quiz novo que retoma estes erros">
             <i class="bi bi-clipboard me-1"></i>Pedir quiz de reforço</button>
     </div>
 
-    <div class="chip-row" th:if="${errorsBySubject.size() > 1}">
+    <div class="chip-row" th:if="${!hoje and errorsBySubject.size() > 1}">
         <a href="/aulas/erros" class="chip" th:classappend="${disciplina == null} ? 'active'">Todas</a>
         <a th:each="e : ${errorsBySubject}" th:href="@{/aulas/erros(disciplina=${e.key})}" class="chip"
            th:classappend="${e.key == disciplina} ? 'active'" th:text="${e.key} + ' · ' + ${e.value}"></a>
     </div>
 
-    <div class="empty-state" th:if="${errors.isEmpty()}"><i class="bi bi-trophy"></i>
+    <div class="empty-state" th:if="${errors.isEmpty() and !hoje}"><i class="bi bi-trophy"></i>
         <span>Nenhum erro em aberto. Mandou bem!</span> <a href="/aulas" class="ms-1">Voltar às aulas</a></div>
+    <div class="empty-state" th:if="${errors.isEmpty() and hoje}"><i class="bi bi-check2-all text-ok"></i>
+        <span th:text="${retorno.feitosHoje > 0} ? 'Erros de hoje revistos (' + ${retorno.feitosHoje} + ').' : 'Nenhum erro antigo para rever hoje.'"></span>
+        <a href="/hoje" class="ms-1">Voltar para Hoje</a></div>
 
     <!-- Mesmo jeito do quiz: clicar responde na hora, com o porque; a tentativa vale para a pergunta original. -->
     <div class="card p-4 mb-3 quiz-question" th:each="e, it : ${errors}"
@@ -32,7 +37,7 @@
             <span th:text="${it.count} + ' de ' + ${errors.size()} + ' · ' + ${e.disciplina} + (${e.pergunta.topic != null} ? ' · ' + ${e.pergunta.topic} : '')"></span>
             <a class="ms-auto text-muted text-nowrap" th:href="@{/quizzes/{id}(id=${e.pergunta.quizId})}" th:text="${e.quiz}"></a>
         </div>
-        <div class="small text-bad mb-2" th:if="${e.suaResposta != null}"
+        <div class="small text-bad mb-2 last-answer" th:if="${e.suaResposta != null}" th:hidden="${hoje}"
              th:text="'Da última vez você marcou ' + ${e.suaResposta} + ' (' + ${#temporals.format(e.respondidaEm, 'dd/MM')} + ')'"></div>
         <div class="quiz-statement" th:utext="${@richText.html(e.pergunta.statement)}"></div>
         <div class="quiz-options">
@@ -46,8 +51,9 @@
         </div>
     </div>
     <div class="d-flex justify-content-end" th:unless="${errors.isEmpty()}">
-        <a th:href="@{/aulas/erros(disciplina=${disciplina})}" class="btn btn-outline-secondary btn-sm">
+        <a th:unless="${hoje}" th:href="@{/aulas/erros(disciplina=${disciplina})}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-repeat me-1"></i>Atualizar caixa</a>
+        <a th:if="${hoje}" href="/hoje" class="btn btn-primary btn-sm">Voltar para Hoje</a>
     </div>
 </main>
 <div th:replace="~{fragments/scripts :: scripts}"></div>
@@ -64,6 +70,8 @@
     function reveal(card) {
         const selected = card.dataset.selected, correct = card.dataset.correct;
         card.classList.add('is-answered');
+        const last = card.querySelector('.last-answer');
+        if (last) { last.hidden = false; }
         card.querySelectorAll('.quiz-option').forEach(function (opt) {
             const letter = opt.dataset.letter;
             opt.classList.toggle('is-correct', letter === correct);
