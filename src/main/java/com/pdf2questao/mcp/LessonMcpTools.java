@@ -75,7 +75,10 @@ public class LessonMcpTools {
                 2. AULA. Antes de escrever, leia o item do edital (ler_edital), pesquise na web fontes atuais do \\
                 tópico (norma vigente, súmulas, temas e jurisprudência, autores e conceitos; prefira fontes \\
                 oficiais) e veja o que o usuário já anotou (buscar_paginas / ler_pagina) e como a \\
-                banca cobra o tópico (exemplos_da_banca). Escreva a aula com criar_aula (tarefaId = a tarefa de \\
+                banca cobra o tópico: PRIMEIRO as questões reais importadas no sistema, com \\
+                exemplos_da_banca(banca, disciplina, assunto=palavras-chave do tópico); a internet só complementa. \\
+                As questões de fixação seguem essas questões reais (ids em referencias e em 'modelo'). \\
+                Escreva a aula com criar_aula (tarefaId = a tarefa de \\
                 hoje que ela cobre; em 'fontes', só o que você LEU, cada fonte com o link (URL)), no nível dele (use o \\
                 desempenho), EM SLIDES (veja a descrição de criar_aula: caixas :::regra/:::pegadinha/:::exemplo e \\
                 exemplos com os dados de entrada e o resultado lado a lado): um slide ("=== Título") por assunto do tópico (ex.: DFC num, DMPL noutro), \\
@@ -209,7 +212,9 @@ public class LessonMcpTools {
             @McpToolParam(description = "Com perguntasDaAula: como a banca cobra o tópico, observado nas questões "
                     + "reais lidas (mínimo 300 caracteres).", required = false) String estiloDaBanca,
             @McpToolParam(description = "Com perguntasDaAula: questões reais lidas como modelo, uma por linha "
-                    + "(mínimo 2).", required = false) String referencias,
+                    + "(mínimo 2): primeiro as do sistema (\"questão local #id\", de exemplos_da_banca), depois links. "
+                    + "Com questões reais da banca no sistema na disciplina, ao menos 2 locais e 'modelo' em cada "
+                    + "pergunta são obrigatórios.", required = false) String referencias,
             @McpToolParam(description = "Com perguntasDaAula: multipla_escolha (padrão) ou certo_errado.",
                     required = false) String formato,
             @McpToolParam(description = "Ids dos trechos LITERAIS gravados com registrar_trecho (mínimo 1): todo "
@@ -407,14 +412,17 @@ public class LessonMcpTools {
                 extraia o texto ou ache outra fonte antes de desistir); se for avulso, leia o tópico no edital \
                 (ler_edital), pesquise fontes atuais na web e veja como a banca cobra (exemplos_da_banca). Não \
                 cobre o que não conseguiu confirmar.
-                3. PESQUISA DA BANCA (nível prova, o padrão). Antes de escrever, ache questões REAIS da banca do \
-                concurso sobre o tópico: provas_da_banca e exemplos_da_banca no sistema e, na internet, provas e \
-                gabaritos da mesma banca (de preferência mesma área e últimos anos; PCI Concursos, sites de \
-                questões, PDFs oficiais). Leia pelo menos 3 questões inteiras do tópico e anote o que OBSERVOU (sem \
+                3. PESQUISA DA BANCA (nível prova, o padrão). Antes de escrever, PRIMEIRO as questões REAIS da banca \
+                do concurso importadas no sistema: exemplos_da_banca(banca, disciplina, assunto=palavras-chave do \
+                tópico) traz as mais próximas do assunto (peça mais com 'excluir'). Só se o sistema tiver poucas \
+                ('disponiveis' baixo ou nenhuma do assunto), complemente na internet com provas e gabaritos da mesma \
+                banca (mesma área, últimos anos). Leia pelo menos 3 questões inteiras e anote o que OBSERVOU (sem \
                 inventar): tamanho e contextualização do enunciado, comando ("é correto afirmar", "EXCETO", I-II-III, \
                 caso concreto, cálculo), como são os distratores (troca de prazo, de competência, de exceção, de \
                 termo parecido) e as pegadinhas recorrentes. Isso vai em estiloDaBanca; as questões lidas, em \
-                referencias.
+                referencias (as do sistema como "questão local #id"). Quando o sistema tem questões reais da banca na \
+                disciplina, criar_quiz exige ao menos 2 delas em referencias e, em cada pergunta, 'modelo' = o id da \
+                questão real que ela segue.
                 4. Escreva de 6 a 10 perguntas: uma ou mais para cada erro anterior (com outro enunciado, cobrando o \
                 mesmo ponto), as dúvidas do usuário, e o restante no nível pedido (basico = conceito; \
                 intermediario = aplicação; avancado = casos e exceções; prova = como a banca cobra). No nível prova, \
@@ -465,11 +473,14 @@ public class LessonMcpTools {
                 precisa exigir aplicar a regra a um caso concreto, distinguir dois conceitos parecidos, achar a exceção ou \
                 a assertiva incorreta (use "exceto", "apenas" e I-II-III). Pelo menos metade em afirmativas I-II-III ou \
                 cenário com cálculo/aplicação. Todas as alternativas plausíveis e do mesmo tamanho e estrutura; os \
-                distratores são os erros reais do usuário e as pegadinhas da banca (exemplos_da_banca), não absurdos. \
+                distratores são os erros reais do usuário e as pegadinhas da banca, não absurdos. \
                 A correta não pode ser a mais longa nem a única com detalhe. Priorize o que ele errou e os tópicos de \
                 menor acerto; o que ele acerta sempre entra só em versão mais difícil.
 
-                4. FONTE. Baseie-se no conteúdo das aulas (listar_aulas com aulaId) e em questões reais; confira na web \
+                4. FONTE. Baseie-se no conteúdo das aulas (listar_aulas com aulaId) e nas questões REAIS da banca \
+                importadas no sistema: para cada assunto, exemplos_da_banca(banca, disciplina, assunto) ANTES de \
+                qualquer pesquisa na internet; cada pergunta segue uma delas como modelo (sem copiar) e informa o id \
+                em 'modelo'. Confira na web \
                 o que for norma ou jurisprudência. Não cobre o que não confirmou. Toda alternativa com a explicação de \
                 por que está certa ou errada.
 
@@ -484,7 +495,8 @@ public class LessonMcpTools {
                 6. GRAVAR. Um quiz por disciplina do foco (assim o sistema retoma os erros dela; informe \
                 errosRetomados) e com tarefaId = tarefaRevisaoId de revisoes_de_hoje (assim a tarefa de \
                 revisão da tela Hoje mostra "Começar revisão"), de 8 a 12 perguntas no total da disciplina, nível "prova" (com estiloDaBanca e \
-                referencias: as questões reais da banca que você leu como modelo). Grave a disciplina real na \
+                referencias: as questões reais da banca que você leu como modelo, as do sistema como "questão local \
+                #id", e 'modelo' em cada pergunta). Grave a disciplina real na \
                 questão (nunca "Revisão" ou "Misto"): é ela que alimenta a medida de pontos fracos. Passe em \
                 'flashcards' os ids escolhidos. Passe o link e não mostre as respostas.
 
@@ -513,17 +525,26 @@ public class LessonMcpTools {
                     + "conceito que não está na aula é recusado.", required = false) List<String> conceitos,
             @McpToolParam(description = "true = a pergunta vai além da aula de propósito (dispensa conceito da "
                     + "aula; aparece como \"além da aula\" no resultado). Não vale para questão de fixação.",
-                    required = false) Boolean ampliacao) {
+                    required = false) Boolean ampliacao,
+            @McpToolParam(description = "Nível prova: id da questão REAL da banca (de exemplos_da_banca, citada em "
+                    + "referencias como \"questão local #id\") que esta pergunta segue como modelo de estrutura, "
+                    + "profundidade e distratores, sem copiar. Obrigatório quando o sistema tem questões reais da banca "
+                    + "na disciplina.", required = false) Long modelo) {
 
         public QuizItem(String enunciado, String topico, List<QuizAlternative> alternativas, String correta) {
-            this(enunciado, topico, alternativas, correta, null, null);
+            this(enunciado, topico, alternativas, correta, null, null, null);
+        }
+
+        public QuizItem(String enunciado, String topico, List<QuizAlternative> alternativas, String correta,
+                        List<String> conceitos, Boolean ampliacao) {
+            this(enunciado, topico, alternativas, correta, conceitos, ampliacao, null);
         }
 
         NewQuestion toNew() {
             return new NewQuestion(enunciado, topico,
                     alternativas == null ? null : alternativas.stream().map(QuizAlternative::texto).toList(),
                     alternativas == null ? null : alternativas.stream().map(QuizAlternative::explicacao).toList(),
-                    correta, conceitos, Boolean.TRUE.equals(ampliacao));
+                    correta, conceitos, Boolean.TRUE.equals(ampliacao), modelo);
         }
     }
 
@@ -561,10 +582,13 @@ public class LessonMcpTools {
     @McpTool(name = "criar_quiz",
             description = "Cria um quiz novo: de uma aula (aulaId; uma aula pode ter vários quizzes) ou avulso "
                     + "(disciplina/tópico). Nível: basico, intermediario, avancado ou prova (padrão: prova). No nível prova, "
-                    + "pesquise antes como a banca cobra o tópico (questões reais na internet, provas_da_banca e "
-                    + "exemplos_da_banca), descreva em estiloDaBanca o que observou e liste em referencias as "
-                    + "questões reais lidas (mínimo 2); cada pergunta segue uma delas como modelo de estrutura, "
-                    + "profundidade e distratores, sem copiar. Lotes de 4+ com a correta sempre a mais longa ou o "
+                    + "pesquise antes como a banca cobra o tópico, PRIMEIRO nas questões reais importadas no sistema "
+                    + "(exemplos_da_banca com disciplina e assunto) e só depois na internet; descreva em estiloDaBanca "
+                    + "o que observou e liste em referencias as questões reais lidas (mínimo 2); cada pergunta segue "
+                    + "uma delas como modelo de estrutura, profundidade e distratores, sem copiar. Quando o sistema "
+                    + "tem questões reais da banca do concurso na disciplina, é obrigatório: ao menos 2 delas em "
+                    + "referencias como \"questão local #id\" e, em cada pergunta, 'modelo' = o id que ela segue. "
+                    + "Lotes de 4+ com a correta sempre a mais longa ou o "
                     + "gabarito todo na mesma letra são recusados. Se houver erros em "
                     + "quizzes anteriores do assunto, é obrigatório retomá-los: leia erros_quiz_anteriores e informe os "
                     + "ids em errosRetomados. Pergunta repetida (já feita no concurso, em qualquer quiz ou revisão) é "
@@ -605,8 +629,8 @@ public class LessonMcpTools {
                     + "concreto, cálculo), tipo de distrator e pegadinhas recorrentes. Mínimo 300 caracteres.",
                     required = false) String estiloDaBanca,
             @McpToolParam(description = "Nível prova (obrigatório): questões reais da banca lidas como modelo, uma "
-                    + "por linha (link da questão/prova ou \"questão local #id\"). Mínimo 2.",
-                    required = false) String referencias,
+                    + "por linha: primeiro as do sistema (\"questão local #id\", de exemplos_da_banca), depois links "
+                    + "da internet. Mínimo 2.", required = false) String referencias,
             @McpToolParam(description = "Revisão: ids dos flashcards (flashcards_da_revisao) que aparecem ANTES das "
                     + "questões, na mesma tela. As questões dos conceitos que o usuário marcar como errei/difícil "
                     + "sobem para o começo.", required = false) List<Long> flashcards) {

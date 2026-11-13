@@ -111,6 +111,12 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findBancaSamples(@Param("banca") String banca, @Param("subject") String subject,
                                     @Param("quantity") int quantity);
 
+    /** Todas as questoes reais da banca (com gabarito, nao anuladas, sem as escritas pelo Claude). */
+    @Query(value = "SELECT * FROM question WHERE upper(organization) = upper(:banca) AND correct_answer IS NOT NULL " +
+            "AND (annulled IS NULL OR annulled = 0) " +
+            "AND (source IS NULL OR source NOT IN ('Simulado do Claude', 'Treino no Claude'))", nativeQuery = true)
+    List<Question> findRealOfBanca(@Param("banca") String banca);
+
     /** [import_job_id, questoes] das provas reais da banca no banco (sem as escritas pelo Claude). */
     @Query(value = "SELECT import_job_id, COUNT(*) FROM question WHERE upper(organization) = upper(:banca) " +
             "AND import_job_id IS NOT NULL AND (source IS NULL OR source NOT IN ('Simulado do Claude', 'Treino no Claude')) " +

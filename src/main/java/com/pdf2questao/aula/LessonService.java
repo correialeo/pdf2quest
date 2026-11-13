@@ -49,6 +49,7 @@ public class LessonService {
     private final SourceExcerptRepository excerptRepository;
     private final com.pdf2questao.flashcard.FlashcardRepository flashcardRepository;
     private final com.pdf2questao.flashcard.FlashcardRatingRepository flashcardRatingRepository;
+    private final com.pdf2questao.question.BancaReferences references;
 
     public LessonService(LessonRepository lessonRepository, QuizRepository quizRepository,
                          QuizQuestionRepository questionRepository, QuizAttemptRepository attemptRepository,
@@ -56,7 +57,9 @@ public class LessonService {
                          com.pdf2questao.concurso.ConcursoService concursoService,
                          LessonBlockValidator blockValidator, SourceExcerptRepository excerptRepository,
                          com.pdf2questao.flashcard.FlashcardRepository flashcardRepository,
-                         com.pdf2questao.flashcard.FlashcardRatingRepository flashcardRatingRepository) {
+                         com.pdf2questao.flashcard.FlashcardRatingRepository flashcardRatingRepository,
+                         com.pdf2questao.question.BancaReferences references) {
+        this.references = references;
         this.flashcardRepository = flashcardRepository;
         this.flashcardRatingRepository = flashcardRatingRepository;
         this.blockValidator = blockValidator;
@@ -720,12 +723,18 @@ public class LessonService {
      * @param concepts     conceitos da aula que a pergunta cobra ({#id} dos slides/caixas)
      * @param beyondLesson pergunta que vai alem da aula de proposito
      */
+    /** @param model id da questao REAL da banca (importada no sistema) usada como modelo; nulo = sem modelo local. */
     public record NewQuestion(String statement, String topic, List<String> texts, List<String> explanations,
-                              String correct, List<String> concepts, boolean beyondLesson) {
+                              String correct, List<String> concepts, boolean beyondLesson, Long model) {
+
+        public NewQuestion(String statement, String topic, List<String> texts, List<String> explanations,
+                           String correct, List<String> concepts, boolean beyondLesson) {
+            this(statement, topic, texts, explanations, correct, concepts, beyondLesson, null);
+        }
 
         public NewQuestion(String statement, String topic, List<String> texts, List<String> explanations,
                            String correct) {
-            this(statement, topic, texts, explanations, correct, null, false);
+            this(statement, topic, texts, explanations, correct, null, false, null);
         }
     }
 
@@ -1092,6 +1101,45 @@ public class LessonService {
                 last.containsKey(q.getId()) ? last.get(q.getId()).getAnsweredAt() : null)).toList();
     }
 
+    /**
+     * Nivel prova: quando o sistema tem questoes REAIS da banca do concurso na disciplina do quiz (provas e listas
+     * importadas com gabarito oficial), o quiz tem de partir delas. 'referencias' cita ao menos
+     * {@value #MIN_STYLE_SOURCES} como "questão local #id" e cada pergunta diz em 'modelo' qual delas seguiu. Sem
+     * modelos locais suficientes, valem as referencias da internet.
+     */
+    private void checkRealModels(Quiz quiz, List<NewQuestion> questions) {
+        String banca = concursoService.find(quiz.getConcursoId()).map(com.pdf2questao.concurso.Concurso::getBanca)
+                .filter(b -> !b.isBlank()).orElse(null);
+        if (banca == null || quiz.getSubject() == null) {
+            return;
+        }
+        long available = references.available(banca, quiz.getSubject());
+        if (available < MIN_STYLE_SOURCES) {
+            return;
+        }
+        List<Long> cited = com.pdf2questao.question.BancaReferences.questionIds(quiz.getStyleSources());
+        List<Long> valid = references.validQuestions(banca, cited);
+        if (valid.size() < MIN_STYLE_SOURCES) {
+            List<Long> invalid = cited.stream().filter(id -> !valid.contains(id)).toList();
+            throw new IllegalArgumentException("O sistema tem " + available + " questões REAIS da " + banca + " em \""
+                    + quiz.getSubject() + "\" (importadas com gabarito oficial). Comece por elas: chame "
+                    + "exemplos_da_banca(banca=\"" + banca + "\", disciplina=\"" + quiz.getSubject() + "\", assunto=...), "
+                    + "leia as questões e cite ao menos " + MIN_STYLE_SOURCES + " em 'referencias' como \"questão local "
+                    + "#id\" (links da internet podem vir junto, como complemento)."
+                    + (invalid.isEmpty() ? "" : " Não são questões reais da " + banca + ": "
+                    + invalid.stream().map(id -> "#" + id).collect(Collectors.joining(", ")) + "."));
+        }
+        for (int i = 0; i < questions.size(); i++) {
+            Long model = questions.get(i).model();
+            if (model == null || !valid.contains(model)) {
+                throw new IllegalArgumentException("Pergunta " + (i + 1) + ": informe em 'modelo' o id da questão real "
+                        + "da " + banca + " que ela segue como modelo de estrutura, profundidade e distratores (uma das "
+                        + "citadas em referencias: " + valid.stream().map(id -> "#" + id)
+                        .collect(Collectors.joining(", ")) + ")" + (model == null ? "." : "; #" + model + " não é."));
+            }
+        }
+    }
+
     /** Acrescenta perguntas a um quiz. Toda alternativa precisa de explicacao (por que certa/errada). */
     @Transactional
     public List<QuizQuestion> addQuestions(Long quizId, List<NewQuestion> questions) {
@@ -1105,6 +1153,7 @@ public class LessonService {
         }
         if (PROVA.equals(quiz.getLevel())) {
             rejectGiveaways(quiz, questions);
+            checkRealModels(quiz, questions);
         }
         int position = questions(quizId).size();
         List<QuizQuestion> saved = new ArrayList<>();

@@ -11,3 +11,6 @@ data/
 
 # PDFs de provas (material da banca, nao versionar); os mapas de secao .json ficam
 fixtures/**/*.pdf
+
+# Ferramentas pessoais de extracao de questoes (Qconcursos, gabaritos): fora do repositorio
+tools/qconcursos/

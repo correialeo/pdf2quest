@@ -362,6 +362,12 @@ public class GeneratedExamService {
                 .orElseThrow(() -> new IllegalArgumentException("Simulado " + examId + " não existe.")));
     }
 
+    /** Banca que o simulado imita (a informada em criar_simulado). */
+    public String banca(Long examId) {
+        GeneratedExam exam = draft(examId);
+        return importJobRepository.findById(exam.getImportJobId()).map(ImportJob::getBanca).orElse(null);
+    }
+
     private GeneratedExam draft(Long examId) {
         GeneratedExam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new IllegalArgumentException("Simulado " + examId + " não existe."));

@@ -52,14 +52,17 @@ public class ExamMcpTools {
     private final ImportJobRepository importJobRepository;
     private final PassageRepository passageRepository;
     private final McpConcurso mcpConcurso;
+    private final com.pdf2questao.question.BancaReferences references;
     private final String baseUrl;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public ExamMcpTools(ScoringProfileService profileService, com.pdf2questao.concurso.ConcursoService concursoService,
                         GeneratedExamService examService,
                         QuestionRepository questionRepository, ImportJobRepository importJobRepository,
-                        PassageRepository passageRepository, McpConcurso mcpConcurso, @Value("${server.port:8080}") int port) {
+                        PassageRepository passageRepository, McpConcurso mcpConcurso,
+                        com.pdf2questao.question.BancaReferences references, @Value("${server.port:8080}") int port) {
         this.mcpConcurso = mcpConcurso;
+        this.references = references;
         this.concursoService = concursoService;
         this.passageRepository = passageRepository;
         this.profileService = profileService;
@@ -89,12 +92,16 @@ public class ExamMcpTools {
                 conteúdo programático do cargo %s) e grave com salvar_perfil_edital: cada disciplina com nº de \
                 questões, peso e apelidos (os nomes que aparecem nas provas reais). Anote o tempo de cada prova.
 
-                2. PESQUISA DA BANCA (crucial). Antes de escrever qualquer questão:
-                   a) Pesquise na internet provas anteriores da MESMA banca, de preferência da mesma área/cargo e \
-                dos últimos anos (PDFs de provas e gabaritos, PCI Concursos, sites de questões, análises de \
-                professores). Leia pelo menos 2 provas reais inteiras, não só resumos.
-                   b) Leia as provas reais que já estão no sistema: provas_da_banca e exemplos_da_banca (com provaId, \
-                página a página, até o fim da prova).
+                2. PESQUISA DA BANCA (crucial). Antes de escrever qualquer questão, PRIMEIRO o que está no sistema:
+                   a) provas_da_banca: as provas reais da banca já importadas (com gabarito oficial). Leia-as com \
+                exemplos_da_banca(provaId=...), página a página, até o fim; e, por disciplina do edital, \
+                exemplos_da_banca(disciplina=...) para ver todas as questões reais dela ('disponiveis' diz quantas há). \
+                Essas provas vão em 'fontes' como "prova local #id": com provas da banca no sistema, criar_simulado \
+                exige ao menos 2 delas.
+                   b) Só DEPOIS, e para o que o sistema não cobre (disciplina com poucas ou nenhuma questão real, área \
+                diferente), pesquise na internet provas anteriores da MESMA banca, de preferência da mesma área/cargo e \
+                dos últimos anos (PDFs de provas e gabaritos, PCI Concursos, sites de questões). Leia provas inteiras, \
+                não só resumos.
                    c) Para cada disciplina, registre o que OBSERVOU (separado do que é hipótese sua, e sem inventar \
                 estatísticas): formato e tamanho dos enunciados, contextualização, uso de casos, cálculos, tabelas, \
                 código/SQL, comandos típicos \
@@ -104,10 +111,12 @@ public class ExamMcpTools {
 
                 3. ESCRITA, QUESTÃO A QUESTÃO. Para cada prova (%s), crie o rascunho com criar_simulado e escreva \
                 as questões na quantidade exata do edital por disciplina, distribuindo os assuntos pelo conteúdo \
-                programático (grave-o antes com registrar_conteudo_programatico). Para CADA questão: escolha 1 a 3 \
-                questões reais pertinentes (mesma disciplina/assunto; para TI e dados, provas de TI; para direito e \
-                AFO, provas fiscais) e LEIA o conteúdo delas; use-as como modelo de estrutura, profundidade e \
-                distratores, sem copiar nem parafrasear. Envie no máximo 5 por chamada de adicionar_questoes. \
+                programático (grave-o antes com registrar_conteudo_programatico). Para CADA questão: chame \
+                exemplos_da_banca(banca, disciplina, assunto=o assunto da questão) e LEIA as questões reais mais \
+                próximas (use 'excluir' para não repetir modelo); escolha 1 a 3 como modelo de estrutura, profundidade \
+                e distratores, sem copiar nem parafrasear, e informe os ids em 'modelos' (obrigatório quando o sistema \
+                tem questões reais da banca na disciplina; a questão sem modelo é recusada). Só quando o sistema não \
+                tem a disciplina, use questões da internet e descreva-as em 'inspiracao'. Envie no máximo 5 por chamada de adicionar_questoes. \
                 Cebraspe: crie com formato=certo_errado; cada questão é um item a julgar (resposta C ou E, sem \
                 alternativas) e o gabarito comentado explica por que o item está certo ou errado.
 
@@ -295,8 +304,9 @@ public class ExamMcpTools {
     }
 
     @McpTool(name = "provas_da_banca",
-            description = "Provas reais da banca já importadas no sistema (PDFs de provas anteriores), para estudar o "
-                    + "estilo. Leia cada uma com exemplos_da_banca(provaId=...).",
+            description = "Provas reais da banca já importadas no sistema (provas anteriores com gabarito oficial). "
+                    + "É a PRIMEIRA fonte para estudar a banca, antes da internet: leia cada uma com "
+                    + "exemplos_da_banca(provaId=...) e cite-as como \"prova local #id\" em 'fontes' (criar_simulado).",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
     public List<BancaExam> bancaExams(@McpToolParam(description = "Banca, ex.: FCC.") String banca) {
         List<BancaExam> out = new ArrayList<>();
@@ -309,26 +319,45 @@ public class ExamMcpTools {
         return out;
     }
 
-    public record SampleQuestion(Long id, Long provaId, Integer numero, String disciplina, String textoBase,
-                                 String enunciado, Map<String, String> alternativas, String gabarito,
-                                 boolean anulada) {
+    public record SampleQuestion(Long id, Long provaId, Integer numero, String disciplina, String assunto,
+                                 String textoBase, String enunciado, Map<String, String> alternativas, String gabarito,
+                                 boolean anulada, Integer relevancia) {
     }
 
-    public record Samples(List<SampleQuestion> questoes, Integer proximoInicio) {
+    /**
+     * @param disponiveis quantas questoes reais da banca o sistema tem na disciplina (ou no todo, sem disciplina)
+     * @param aviso       o que fazer a seguir (ex.: poucas no sistema = complementar na internet)
+     */
+    public record Samples(List<SampleQuestion> questoes, Integer proximoInicio, Long disponiveis, String aviso) {
     }
 
     @McpTool(name = "exemplos_da_banca",
-            description = "Questões REAIS da banca (com gabarito) para estudar o estilo. Com provaId, lê a prova na "
-                    + "ordem, 10 por vez a partir de 'inicio' (use proximoInicio para continuar até o fim); sem "
-                    + "provaId, sorteia questões da banca, opcionalmente de uma disciplina.",
+            description = "Questões REAIS da banca importadas no sistema (provas e listas com gabarito oficial): a "
+                    + "PRIMEIRA fonte de modelo para qualquer questão inédita (quiz, revisão, aula, simulado), antes "
+                    + "da internet. Com disciplina + assunto, traz as questões reais mais próximas do assunto (as do "
+                    + "assunto primeiro; 'relevancia' 0 = só da disciplina). Com provaId, lê a prova na ordem, 10 por "
+                    + "vez a partir de 'inicio'. Cite os 'id' lidos como \"questão local #id\" em 'referencias' "
+                    + "(criar_quiz) e em 'modelos' (adicionar_questoes) e, em cada pergunta, o id do modelo seguido: "
+                    + "quando o sistema tem modelos da banca na disciplina, as ferramentas exigem isso. Peça mais com "
+                    + "'excluir' (ids já lidos). 'disponiveis' diz quantas reais há; se forem poucas, complemente na "
+                    + "internet.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false))
     public Samples bancaSamples(
             @McpToolParam(description = "Banca, ex.: FCC.") String banca,
-            @McpToolParam(description = "Parte do nome da disciplina (só no sorteio).", required = false) String disciplina,
+            @McpToolParam(description = "Disciplina (nome, apelido ou sigla: \"Português\" acha \"Língua Portuguesa\", "
+                    + "\"AFO\" acha \"Administração Financeira e Orçamentária\").", required = false) String disciplina,
             @McpToolParam(description = "Prova a ler inteira (de provas_da_banca).", required = false) Long provaId,
-            @McpToolParam(description = "Posição inicial na prova (0 = começo).", required = false) Integer inicio) {
+            @McpToolParam(description = "Posição inicial na prova (0 = começo).", required = false) Integer inicio,
+            @McpToolParam(description = "Assunto/tópico em palavras-chave (ex.: \"substituição tributária ICMS base de "
+                    + "cálculo\"): traz primeiro as questões reais desse assunto.", required = false) String assunto,
+            @McpToolParam(description = "Ids de questões já lidas, para trazer outras.", required = false)
+            List<Long> excluir,
+            @McpToolParam(description = "Quantas trazer (padrão 10, máximo 20).", required = false) Integer quantidade) {
         List<Question> questions;
+        List<Integer> relevance = new ArrayList<>();
         Integer next = null;
+        Long available = null;
+        String warning = null;
         if (provaId != null) {
             List<Question> all = questionRepository.findByImportJobId(provaId).stream()
                     .filter(q -> q.getOrganization() == null || q.getOrganization().equalsIgnoreCase(banca.strip()))
@@ -338,12 +367,28 @@ public class ExamMcpTools {
             questions = all.subList(Math.min(from, all.size()), Math.min(from + MAX_SAMPLES, all.size()));
             next = from + MAX_SAMPLES < all.size() ? from + MAX_SAMPLES : null;
         } else {
-            questions = questionRepository.findBancaSamples(banca.strip(),
-                    McpText.blank(disciplina) ? null : disciplina.strip(), MAX_SAMPLES);
+            int max = quantidade == null ? MAX_SAMPLES : Math.min(Math.max(quantidade, 1), 2 * MAX_SAMPLES);
+            String subject = McpText.blank(disciplina) ? null : disciplina.strip();
+            var matches = references.search(banca, subject, McpText.blank(assunto) ? null : assunto, max, excluir);
+            questions = matches.stream().map(com.pdf2questao.question.BancaReferences.Match::question).toList();
+            matches.forEach(m -> relevance.add(McpText.blank(assunto) ? null : m.relevancia()));
+            available = references.available(banca, subject);
+            if (available == 0) {
+                warning = "O sistema não tem questões reais da " + banca.strip()
+                        + (subject == null ? "" : " em \"" + subject + "\"") + ": pesquise provas reais da banca na "
+                        + "internet (e, se o usuário tiver, importe-as) e cite os links em referencias.";
+            } else if (available < 5) {
+                warning = "Só " + available + " questões reais no sistema nesta disciplina: leia todas e complemente "
+                        + "com provas da banca na internet.";
+            } else if (!McpText.blank(assunto) && matches.stream().noneMatch(m -> m.relevancia() > 0)) {
+                warning = "Nenhuma questão real do sistema trata deste assunto: vieram as da disciplina (mesma banca, "
+                        + "mesmo estilo). Para o conteúdo, complemente com questões do assunto na internet.";
+            }
         }
         Map<Long, String> passages = new LinkedHashMap<>();
         List<SampleQuestion> out = new ArrayList<>();
-        for (Question q : questions) {
+        for (int i = 0; i < questions.size(); i++) {
+            Question q = questions.get(i);
             Map<String, String> alternatives = new LinkedHashMap<>();
             q.alternatives().forEach((k, v) -> alternatives.put(k, McpText.plain(v)));
             // Texto base inteiro so na primeira questao que o usa; nas seguintes, so a referencia.
@@ -353,13 +398,18 @@ public class ExamMcpTools {
                         + passages.get(q.getPassageId()) + ")"
                         : passageRepository.findById(q.getPassageId())
                         .map(p -> McpText.clip(McpText.plain(p.getContent()), 6000)).orElse(null);
-                passages.putIfAbsent(q.getPassageId(), String.valueOf(q.getQuestionNumber()));
+                passages.putIfAbsent(q.getPassageId(), "#" + q.getId());
             }
             out.add(new SampleQuestion(q.getId(), q.getImportJobId(), q.getQuestionNumber(), q.getSubject(),
-                    passage, McpText.clip(McpText.plain(q.getStatement()), 3000), alternatives, q.getCorrectAnswer(),
-                    q.isAnnulled()));
+                    q.getTopic(), passage, McpText.clip(McpText.plain(q.getStatement()), 3000), alternatives,
+                    q.getCorrectAnswer(), q.isAnnulled(), i < relevance.size() ? relevance.get(i) : null));
         }
-        return new Samples(out, next);
+        return new Samples(out, next, available, warning);
+    }
+
+    /** Assinatura antiga (sem assunto). */
+    public Samples bancaSamples(String banca, String disciplina, Long provaId, Integer inicio) {
+        return bancaSamples(banca, disciplina, provaId, inicio, null, null, null);
     }
 
     // ---- simulado ----
@@ -368,7 +418,8 @@ public class ExamMcpTools {
             description = "Abre o rascunho de um simulado INÉDITO para uma prova do perfil (ex.: P1). Exige a pesquisa "
                     + "da banca já feita: 'estiloDaBanca' com o perfil detalhado (formato dos enunciados, comandos, "
                     + "distratores e pegadinhas por disciplina) e 'fontes' com ao menos 2 provas reais lidas. Devolve "
-                    + "quantas questões criar de cada disciplina. Cebraspe: formato=certo_errado (cada questão é um item "
+                    + "quantas questões criar de cada disciplina. Com provas reais da banca no sistema (provas_da_banca), "
+                    + "'fontes' precisa citar ao menos 2 delas como \"prova local #id\". Cebraspe: formato=certo_errado (cada questão é um item "
                     + "a julgar, sem alternativas; resposta C ou E). Veja o roteiro no prompt montar_simulado.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public ExamStatus createExam(
@@ -380,7 +431,8 @@ public class ExamMcpTools {
             @McpToolParam(description = "Banca imitada, ex.: FCC.") String banca,
             @McpToolParam(description = "Tempo da prova em minutos (do edital).", required = false) Integer tempoMinutos,
             @McpToolParam(description = "Perfil da banca levantado na pesquisa (mínimo 600 caracteres).") String estiloDaBanca,
-            @McpToolParam(description = "Provas reais analisadas, uma por linha (link ou \"prova local #id\").") String fontes,
+            @McpToolParam(description = "Provas reais analisadas, uma por linha: primeiro as do sistema (\"prova local #id\", "
+                    + "de provas_da_banca), depois links da internet.") String fontes,
             @McpToolParam(description = McpConcurso.PARAM + " O simulado e o bloco final ficam nesse concurso.",
                     required = false) String concurso,
             @McpToolParam(description = "multipla_escolha (padrão) ou certo_errado (Cebraspe).", required = false)
@@ -394,8 +446,29 @@ public class ExamMcpTools {
             if (profile == null) {
                 throw new IllegalArgumentException("Informe perfilId (estrutura_do_edital) ou um concurso com perfil ligado.");
             }
+            checkLocalExams(banca, fontes);
             return examService.create(profile, prova, titulo, banca, tempoMinutos, estiloDaBanca, fontes, formato);
         });
+    }
+
+    /**
+     * As provas reais da banca ja importadas sao a primeira fonte: com elas no sistema, 'fontes' cita ao menos duas
+     * (ou todas, se houver so uma) como "prova local #id"; provas da internet entram como complemento.
+     */
+    private void checkLocalExams(String banca, String fontes) {
+        List<Long> local = references.realExams(banca);
+        if (local.isEmpty()) {
+            return;
+        }
+        long cited = com.pdf2questao.question.BancaReferences.examIds(fontes).stream().filter(local::contains).count();
+        long needed = Math.min(2, local.size());
+        if (cited < needed) {
+            throw new IllegalArgumentException("O sistema tem " + local.size() + " provas reais da " + banca
+                    + " importadas (provas_da_banca). Leia-as primeiro com exemplos_da_banca(provaId=...) e cite ao "
+                    + "menos " + needed + " em 'fontes' como \"prova local #id\" (ids: " + local.stream()
+                    .map(id -> "#" + id).collect(java.util.stream.Collectors.joining(", ")) + "). Provas da internet "
+                    + "entram como complemento.");
+        }
     }
 
     public record ExamQuestion(
@@ -412,12 +485,25 @@ public class ExamMcpTools {
             String explicacao,
             @McpToolParam(description = "Padrão real em que se baseou (prova/questão ou tipo de questão da banca).")
             String inspiracao,
-            @McpToolParam(description = "Pegadinha da banca aplicada (ou \"questão direta\").") String pegadinha) {
+            @McpToolParam(description = "Pegadinha da banca aplicada (ou \"questão direta\").") String pegadinha,
+            @McpToolParam(description = "Ids das questões REAIS da banca importadas no sistema (exemplos_da_banca) "
+                    + "que esta questão segue como modelo de estrutura, profundidade e distratores, sem copiar. "
+                    + "Obrigatório (ao menos 1) quando o sistema tem questões reais da banca na disciplina.",
+                    required = false) List<Long> modelos) {
+
+        public ExamQuestion(String disciplina, String assunto, String textoBase, String enunciado,
+                            List<String> alternativas, String resposta, String explicacao, String inspiracao,
+                            String pegadinha) {
+            this(disciplina, assunto, textoBase, enunciado, alternativas, resposta, explicacao, inspiracao, pegadinha,
+                    null);
+        }
 
         QuestionDraft toDraft() {
+            String models = modelos == null || modelos.isEmpty() ? "" : "\nModelos (questões reais do sistema): "
+                    + String.join(", ", modelos.stream().map(id -> "questão local #" + id).toList());
             String explanation = McpText.blank(explicacao) ? null : explicacao.strip()
                     + (McpText.blank(pegadinha) ? "" : "\n\nPegadinha: " + pegadinha.strip())
-                    + (McpText.blank(inspiracao) ? "" : "\nInspirada em: " + inspiracao.strip());
+                    + (McpText.blank(inspiracao) ? "" : "\nInspirada em: " + inspiracao.strip()) + models;
             return new QuestionDraft(enunciado, alternativas, resposta, null, null, disciplina, assunto, explanation,
                     textoBase);
         }
@@ -425,7 +511,8 @@ public class ExamMcpTools {
 
     @McpTool(name = "adicionar_questoes",
             description = "Acrescenta até 5 questões ao rascunho do simulado. Cada uma precisa de disciplina do perfil, "
-                    + "gabarito comentado, inspiração e pegadinha. Devolve o que entrou, o que foi recusado (com o "
+                    + "gabarito comentado, inspiração e pegadinha e, quando o sistema tem questões reais da banca na "
+                    + "disciplina, 'modelos' com os ids das que ela segue (exemplos_da_banca com disciplina e assunto). Devolve o que entrou, o que foi recusado (com o "
                     + "motivo) e quanto falta por disciplina.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false))
     public AddResult addQuestions(
@@ -433,13 +520,19 @@ public class ExamMcpTools {
             @McpToolParam(description = "De 1 a 5 questões.") List<ExamQuestion> questoes) {
         List<String> missing = new ArrayList<>();
         List<QuestionDraft> drafts = new ArrayList<>();
+        String banca = examService.banca(simuladoId);
         for (int i = 0; i < (questoes == null ? 0 : questoes.size()); i++) {
             ExamQuestion q = questoes.get(i);
             if (McpText.blank(q.inspiracao()) || McpText.blank(q.pegadinha())) {
                 missing.add("Questão " + (i + 1) + ": informe 'inspiracao' e 'pegadinha'.");
-            } else {
-                drafts.add(q.toDraft());
+                continue;
             }
+            String models = missingModels(banca, q);
+            if (models != null) {
+                missing.add("Questão " + (i + 1) + ": " + models);
+                continue;
+            }
+            drafts.add(q.toDraft());
         }
         if (drafts.isEmpty()) {
             throw new IllegalArgumentException(missing.isEmpty() ? "Envie ao menos uma questão." : String.join(" ", missing));
@@ -451,6 +544,29 @@ public class ExamMcpTools {
         List<String> refused = new ArrayList<>(missing);
         refused.addAll(result.recusadas());
         return new AddResult(result.gravadas(), refused, result.status());
+    }
+
+    /**
+     * Quando o sistema tem questoes reais da banca na disciplina, a questao do simulado precisa citar em 'modelos' ao
+     * menos uma delas (a internet so complementa). Devolve o motivo da recusa, ou null se esta ok.
+     */
+    private String missingModels(String banca, ExamQuestion q) {
+        if (McpText.blank(banca)) {
+            return null;
+        }
+        long available = references.available(banca, q.disciplina());
+        if (available == 0) {
+            return null;
+        }
+        List<Long> valid = references.validQuestions(banca, q.modelos());
+        if (!valid.isEmpty()) {
+            return null;
+        }
+        List<Long> given = q.modelos() == null ? List.of() : q.modelos();
+        return "o sistema tem " + available + " questões REAIS da " + banca + " em \"" + q.disciplina() + "\". Leia "
+                + "as do assunto com exemplos_da_banca(banca, disciplina, assunto) e informe em 'modelos' o id da(s) "
+                + "que esta questão segue" + (given.isEmpty() ? "." : " (" + given.stream().map(id -> "#" + id)
+                .collect(java.util.stream.Collectors.joining(", ")) + " não são questões reais da " + banca + ").");
     }
 
     public record FixedQuestion(int numero, String disciplina, String resposta, String link) {
