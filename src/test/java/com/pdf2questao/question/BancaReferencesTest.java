@@ -19,6 +19,11 @@ class BancaReferencesTest {
         assertFalse(BancaReferences.sameSubject("Direito Tributário", "Direito Constitucional"));
         assertFalse(BancaReferences.sameSubject("Contabilidade Geral", "Contabilidade Pública"));
         assertFalse(BancaReferences.sameSubject("Português", null));
+        // Mesmo conteúdo com nomes diferentes: AFO e Direito Financeiro.
+        assertTrue(BancaReferences.sameSubject("AFO", "Direito Financeiro"));
+        assertTrue(BancaReferences.sameSubject("Direito Financeiro e Finanças Públicas", "Administração Financeira e Orçamentária"));
+        assertFalse(BancaReferences.sameSubject("AFO", "Matemática Financeira"));
+        assertFalse(BancaReferences.sameSubject("Direito Financeiro", "Contabilidade Pública"));
     }
 
     @Test

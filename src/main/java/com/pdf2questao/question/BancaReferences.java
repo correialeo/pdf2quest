@@ -170,6 +170,10 @@ public class BancaReferences {
         if (a == null || b == null) {
             return false;
         }
+        String fa = family(a);
+        if (fa != null && fa.equals(family(b))) {
+            return true;
+        }
         List<String> ta = tokens(a);
         List<String> tb = tokens(b);
         if (ta.isEmpty() || tb.isEmpty()) {
@@ -183,6 +187,21 @@ public class BancaReferences {
         List<String> shorter = ta.size() <= tb.size() ? ta : tb;
         List<String> longer = shorter == ta ? tb : ta;
         return shorter.stream().allMatch(t -> contains(longer, t));
+    }
+
+    /**
+     * Disciplinas com nomes diferentes nos editais e nas provas mas o mesmo conteudo cobrado pela banca. AFO, Direito
+     * Financeiro, Finanças Públicas e Orçamento Público cobram LRF, Lei 4.320, PPA/LDO/LOA e créditos adicionais: o
+     * modelo de uma serve para a outra. (Contabilidade Pública fica fora: é MCASP/PCASP.)
+     */
+    static String family(String subject) {
+        String n = norm(subject);
+        if (n.equals("afo") || n.contains("administracao financeira") || n.contains("direito financeiro")
+                || n.contains("financas publicas") || n.contains("orcamento publico")
+                || n.startsWith("afo ") || n.contains(" afo")) {
+            return "financas-publicas";
+        }
+        return null;
     }
 
     private static String acronym(List<String> tokens) {
