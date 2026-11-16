@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 /**
  * Aula em slides: cada linha "=== Titulo" abre um slide (uma pagina por assunto, ex.: DFC numa, DMPL noutra) e cada
  * linha "[[questao N]]" poe ali a questao N de fixacao da aula. Aula sem "===" continua sendo uma pagina so.
- * Caixas: ":::regra Titulo", ":::pegadinha", ":::exemplo", ":::dica" ate ":::" viram cartoes coloridos; dentro de
+ * Caixas: ":::regra Titulo", ":::pegadinha", ":::exemplo", ":::dica", ":::simples" (o conceito sem jargao) ate ":::" viram cartoes coloridos; dentro de
  * ":::lado" (ou de qualquer caixa), "+++" separa colunas lado a lado (ex.: tabela de entrada | resultado).
  * Conceitos: "=== Titulo {#id}" e ":::regra Titulo {#id}" declaram o conceito ensinado ali; as perguntas de quiz da
  * aula dizem que conceito cobram, e o sistema confere que ele existe (o quiz nao cobra o que a aula nao ensinou).
@@ -18,10 +18,10 @@ import java.util.regex.Pattern;
 public final class LessonSlides {
 
     static final Pattern SLIDE = Pattern.compile("^===\\s*(.+?)\\s*=*\\s*$");
-    static final Pattern BOX = Pattern.compile("^:::\\s*(regra|pegadinha|exemplo|dica|lado)\\b\\s*(.*)$",
+    static final Pattern BOX = Pattern.compile("^:::\\s*(regra|pegadinha|exemplo|dica|simples|lado)\\b\\s*(.*)$",
             Pattern.CASE_INSENSITIVE);
     static final java.util.Map<String, String> BOX_TITLES = java.util.Map.of("regra", "Regra", "pegadinha",
-            "Pegadinha da banca", "exemplo", "Exemplo", "dica", "Dica", "lado", "");
+            "Pegadinha da banca", "exemplo", "Exemplo", "dica", "Dica", "simples", "Em palavras simples", "lado", "");
     /** Identificador de conceito no fim de um titulo: "{#rp-desbloqueio}". */
     static final Pattern CONCEPT_ID = Pattern.compile("\\s*\\{#([a-z0-9][a-z0-9-]*)}\\s*$");
     static final Pattern QUESTION = Pattern.compile("^\\[\\[\\s*quest[aã]o\\s+(\\d+)\\s*]]$", Pattern.CASE_INSENSITIVE);

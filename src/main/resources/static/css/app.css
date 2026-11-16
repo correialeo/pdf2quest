@@ -1855,6 +1855,9 @@ html.sidebar-collapsed .workspace-switch {
 .lesson-box-exemplo .lesson-box-title { color: var(--ok); }
 .lesson-box-dica { border-color: color-mix(in srgb, var(--guess) 35%, transparent); background: color-mix(in srgb, var(--guess) 7%, var(--bs-body-bg)); }
 .lesson-box-dica .lesson-box-title { color: var(--guess); }
+.lesson-box-simples { border-color: color-mix(in srgb, var(--bs-info) 40%, transparent); background: color-mix(in srgb, var(--bs-info) 8%, var(--bs-body-bg)); }
+.lesson-box-simples .lesson-box-title { color: var(--bs-info-text-emphasis); }
+.lesson-box-simples .lesson-box-title::before { content: "💡 "; }
 .lesson-box-lado { border: 0; padding: 0; background: none; }
 .lesson-box table { background: var(--bs-body-bg); margin: .25rem 0 .5rem; }
 .lesson-cols { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }

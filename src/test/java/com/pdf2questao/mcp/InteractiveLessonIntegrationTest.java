@@ -162,6 +162,37 @@ class InteractiveLessonIntegrationTest {
     }
 
     @Test
+    void criarAulaConfereADidaticaEMontaRoteiroEGlossario() {
+        var t = tools.registerExcerpt("https://www.planalto.gov.br/ccivil_03/leis/l4320.htm", "Lei 4.320, art. 36",
+                "Art. 36. Consideram-se Restos a Pagar as despesas empenhadas mas não pagas até o dia 31 de dezembro "
+                        + "distinguindo-se as processadas das não processadas.", "curl do HTML do Planalto, recorte do art. 36");
+        String link = "[Lei 4.320](https://www.planalto.gov.br/ccivil_03/leis/l4320.htm)";
+        String texto = "Explicação em texto corrido do conceito, passo a passo, para quem nunca viu o assunto. ".repeat(12);
+        String aula = "=== Inscrição {#regra}\n" + texto + "A despesa vira RP no fim do ano.\n:::simples\nÉ a conta "
+                + "que ficou para janeiro.\n:::\n[[questão 1]]\n=== Cancelamento {#rp-cancelamento}\n" + texto
+                + "\n:::simples\nÉ riscar a conta da lista.\n:::\n[[questão 2]]\n[[questão 3]]";
+        var cobertura = List.of(new LessonMcpTools.EditalItem("Restos a pagar: inscrição", List.of("regra")),
+                new LessonMcpTools.EditalItem("cancelamento", List.of("rp-cancelamento")));
+
+        var recusada = assertThrows(IllegalArgumentException.class, () -> tools.createLesson("RP", "AFO",
+                "Restos a pagar: inscrição e cancelamento", aula, link, null, null, null, null,
+                LessonMcpToolsIntegrationTest.fixacao(), LessonMcpToolsIntegrationTest.ESTILO,
+                LessonMcpToolsIntegrationTest.REFS, null, List.of(t.trechoId()), cobertura.subList(0, 1), null));
+        assertTrue(recusada.getMessage().contains("cancelamento"), recusada.getMessage());
+        assertTrue(recusada.getMessage().contains("[RP]"), "sigla sem explicação: " + recusada.getMessage());
+
+        var criada = tools.createLesson("RP", "AFO", "Restos a pagar: inscrição e cancelamento", aula, link, null,
+                null, null, null, LessonMcpToolsIntegrationTest.fixacao(), LessonMcpToolsIntegrationTest.ESTILO,
+                LessonMcpToolsIntegrationTest.REFS, null, List.of(t.trechoId()), cobertura,
+                List.of(new LessonMcpTools.Term("RP", "restos a pagar: despesa empenhada e não paga até 31/12")));
+        assertEquals(5, criada.slides(), "roteiro do edital, 2 de conteúdo, glossário e fontes");
+        String conteudo = lessonService.find(criada.aulaId()).getContent();
+        assertTrue(conteudo.startsWith("=== O que o edital cobra"), conteudo);
+        assertTrue(conteudo.contains("| cancelamento | slide 3: Cancelamento |"), conteudo);
+        assertTrue(conteudo.contains("=== Glossário") && conteudo.indexOf("=== Glossário") < conteudo.indexOf("=== Fontes"));
+    }
+
+    @Test
     void trechoLiteralEExigidoParaOArtigoCitado() {
         String texto = "Art. 42. É vedado ao titular de Poder ou órgão referido no art. 20, nos últimos dois "
                 + "quadrimestres do seu mandato, contrair obrigação de despesa que não possa ser cumprida integralmente "

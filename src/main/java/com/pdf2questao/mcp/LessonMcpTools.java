@@ -82,14 +82,24 @@ public class LessonMcpTools {
                 hoje que ela cobre; em 'fontes', só o que você LEU, cada fonte com o link (URL)), no nível dele (use o \\
                 desempenho), EM SLIDES (veja a descrição de criar_aula: caixas :::regra/:::pegadinha/:::exemplo e \\
                 exemplos com os dados de entrada e o resultado lado a lado): um slide ("=== Título") por assunto do tópico (ex.: DFC num, DMPL noutro), \\
-                cada um com a regra, a exceção e a pegadinha da banca, do que mais cai ao que menos cai (sem número \\
+                cada um com a explicação simples (:::simples), a explicação em texto corrido, a regra, a exceção e a pegadinha da banca, do que mais cai ao que menos cai (sem número \\
                 de item de norma que a banca não cobra, sem o que está fora do edital e sem bastidor da pesquisa), e \\
                 logo depois de cada explicação uma questão de fixação no nível da prova ("[[questão N]]", enviadas \\
                 em perguntasDaAula com estiloDaBanca e referencias, cada uma com 'conceitos' = o {#id} do slide, e \\
-                com números, nomes e estrutura de dados DIFERENTES do exemplo do slide). Cada conceito tem definição \\
-                curta, o porquê, um exemplo com dados e a pegadinha de prova; nenhuma regra solta. Feche com um slide de quadro comparativo e um \\
+                com números, nomes e estrutura de dados DIFERENTES do exemplo do slide). Cada conceito tem a \\
+                explicação simples, a definição, o porquê, um exemplo com dados comentado e a pegadinha de prova; nenhuma regra solta. Feche com um slide de quadro comparativo e um \\
                 de resumo de meia página (é ele que volta na revisão). Para lei \\
                 ou norma, use a redação vigente confirmada na fonte oficial e cite o dispositivo.
+                DIDÁTICA (o ponto mais importante da aula). O usuário não é especialista e estuda só por aqui: se \\
+                ele precisar perguntar a outra IA, a aula falhou. A aula não precisa ir a todo detalhe, mas tem de \\
+                explicar BEM tudo o que o item do edital cobra. Antes de escrever, quebre o tópico do edital em \\
+                itens e planeje um slide (ou mais) para cada um: isso vai em coberturaEdital, e item sem slide é \\
+                recusado. Em cada slide: para que serve, a caixa :::simples (analogia, sem jargão), a explicação em \\
+                texto corrido (o que é, por quê, como funciona passo a passo), o exemplo com a leitura linha a \\
+                linha, e só então regra, exceção e pegadinha. Todo termo técnico e toda sigla explicados na \\
+                primeira vez (ou em glossario); pré-requisito que ele pode não ter, explicado em 2 ou 3 frases. \\
+                Prefira mais slides a slides resumidos. Faça o TESTE DO LEIGO antes de gravar (descrição de \\
+                criar_aula).
                 COLETA DA FONTE EM TEXTO LITERAL (antes de escrever). O WebFetch devolve um RESUMO da página, não o \\
                 texto: não escreva a aula a partir dele. Para cada fonte: baixe com Bash (curl -sL URL > f.html; PDF: \\
                 curl -sLo f.pdf URL && pdftotext -layout f.pdf f.txt), leia o arquivo em partes (várias páginas e \\
@@ -98,8 +108,9 @@ public class LessonMcpTools {
                 de criar_aula. Todo artigo citado precisa de um trecho gravado. Se a fonte não abrir, procure outro \\
                 site oficial (Câmara, Senado, LexML, normas.leg.br, documentação oficial do produto); só dê algo por \\
                 não confirmado depois de pelo menos duas tentativas diferentes, em 'naoConfirmado' e 'tentativas'. \\
-                Escreva cada conceito a partir do trecho: definição curta, o porquê, um exemplo com dados e a \\
-                pegadinha. Nunca escreva da memória o que a fonte deveria dizer, nem leve isso para o quiz.
+                O que a norma ou a fonte DIZ (regra, prazo, percentual, redação) sai do trecho; a explicação, a \\
+                analogia e o passo a passo são seus, com suas palavras (aula não é paráfrase de trecho). Nunca \\
+                escreva da memória o que a fonte deveria dizer, nem leve isso para o quiz.
 
                 FLASHCARDS. Logo depois de criar a aula, crie os cartões dela com criar_flashcards (um ou mais \\
                 por conceito; eles voltam nas revisões, antes das questões).
@@ -137,8 +148,30 @@ public class LessonMcpTools {
             + "põe ali a questão N de 'perguntasDaAula' para fixar o que acabou de ser explicado (nível prova, com "
             + "estiloDaBanca e referencias). Toda questão precisa aparecer em algum slide. As fontes viram o último "
             + "slide sozinhas: não escreva bastidor (ferramenta que falhou, como leu o PDF) no conteúdo. "
-            + "ESCRITA: um conceito por slide, frases curtas, no máximo 5 tópicos seguidos; destaque em caixas "
-            + "\":::regra Título\", \":::pegadinha\", \":::exemplo Título\" ou \":::dica\" fechadas com \":::\". "
+            + "DIDÁTICA (o sistema confere e recusa): o aluno NÃO é da área e não pode precisar de outra fonte para "
+            + "entender. A aula não precisa esgotar o assunto, mas tudo o que ela se propõe a ensinar (todo o item "
+            + "do edital) tem de ficar BEM explicado. Um conceito por slide, nesta ordem: (1) para que serve / que "
+            + "problema resolve, ligando ao slide anterior; (2) caixa \":::simples\" (obrigatória em todo slide de "
+            + "conteúdo): o conceito como você explicaria a um colega de outra área, com analogia ou situação do dia "
+            + "a dia, sem jargão; (3) a explicação técnica em TEXTO CORRIDO (mínimo "
+            + com.pdf2questao.aula.LessonDidactics.MIN_PROSE + " caracteres por slide, fora tabela e código): o que "
+            + "é, por que a regra existe, como funciona passo a passo; lista e tabela só organizam o que o texto já "
+            + "explicou; (4) exemplo com dados e, depois dele, a leitura do exemplo linha a linha (de onde saiu cada "
+            + "número ou lançamento); (5) regra, exceção e pegadinha. TERMOS: todo termo técnico e toda sigla é "
+            + "explicado na primeira vez (\"variação patrimonial aumentativa (VPA): o que aumenta o patrimônio "
+            + "líquido\") ou vai em 'glossario'; não use um termo que a aula ainda não explicou; pré-requisito que "
+            + "o aluno pode não ter (ex.: débito e crédito, derivada, o que é empenho) ganha 2 ou 3 frases antes de "
+            + "ser usado. COMPLETO: se o título do slide ou o edital fala em X, o slide explica X (não só cita); "
+            + "'coberturaEdital' liga cada item do tópico do edital ao slide que o ensina, e item sem slide é "
+            + "recusado. Assunto grande = mais slides, nunca explicação encurtada. FIDELIDADE x EXPLICAÇÃO: o que a "
+            + "norma ou a fonte DIZ (regra, prazo, percentual, redação) vem do trecho literal; a explicação, a "
+            + "analogia, o passo a passo e o pré-requisito são trabalho seu, com suas palavras: não escreva a aula "
+            + "como paráfrase dos trechos. TESTE DO LEIGO antes de gravar: releia cada slide como quem nunca viu o "
+            + "assunto; se sobrar um \"o que é isso?\", \"por quê?\" ou \"de onde veio esse número?\", responda no "
+            + "próprio slide; cada questão de fixação tem de ser respondível só com o que o slide explicou. "
+            + "Slides de fechamento (título começando com Resumo, Quadro ou Comparativo) dispensam a caixa simples. "
+            + "Destaque em caixas \":::regra Título\", \":::pegadinha\", \":::exemplo Título\", \":::dica\" ou "
+            + "\":::simples\" fechadas com \":::\". "
             + "TODO exemplo é concreto: mostre os DADOS de entrada (tabelas pequenas, 3 a 4 linhas, com nomes do "
             + "contexto do concurso, ex.: contribuinte e debitos) e o RESULTADO, lado a lado com \"+++\" entre as "
             + "colunas da caixa; nunca use nome solto (esq, dir, df, x) sem mostrar o que tem dentro. Explique a regra "
@@ -147,8 +180,8 @@ public class LessonMcpTools {
             + "{#rp-desbloqueio}\" (minúsculas, números e hífen); uma caixa pode declarar um conceito próprio, "
             + "\":::pegadinha Prazo {#rp-prazo}\". Cada questão de fixação e cada pergunta de quiz da aula diz em "
             + "'conceitos' o(s) id(s) que cobra; o sistema recusa conceito que não está na aula. "
-            + "CADA CONCEITO TEM: definição curta, o porquê da regra, um exemplo com dados e a pegadinha de prova; "
-            + "nenhuma regra solta, sem o caso que a mostra. "
+            + "CADA CONCEITO TEM: a explicação simples, a definição, o porquê da regra, um exemplo com dados "
+            + "comentado e a pegadinha de prova; nenhuma regra solta, sem o caso que a mostra. "
             + "DADOS DIFERENTES: a questão de fixação não reaproveita os valores, os nomes de entidade nem a mesma "
             + "estrutura de dados do exemplo do slide (o aluno tem de aplicar a regra a um caso novo, não "
             + "reconhecer o exemplo). O sistema recusa a questão que repete mais de "
@@ -218,9 +251,54 @@ public class LessonMcpTools {
             @McpToolParam(description = "Com perguntasDaAula: multipla_escolha (padrão) ou certo_errado.",
                     required = false) String formato,
             @McpToolParam(description = "Ids dos trechos LITERAIS gravados com registrar_trecho (mínimo 1): todo "
-                    + "artigo citado na aula precisa estar num deles (ou em naoConfirmado).") List<Long> trechos) {
+                    + "artigo citado na aula precisa estar num deles (ou em naoConfirmado).") List<Long> trechos,
+            @McpToolParam(description = COVERAGE_PARAM) List<EditalItem> coberturaEdital,
+            @McpToolParam(description = GLOSSARY_PARAM, required = false) List<Term> glossario) {
         return createLesson(titulo, disciplina, topicoEdital, conteudo, fontes, tarefaId, concurso, naoConfirmado,
-                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, trechos, true);
+                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, trechos, true,
+                new Didactics(coberturaEdital, glossario));
+    }
+
+    private static final String COVERAGE_PARAM = "Obrigatório. O tópico do edital quebrado em itens (com as palavras "
+            + "do edital; tudo o que o tópico cita precisa aparecer em algum item) e, em cada um, o(s) conceito(s) "
+            + "{#id} do slide que o ENSINA. Vira o slide de abertura \"O que o edital cobra\". Item sem slide é "
+            + "recusado: escreva o slide.";
+    private static final String GLOSSARY_PARAM = "Termos técnicos e siglas da aula com o significado em linguagem "
+            + "simples (uma frase). Vira o slide \"Glossário\". Sigla que a aula usa sem explicar no texto precisa "
+            + "estar aqui.";
+
+    public record EditalItem(
+            @McpToolParam(description = "Item do tópico do edital, com as palavras do edital.") String item,
+            @McpToolParam(description = "Conceito(s) {#id} do(s) slide(s) que ensinam o item.") List<String> conceitos) {
+    }
+
+    public record Term(
+            @McpToolParam(description = "Termo técnico ou sigla.") String termo,
+            @McpToolParam(description = "O que é, em uma frase simples (sigla: o nome por extenso e o que é).")
+            String significado) {
+    }
+
+    /** Cobertura do edital e glossario informados pela ferramenta (nulo = chamada antiga ou teste: sem conferencia). */
+    private record Didactics(List<EditalItem> cobertura, List<Term> glossario) {
+
+        List<com.pdf2questao.aula.LessonDidactics.EditalItem> coverage() {
+            return cobertura == null ? null : cobertura.stream().filter(java.util.Objects::nonNull)
+                    .map(i -> new com.pdf2questao.aula.LessonDidactics.EditalItem(i.item(), i.conceitos())).toList();
+        }
+
+        List<com.pdf2questao.aula.LessonDidactics.Term> terms() {
+            return glossario == null ? null : glossario.stream().filter(java.util.Objects::nonNull)
+                    .map(t -> new com.pdf2questao.aula.LessonDidactics.Term(t.termo(), t.significado())).toList();
+        }
+    }
+
+    /** Sem cobertura do edital nem glossario (chamadas antigas e testes): a didatica nao e conferida. */
+    public LessonCreated createLesson(String titulo, String disciplina, String topicoEdital, String conteudo,
+                                      String fontes, Long tarefaId, String concurso, String naoConfirmado,
+                                      String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
+                                      String referencias, String formato, List<Long> trechos) {
+        return createLesson(titulo, disciplina, topicoEdital, conteudo, fontes, tarefaId, concurso, naoConfirmado,
+                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, trechos, true, null);
     }
 
     /** Sem trechos (chamadas antigas e testes): so confere os artigos citados. */
@@ -229,20 +307,35 @@ public class LessonMcpTools {
                                       String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
                                       String referencias, String formato) {
         return createLesson(titulo, disciplina, topicoEdital, conteudo, fontes, tarefaId, concurso, naoConfirmado,
-                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, null, false);
+                tentativas, perguntasDaAula, estiloDaBanca, referencias, formato, null, false, null);
     }
 
     private LessonCreated createLesson(String titulo, String disciplina, String topicoEdital, String conteudo,
                                        String fontes, Long tarefaId, String concurso, String naoConfirmado,
                                        String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
-                                       String referencias, String formato, List<Long> trechos, boolean requireExcerpts) {
+                                       String referencias, String formato, List<Long> trechos, boolean requireExcerpts,
+                                       Didactics didactics) {
         List<com.pdf2questao.aula.SourceExcerpt> excerpts = checkExcerpts(conteudo, trechos, naoConfirmado,
                 requireExcerpts);
-        String content = withSources(conteudo, fontes, naoConfirmado, tentativas, excerpts);
+        String content = withSources(didactic(conteudo, topicoEdital, didactics), fontes, naoConfirmado, tentativas,
+                excerpts);
         Lesson lesson = mcpConcurso.in(concurso, () -> lessonService.createWithFixation(titulo, disciplina,
                 topicoEdital, content, tarefaId, toNew(perguntasDaAula), formato, estiloDaBanca, referencias));
         lessonService.linkExcerpts(lesson.getId(), trechos);
         return lessonCreated(lesson);
+    }
+
+    /**
+     * Confere a didatica (edital coberto, explicacao simples e em texto em cada slide, siglas explicadas) e monta o
+     * slide de abertura "O que o edital cobra" e o de glossario.
+     */
+    private static String didactic(String conteudo, String topicoEdital, Didactics didactics) {
+        if (didactics == null || conteudo == null || !com.pdf2questao.aula.LessonSlides.isSlides(conteudo)) {
+            return conteudo;   // sem slides, requireSlides recusa adiante com a mensagem certa
+        }
+        com.pdf2questao.aula.LessonDidactics.check(conteudo, topicoEdital, didactics.coverage(), didactics.terms());
+        return com.pdf2questao.aula.LessonDidactics.roadmapSlide(conteudo, topicoEdital, didactics.coverage())
+                + conteudo + com.pdf2questao.aula.LessonDidactics.glossarySlide(didactics.terms());
     }
 
     private List<com.pdf2questao.aula.SourceExcerpt> checkExcerpts(String conteudo, List<Long> trechos,
@@ -268,7 +361,9 @@ public class LessonMcpTools {
 
     @McpTool(name = "reescrever_aula",
             description = "Reescreve o conteúdo de uma aula já criada (os quizzes dela continuam). Mesmas regras de "
-                    + "criar_aula para fontes, naoConfirmado e tentativas. " + SLIDES_HELP + " Enviar perguntasDaAula "
+                    + "criar_aula para fontes, naoConfirmado, tentativas, coberturaEdital e glossario. Use também "
+                    + "quando o usuário disser que uma aula ficou confusa ou incompleta: reescreva-a pelas regras "
+                    + "de DIDÁTICA abaixo. " + SLIDES_HELP + " Enviar perguntasDaAula "
                     + "substitui as questões de fixação anteriores (e as respostas delas); se a aula tem erros em "
                     + "quizzes anteriores, retome-os em errosRetomados.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true, idempotentHint = false))
@@ -290,9 +385,21 @@ public class LessonMcpTools {
             @McpToolParam(description = "Ids das perguntas erradas (erros_quiz_anteriores da aula) que a fixação "
                     + "retoma.", required = false) List<Long> errosRetomados,
             @McpToolParam(description = "Ids dos trechos literais (registrar_trecho), como em criar_aula.")
-            List<Long> trechos) {
+            List<Long> trechos,
+            @McpToolParam(description = COVERAGE_PARAM) List<EditalItem> coberturaEdital,
+            @McpToolParam(description = GLOSSARY_PARAM, required = false) List<Term> glossario) {
         return rewriteLesson(aulaId, titulo, conteudo, fontes, naoConfirmado, tentativas, perguntasDaAula,
-                estiloDaBanca, referencias, formato, errosRetomados, trechos, true);
+                estiloDaBanca, referencias, formato, errosRetomados, trechos, true,
+                new Didactics(coberturaEdital, glossario));
+    }
+
+    /** Sem cobertura do edital nem glossario (chamadas antigas e testes). */
+    public LessonCreated rewriteLesson(Long aulaId, String titulo, String conteudo, String fontes, String naoConfirmado,
+                                       String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
+                                       String referencias, String formato, List<Long> errosRetomados,
+                                       List<Long> trechos) {
+        return rewriteLesson(aulaId, titulo, conteudo, fontes, naoConfirmado, tentativas, perguntasDaAula,
+                estiloDaBanca, referencias, formato, errosRetomados, trechos, true, null);
     }
 
     /** Sem trechos (chamadas antigas e testes). */
@@ -300,16 +407,17 @@ public class LessonMcpTools {
                                        String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
                                        String referencias, String formato, List<Long> errosRetomados) {
         return rewriteLesson(aulaId, titulo, conteudo, fontes, naoConfirmado, tentativas, perguntasDaAula,
-                estiloDaBanca, referencias, formato, errosRetomados, null, false);
+                estiloDaBanca, referencias, formato, errosRetomados, null, false, null);
     }
 
     private LessonCreated rewriteLesson(Long aulaId, String titulo, String conteudo, String fontes, String naoConfirmado,
                                         String tentativas, List<QuizItem> perguntasDaAula, String estiloDaBanca,
                                         String referencias, String formato, List<Long> errosRetomados,
-                                        List<Long> trechos, boolean requireExcerpts) {
+                                        List<Long> trechos, boolean requireExcerpts, Didactics didactics) {
         List<com.pdf2questao.aula.SourceExcerpt> excerpts = checkExcerpts(conteudo, trechos, naoConfirmado,
                 requireExcerpts);
-        String content = withSources(conteudo, fontes, naoConfirmado, tentativas, excerpts);
+        String topic = didactics == null ? null : lessonService.find(aulaId).getEditalTopic();
+        String content = withSources(didactic(conteudo, topic, didactics), fontes, naoConfirmado, tentativas, excerpts);
         Lesson lesson = lessonService.rewriteWithFixation(aulaId, titulo, content, toNew(perguntasDaAula), formato,
                 estiloDaBanca, referencias, errosRetomados);
         lessonService.linkExcerpts(lesson.getId(), trechos);

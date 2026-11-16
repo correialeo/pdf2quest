@@ -125,7 +125,7 @@ public class LessonService {
     public static void requireSlides(String content, int multipleChoice) {
         int questions = multipleChoice + (int) LessonSlides.parseAll(content).blocks().stream()
                 .filter(LessonBlocks.Block::graded).count();
-        long slides = LessonSlides.parse(content).stream().filter(s -> !s.title().equalsIgnoreCase("Fontes")).count();
+        long slides = LessonSlides.parse(content).stream().filter(s -> !LessonDidactics.auxiliary(s.title())).count();
         if (slides < MIN_SLIDES || questions < MIN_FIXATION) {
             throw new IllegalArgumentException("A aula precisa ser em slides: ao menos " + MIN_SLIDES + " slides "
                     + "(linhas \"=== Título\", um por assunto do tópico) e ao menos " + MIN_FIXATION + " questões de "
@@ -135,7 +135,7 @@ public class LessonService {
                     + " questões. Se a ferramenta não tem o campo perguntasDaAula, reconecte o servidor MCP (/mcp).");
         }
         List<String> untagged = LessonSlides.parse(content).stream()
-                .filter(s -> !s.title().equalsIgnoreCase("Fontes") && s.concept() == null).map(LessonSlides.Slide::title)
+                .filter(s -> !LessonDidactics.auxiliary(s.title()) && s.concept() == null).map(LessonSlides.Slide::title)
                 .toList();
         if (!untagged.isEmpty()) {
             throw new IllegalArgumentException("Todo slide declara o conceito que ensina, no fim do título: "
